@@ -4,29 +4,36 @@ with import (builtins.fetchTarball {
   sha256 = "1h8c0mk6jlxdmjqch6ckj30pax3hqh6kwjlvp2021x3z4pdzrn9p";
 }) {};
 let
-  check_role_membership = stdenv.mkDerivation {
-    name = "check_role_membership";
-    buildInputs = [ postgresql_13 ];
-    src = ./check_role_membership;
-    installPhase = ''
-      mkdir -p $out/bin
-      install -D check_role_membership.so -t $out/lib
+  check_role_membership = { postgresql }:
+    stdenv.mkDerivation {
+      name = "check_role_membership";
+      buildInputs = [ postgresql ];
+      src = ./check_role_membership;
+      installPhase = ''
+        mkdir -p $out/bin
+        install -D check_role_membership.so -t $out/lib
+      '';
+    };
+  pgWithExt = { postgresql } :
+    let pg = postgresql.withPackages (p: [ (check_role_membership {inherit postgresql;}) ]);
+    in ''
+      tmpdir="$(mktemp -d)"
+
+      export PGDATA="$tmpdir"
+      export PGHOST="$tmpdir"
+      export PGUSER=postgres
+      export PGDATABASE=postgres
+
+      trap '${pg}/bin/pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
+
+      PGTZ=UTC ${pg}/bin/initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
+      ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"check_role_membership\" -c listen_addresses=\"\" -k $PGDATA"
+
+      ${pg}/bin/psql
     '';
-  };
+  supautils-pg-12 = pkgs.writeShellScriptBin "supautils-pg-12" (pgWithExt { postgresql = postgresql_12; });
+  supautils-pg-13 = pkgs.writeShellScriptBin "supautils-pg-13" (pgWithExt { postgresql = postgresql_13; });
 in
-stdenv.mkDerivation {
-  name = "supautils";
-  buildInputs = [ (postgresql_13.withPackages (p: [ check_role_membership ])) ];
-  shellHook = ''
-    tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' sigint sigterm exit
-
-    export PGDATA="$tmpdir"
-    export PGHOST="$tmpdir"
-    export PGUSER=authenticator
-    export PGDATABASE=postgres
-
-    PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
-    pg_ctl start -o "-F -c shared_preload_libraries=\"check_role_membership\" -c listen_addresses=\"\" -k $PGDATA"
-  '';
+pkgs.mkShell {
+  buildInputs = [ supautils-pg-12 supautils-pg-13 ];
 }
