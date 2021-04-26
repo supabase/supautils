@@ -1,5 +1,6 @@
 #include "postgres.h"
 #include "tcop/utility.h"
+#include "miscadmin.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
@@ -52,21 +53,22 @@ void check_role_membership(PlannedStmt *pstmt,
 				{
 					AccessPriv *priv = (AccessPriv *) lfirst(item);
 					char *rolename = priv->priv_name;
+					bool isSuper = superuser_arg(GetUserId());
 
-					if (strcmp(rolename, "pg_read_server_files") == 0)
+					if (strcmp(rolename, "pg_read_server_files") == 0 && !isSuper)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Cannot GRANT \"%s\"", "pg_read_server_files")));
+								 errmsg("Only superusers can GRANT \"%s\"", "pg_read_server_files")));
 
-					if (strcmp(rolename, "pg_write_server_files") == 0)
+					if (strcmp(rolename, "pg_write_server_files") == 0 && !isSuper)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Cannot GRANT \"%s\"", "pg_write_server_files")));
+								 errmsg("Only superusers can GRANT \"%s\"", "pg_write_server_files")));
 
-					if (strcmp(rolename, "pg_execute_server_program") == 0)
+					if (strcmp(rolename, "pg_execute_server_program") == 0 && !isSuper)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Cannot GRANT \"%s\"", "pg_execute_server_program")));
+								 errmsg("Only superusers can GRANT \"%s\"", "pg_execute_server_program")));
 				}
 			}
 

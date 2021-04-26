@@ -29,7 +29,9 @@ let
       PGTZ=UTC ${pg}/bin/initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
       ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"check_role_membership\" -c listen_addresses=\"\" -k $PGDATA"
 
-      ${pg}/bin/psql
+      ${pg}/bin/createuser -d --no-inherit --no-createdb --createrole nosuper
+
+      ${pg}/bin/psql -U nosuper
     '';
   supautils-pg-12 = pkgs.writeShellScriptBin "supautils-pg-12" (pgWithExt { postgresql = postgresql_12; });
   supautils-pg-13 = pkgs.writeShellScriptBin "supautils-pg-13" (pgWithExt { postgresql = postgresql_13; });
