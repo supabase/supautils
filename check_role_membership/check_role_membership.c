@@ -58,6 +58,11 @@ void check_role_membership(PlannedStmt *pstmt,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 								 errmsg("Cannot GRANT \"%s\"", "pg_read_server_files")));
 
+					if (strcmp(rolename, "pg_write_server_files") == 0)
+						ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								 errmsg("Cannot GRANT \"%s\"", "pg_write_server_files")));
+
 					if (strcmp(rolename, "pg_execute_server_program") == 0)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
