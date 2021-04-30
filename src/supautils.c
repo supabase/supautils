@@ -11,7 +11,7 @@ void _PG_fini(void);
 
 static ProcessUtility_hook_type prev_utility_hook = NULL;
 
-static void check_role_membership(PlannedStmt *pstmt,
+static void check_role_super(PlannedStmt *pstmt,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
@@ -25,7 +25,7 @@ static void check_role_membership(PlannedStmt *pstmt,
 );
 
 static
-void check_role_membership(PlannedStmt *pstmt,
+void check_role_super(PlannedStmt *pstmt,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
@@ -93,7 +93,7 @@ void
 _PG_init(void)
 {
 	prev_utility_hook = ProcessUtility_hook;
-	ProcessUtility_hook = check_role_membership;
+	ProcessUtility_hook = check_role_super;
 }
 void
 _PG_fini(void)

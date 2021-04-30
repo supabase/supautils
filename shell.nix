@@ -4,18 +4,18 @@ with import (builtins.fetchTarball {
   sha256 = "1h8c0mk6jlxdmjqch6ckj30pax3hqh6kwjlvp2021x3z4pdzrn9p";
 }) {};
 let
-  check_role_membership = { postgresql }:
+  supautils = { postgresql }:
     stdenv.mkDerivation {
-      name = "check_role_membership";
+      name = "supautils";
       buildInputs = [ postgresql ];
-      src = ./check_role_membership;
+      src = ./.;
       installPhase = ''
         mkdir -p $out/bin
-        install -D check_role_membership.so -t $out/lib
+        install -D supautils.so -t $out/lib
       '';
     };
   pgWithExt = { postgresql } :
-    let pg = postgresql.withPackages (p: [ (check_role_membership {inherit postgresql;}) ]);
+    let pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
     in ''
       tmpdir="$(mktemp -d)"
 
@@ -27,7 +27,7 @@ let
       trap '${pg}/bin/pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
 
       PGTZ=UTC ${pg}/bin/initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
-      ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"check_role_membership\" -c listen_addresses=\"\" -k $PGDATA"
+      ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"supautils\" -c listen_addresses=\"\" -k $PGDATA"
 
       ${pg}/bin/createuser -d --no-inherit --no-createdb --createrole nosuper
 
