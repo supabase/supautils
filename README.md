@@ -11,7 +11,7 @@ Miscellaneous PostgreSQL library for Supabase.
 On `postgresql.conf`, add:
 
 ```
-shared_preload_libraries = 'check_role_membership'
+shared_preload_libraries = 'supautils'
 ```
 
 ### Development

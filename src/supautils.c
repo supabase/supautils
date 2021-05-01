@@ -11,7 +11,7 @@ void _PG_fini(void);
 
 static ProcessUtility_hook_type prev_utility_hook = NULL;
 
-static void check_role_super(PlannedStmt *pstmt,
+static void check_role(PlannedStmt *pstmt,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
@@ -25,7 +25,7 @@ static void check_role_super(PlannedStmt *pstmt,
 );
 
 static
-void check_role_super(PlannedStmt *pstmt,
+void check_role(PlannedStmt *pstmt,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
@@ -75,6 +75,49 @@ void check_role_super(PlannedStmt *pstmt,
 			break;
 		}
 
+		case T_AlterRoleStmt:
+		{
+			AlterRoleStmt *stmt = (AlterRoleStmt *) parsetree;
+			RoleSpec *role = stmt->role;
+			bool isSuper = superuser_arg(GetUserId());
+
+			// Return immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
+			if (role->roletype != ROLESPEC_CSTRING)
+				return;
+
+			if (strcmp(role->rolename, "anon") == 0 && !isSuper)
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_RESERVED_NAME),
+						 errmsg("The \"%s\" role is reserved by Supabase, only superusers can alter it.",
+								role->rolename)));
+			}
+
+		}
+
+	case T_DropRoleStmt:
+		{
+			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
+			ListCell *item;
+
+			bool isSuper = superuser_arg(GetUserId());
+
+			foreach(item, stmt->roles)
+			{
+				RoleSpec *role = lfirst(item);
+
+				if (strcmp(role->rolename, "anon") == 0 && !isSuper)
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_RESERVED_NAME),
+							 errmsg("The \"%s\" role is reserved by Supabase, only superusers can drop it",
+									role->rolename)));
+				}
+
+			}
+
+		}
+
 		default:
 			break;
 	}
@@ -93,7 +136,7 @@ void
 _PG_init(void)
 {
 	prev_utility_hook = ProcessUtility_hook;
-	ProcessUtility_hook = check_role_super;
+	ProcessUtility_hook = check_role;
 }
 void
 _PG_fini(void)
