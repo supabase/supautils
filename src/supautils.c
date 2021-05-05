@@ -1,6 +1,8 @@
 #include "postgres.h"
 #include "tcop/utility.h"
 #include "miscadmin.h"
+#include "tcop/utility.h"
+#include "utils/varlena.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
@@ -9,7 +11,11 @@ PG_MODULE_MAGIC;
 void _PG_init(void);
 void _PG_fini(void);
 
+static char *reserved_roles = NULL;
+
 static ProcessUtility_hook_type prev_utility_hook = NULL;
+
+static void load_params(void);
 
 static void check_role(PlannedStmt *pstmt,
 						const char *queryString,
@@ -81,41 +87,78 @@ void check_role(PlannedStmt *pstmt,
 			RoleSpec *role = stmt->role;
 			bool isSuper = superuser_arg(GetUserId());
 
+			List	   *reserve_list;
+			ListCell *cell;
+
 			// Return immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
 			if (role->roletype != ROLESPEC_CSTRING)
 				return;
 
-			if (strcmp(role->rolename, "anon") == 0 && !isSuper)
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
 			{
 				ereport(ERROR,
-						(errcode(ERRCODE_RESERVED_NAME),
-						 errmsg("The \"%s\" role is reserved by Supabase, only superusers can alter it.",
-								role->rolename)));
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+								"supautils.restricted_roles")));
 			}
 
-		}
-
-	case T_DropRoleStmt:
-		{
-			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
-			ListCell *item;
-
-			bool isSuper = superuser_arg(GetUserId());
-
-			foreach(item, stmt->roles)
+			foreach(cell, reserve_list)
 			{
-				RoleSpec *role = lfirst(item);
+				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(role->rolename, "anon") == 0 && !isSuper)
+				if (strcmp(role->rolename, reserved_role) == 0 && !isSuper)
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved by Supabase, only superusers can drop it",
+							 errmsg("The \"%s\" role is reserved, only superusers can alter it.",
 									role->rolename)));
 				}
 
 			}
 
+			list_free(reserve_list);
+
+			break;
+		}
+
+		case T_DropRoleStmt:
+		{
+			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
+			ListCell *item;
+			bool isSuper = superuser_arg(GetUserId());
+
+			List	   *reserve_list;
+			ListCell *cell;
+
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+								"supautils.restricted_roles")));
+			}
+
+			foreach(item, stmt->roles)
+			{
+				RoleSpec *role = lfirst(item);
+
+				foreach(cell, reserve_list)
+				{
+					const char *reserved_role = (const char *) lfirst(cell);
+
+					if (strcmp(role->rolename, reserved_role) == 0 && !isSuper)
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_RESERVED_NAME),
+								 errmsg("The \"%s\" role is reserved, only superusers can drop it",
+										role->rolename)));
+					}
+				}
+			}
+
+			list_free(reserve_list);
+
+			break;
 		}
 
 		default:
@@ -132,11 +175,25 @@ void check_role(PlannedStmt *pstmt,
 								dest, completionTag);
 }
 
+static
+void load_params(void)
+{
+	DefineCustomStringVariable("supautils.reserved_roles",
+							   "Non-superuser roles that can only be altered or dropped by superusers",
+							   NULL,
+							   &reserved_roles,
+							   NULL,
+							   PGC_POSTMASTER, 0,
+								 NULL, NULL, NULL);
+}
+
 void
 _PG_init(void)
 {
 	prev_utility_hook = ProcessUtility_hook;
 	ProcessUtility_hook = check_role;
+
+	load_params();
 }
 void
 _PG_fini(void)
