@@ -81,6 +81,42 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		}
 
+		case T_CreateRoleStmt:
+		{
+			CreateRoleStmt *stmt = (CreateRoleStmt *) parsetree;
+			const char *role = stmt->role;
+			bool isSuper = superuser_arg(GetUserId());
+
+			List	   *reserve_list;
+			ListCell *cell;
+
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+								"supautils.reserved_roles")));
+			}
+
+			foreach(cell, reserve_list)
+			{
+				const char *reserved_role = (const char *) lfirst(cell);
+
+				if (strcmp(role, reserved_role) == 0 && !isSuper)
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_RESERVED_NAME),
+							 errmsg("The \"%s\" role is reserved, only superusers can create it.",
+									role)));
+				}
+
+			}
+
+			list_free(reserve_list);
+
+			break;
+		};
+
 		case T_AlterRoleStmt:
 		{
 			AlterRoleStmt *stmt = (AlterRoleStmt *) parsetree;
@@ -99,7 +135,7 @@ void check_role(PlannedStmt *pstmt,
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.restricted_roles")));
+								"supautils.reserved_roles")));
 			}
 
 			foreach(cell, reserve_list)
@@ -135,7 +171,7 @@ void check_role(PlannedStmt *pstmt,
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.restricted_roles")));
+								"supautils.reserved_roles")));
 			}
 
 			foreach(item, stmt->roles)
@@ -179,7 +215,7 @@ static
 void load_params(void)
 {
 	DefineCustomStringVariable("supautils.reserved_roles",
-							   "Non-superuser roles that can only be altered or dropped by superusers",
+							   "Non-superuser roles that can only be created, altered or dropped by superusers",
 							   NULL,
 							   &reserved_roles,
 							   NULL,
