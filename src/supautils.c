@@ -157,6 +157,47 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		}
 
+		case T_RenameStmt:
+		{
+			RenameStmt *stmt = (RenameStmt *) parsetree;
+			bool isSuper = superuser_arg(GetUserId());
+
+			List	   *reserve_list;
+			ListCell *cell;
+
+			// Return immediately if not an ALTER ROLE
+			if(stmt->renameType != OBJECT_ROLE)
+				return;
+
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+								"supautils.reserved_roles")));
+
+			foreach(cell, reserve_list)
+			{
+				const char *reserved_role = (const char *) lfirst(cell);
+
+				if (strcmp(stmt->subname, reserved_role) == 0 && !isSuper)
+					ereport(ERROR,
+							(errcode(ERRCODE_RESERVED_NAME),
+							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
+									stmt->subname)));
+
+				if (strcmp(stmt->newname, reserved_role) == 0 && !isSuper)
+					ereport(ERROR,
+							(errcode(ERRCODE_RESERVED_NAME),
+							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
+									stmt->newname)));
+
+			}
+
+			list_free(reserve_list);
+
+			break;
+		}
+
 		case T_DropRoleStmt:
 		{
 			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
