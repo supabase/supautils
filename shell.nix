@@ -29,7 +29,7 @@ let
       PGTZ=UTC ${pg}/bin/initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
       ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"anon, authenticated, supabase_admin\" -c listen_addresses=\"\" -k $PGDATA"
 
-      ${pg}/bin/createuser -d --no-inherit --no-createdb --createrole nosuper
+      ${pg}/bin/createuser --no-inherit --no-createdb --createrole nosuper
 
       ${pg}/bin/psql -U nosuper
     '';

@@ -90,6 +90,9 @@ void check_role(PlannedStmt *pstmt,
 			List	   *reserve_list;
 			ListCell *cell;
 
+			if(!reserved_roles)
+				break;
+
 			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
 			{
 				ereport(ERROR,
@@ -126,9 +129,12 @@ void check_role(PlannedStmt *pstmt,
 			List	   *reserve_list;
 			ListCell *cell;
 
-			// Return immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
+			// Break immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
 			if (role->roletype != ROLESPEC_CSTRING)
-				return;
+				break;
+
+			if(!reserved_roles)
+				break;
 
 			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
 			{
@@ -165,9 +171,12 @@ void check_role(PlannedStmt *pstmt,
 			List	   *reserve_list;
 			ListCell *cell;
 
-			// Return immediately if not an ALTER ROLE
+			// Break immediately if not an ALTER ROLE
 			if(stmt->renameType != OBJECT_ROLE)
-				return;
+				break;
+
+			if(!reserved_roles)
+				break;
 
 			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
 				ereport(ERROR,
@@ -206,6 +215,9 @@ void check_role(PlannedStmt *pstmt,
 
 			List	   *reserve_list;
 			ListCell *cell;
+
+			if(!reserved_roles)
+				break;
 
 			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
 			{
