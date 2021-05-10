@@ -32,7 +32,7 @@ let
 
       options="-F -c listen_addresses=\"\" -k $PGDATA"
 
-      reserved_roles="supabase_storage_admin, anon, not_yet_created"
+      reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
 
       ext_options="-c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"$reserved_roles\""
 

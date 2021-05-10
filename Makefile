@@ -1,7 +1,7 @@
 MODULE_big = supautils
 SOURCES = src/supautils.c
 OBJS = src/supautils.o
-REGRESS = all
+REGRESS = reserved_roles
 REGRESS_OPTS = --inputdir=test \
 							 --use-existing  \
 							 --user=nosuper
