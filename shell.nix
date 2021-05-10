@@ -17,6 +17,8 @@ let
   pgWithExt = { postgresql } :
     let pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
     in ''
+      export PATH=${pg}/bin:"$PATH"
+
       tmpdir="$(mktemp -d)"
 
       export PGDATA="$tmpdir"
@@ -24,18 +26,25 @@ let
       export PGUSER=postgres
       export PGDATABASE=postgres
 
-      trap '${pg}/bin/pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
+      trap 'pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
 
-      PGTZ=UTC ${pg}/bin/initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
-      ${pg}/bin/pg_ctl start -o "-F -c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"anon, authenticated, supabase_admin\" -c listen_addresses=\"\" -k $PGDATA"
+      PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 
-      ${pg}/bin/createuser --no-inherit --no-createdb --createrole nosuper
+      options="-F -c listen_addresses=\"\" -k $PGDATA"
 
-      ${pg}/bin/psql -U nosuper
+      reserved_roles="supabase_storage_admin, anon, not_yet_created"
+
+      ext_options="-c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"$reserved_roles\""
+
+      pg_ctl start -o "$options" -o "$ext_options"
+
+      psql -v ON_ERROR_STOP=1 -f test/fixtures.sql
+
+      "$@"
     '';
-  supautils-pg-12 = pkgs.writeShellScriptBin "supautils-pg-12" (pgWithExt { postgresql = postgresql_12; });
-  supautils-pg-13 = pkgs.writeShellScriptBin "supautils-pg-13" (pgWithExt { postgresql = postgresql_13; });
+  supautils-with-pg-12 = writeShellScriptBin "supautils-with-pg-12" (pgWithExt { postgresql = postgresql_12; });
+  supautils-with-pg-13 = writeShellScriptBin "supautils-with-pg-13" (pgWithExt { postgresql = postgresql_13; });
 in
-pkgs.mkShell {
-  buildInputs = [ supautils-pg-12 supautils-pg-13 ];
+mkShell {
+  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 ];
 }

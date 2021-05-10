@@ -1,0 +1,2 @@
+create role not_yet_created;
+ERROR:  The "not_yet_created" role is reserved, only superusers can create it.
