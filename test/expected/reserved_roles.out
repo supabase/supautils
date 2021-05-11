@@ -1,9 +1,3 @@
--- can't create a reserved role
-create role reserved_but_not_yet_created;
-ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can create it.
--- can't create a reserved role, even if it exists
-create role anon;
-ERROR:  The "anon" role is reserved, only superusers can create it.
 -- cannot rename an existing role to a reserved role
 alter role fake rename to reserved_but_not_yet_created;
 ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can rename it.
@@ -20,3 +14,9 @@ drop role fake, supabase_storage_admin;
 ERROR:  The "supabase_storage_admin" role is reserved, only superusers can drop it
 drop role anon, fake;
 ERROR:  The "anon" role is reserved, only superusers can drop it
+-- cannot create a reserved role
+create role reserved_but_not_yet_created;
+ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can create it.
+-- cannot create a reserved role, even if it exists
+create role anon;
+ERROR:  The "anon" role is reserved, only superusers can create it.
