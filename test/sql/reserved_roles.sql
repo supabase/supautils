@@ -8,6 +8,11 @@ alter role supabase_storage_admin rename to another;
 alter role supabase_storage_admin nologin superuser;
 alter role supabase_storage_admin password 'pass';
 
+-- cannot bypass check by using current_user
+set role anon;
+alter role current_user password 'pass';
+reset role;
+
 -- cannot drop a reserved role
 drop role fake, supabase_storage_admin;
 drop role anon, fake;

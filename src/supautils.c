@@ -3,6 +3,7 @@
 #include "miscadmin.h"
 #include "tcop/utility.h"
 #include "utils/varlena.h"
+#include "utils/acl.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
@@ -120,17 +121,21 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		};
 
+		// ALTER ROLE <role> NOLOGIN SUPERUSER..
 		case T_AlterRoleStmt:
 		{
 			AlterRoleStmt *stmt = (AlterRoleStmt *) parsetree;
 			RoleSpec *role = stmt->role;
 			bool isSuper = superuser_arg(GetUserId());
+			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
+			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
+			const char *rolename = get_rolespec_name(role);
 
 			List	   *reserve_list;
 			ListCell *cell;
 
-			// Break immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
-			if (role->roletype != ROLESPEC_CSTRING)
+			// Break immediately if the role is PUBLIC
+			if (role->roletype == ROLESPEC_PUBLIC)
 				break;
 
 			if(!reserved_roles)
@@ -148,12 +153,12 @@ void check_role(PlannedStmt *pstmt,
 			{
 				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(role->rolename, reserved_role) == 0 && !isSuper)
+				if (strcmp(rolename, reserved_role) == 0 && !isSuper)
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
 							 errmsg("The \"%s\" role is reserved, only superusers can alter it.",
-									role->rolename)));
+									rolename)));
 				}
 
 			}
@@ -230,6 +235,10 @@ void check_role(PlannedStmt *pstmt,
 			foreach(item, stmt->roles)
 			{
 				RoleSpec *role = lfirst(item);
+
+				// Break immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
+				if (role->roletype != ROLESPEC_CSTRING)
+					break;
 
 				foreach(cell, reserve_list)
 				{

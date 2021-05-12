@@ -3,7 +3,8 @@ create role supabase_storage_admin noinherit;
 create role anon noinherit;
 
 -- login role
-create user nosuper createrole nosuperuser;
+create user nosuper noinherit createrole login nosuperuser;
+grant anon to nosuper;
 
 -- other roles
 create role fake noinherit;
