@@ -82,6 +82,7 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		}
 
+		//CREATE ROLE <role>
 		case T_CreateRoleStmt:
 		{
 			CreateRoleStmt *stmt = (CreateRoleStmt *) parsetree;
@@ -168,6 +169,54 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		}
 
+		// ALTER ROLE <role> SET search_path TO ...
+		case T_AlterRoleSetStmt:
+		{
+			AlterRoleSetStmt *stmt = (AlterRoleSetStmt *) parsetree;
+			RoleSpec *role = stmt->role;
+			bool isSuper = superuser_arg(GetUserId());
+			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
+			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
+			const char *rolename = get_rolespec_name(role);
+
+			List	   *reserve_list;
+			ListCell *cell;
+
+			// Break immediately if the role is PUBLIC
+			if (role->roletype == ROLESPEC_PUBLIC)
+				break;
+
+			if(!reserved_roles)
+				break;
+
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+								"supautils.reserved_roles")));
+			}
+
+			foreach(cell, reserve_list)
+			{
+				const char *reserved_role = (const char *) lfirst(cell);
+
+				if (strcmp(rolename, reserved_role) == 0 && !isSuper)
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_RESERVED_NAME),
+							 errmsg("The \"%s\" role is reserved, only superusers can alter it.",
+									rolename)));
+				}
+
+			}
+
+			list_free(reserve_list);
+
+			break;
+		}
+
+		// ALTER ROLE <role> RENAME TO ...
 		case T_RenameStmt:
 		{
 			RenameStmt *stmt = (RenameStmt *) parsetree;
@@ -212,6 +261,7 @@ void check_role(PlannedStmt *pstmt,
 			break;
 		}
 
+		// DROP ROLE <role>
 		case T_DropRoleStmt:
 		{
 			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;

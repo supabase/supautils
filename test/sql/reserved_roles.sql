@@ -8,9 +8,17 @@ alter role supabase_storage_admin rename to another;
 alter role supabase_storage_admin nologin superuser;
 alter role supabase_storage_admin password 'pass';
 
--- cannot bypass check by using current_user
+-- cannot alter-config for a reserved role
+alter role supabase_storage_admin set search_path to 'test';
+
+-- cannot bypass alter-options check by using current_user
 set role anon;
 alter role current_user password 'pass';
+reset role;
+
+-- cannot bypass alter-config check by using current_user
+set role supabase_storage_admin;
+alter role supabase_storage_admin set search_path to 'test';
 reset role;
 
 -- cannot drop a reserved role

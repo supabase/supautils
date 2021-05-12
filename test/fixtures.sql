@@ -5,6 +5,7 @@ create role anon noinherit;
 -- login role
 create user nosuper noinherit createrole login nosuperuser;
 grant anon to nosuper;
+grant supabase_storage_admin to nosuper;
 
 -- other roles
 create role fake noinherit;
