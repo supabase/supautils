@@ -1,3 +1,7 @@
+-- use a role that has the CREATEROLE privilege
+set role rolecreator;
+\echo
+
 -- cannot rename an existing role to a reserved role
 alter role fake rename to reserved_but_not_yet_created;
 ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can rename it.
@@ -20,20 +24,6 @@ alter role supabase_storage_admin set search_path to 'test';
 ERROR:  The "supabase_storage_admin" role is reserved, only superusers can alter it.
 \echo
 
--- cannot bypass alter-options check by using current_user
-set role anon;
-alter role current_user password 'pass';
-ERROR:  The "anon" role is reserved, only superusers can alter it.
-reset role;
-\echo
-
--- cannot bypass alter-config check by using current_user
-set role supabase_storage_admin;
-alter role supabase_storage_admin set search_path to 'test';
-ERROR:  The "supabase_storage_admin" role is reserved, only superusers can alter it.
-reset role;
-\echo
-
 -- cannot drop a reserved role
 drop role fake, supabase_storage_admin;
 ERROR:  The "supabase_storage_admin" role is reserved, only superusers can drop it
@@ -44,3 +34,15 @@ ERROR:  The "anon" role is reserved, only superusers can drop it
 -- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
 ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can create it.
+\echo
+
+-- cannot bypass alter-options check by using current_user
+set role anon;
+alter role current_user password 'pass';
+ERROR:  The "anon" role is reserved, only superusers can alter it.
+\echo
+
+-- cannot bypass alter-config check by using current_user
+set role supabase_storage_admin;
+alter role current_user set search_path to 'test';
+ERROR:  The "supabase_storage_admin" role is reserved, only superusers can alter it.

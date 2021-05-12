@@ -1,3 +1,7 @@
+-- use a role that has the CREATEROLE privilege
+set role rolecreator;
+\echo
+
 -- cannot rename an existing role to a reserved role
 alter role fake rename to reserved_but_not_yet_created;
 \echo
@@ -15,18 +19,6 @@ alter role supabase_storage_admin password 'pass';
 alter role supabase_storage_admin set search_path to 'test';
 \echo
 
--- cannot bypass alter-options check by using current_user
-set role anon;
-alter role current_user password 'pass';
-reset role;
-\echo
-
--- cannot bypass alter-config check by using current_user
-set role supabase_storage_admin;
-alter role supabase_storage_admin set search_path to 'test';
-reset role;
-\echo
-
 -- cannot drop a reserved role
 drop role fake, supabase_storage_admin;
 drop role anon, fake;
@@ -34,3 +26,13 @@ drop role anon, fake;
 
 -- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
+\echo
+
+-- cannot bypass alter-options check by using current_user
+set role anon;
+alter role current_user password 'pass';
+\echo
+
+-- cannot bypass alter-config check by using current_user
+set role supabase_storage_admin;
+alter role current_user set search_path to 'test';
