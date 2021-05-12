@@ -7,3 +7,7 @@ create role non_reserved;
 
 -- ensure we don't call the hook for invalid roles
 drop role public;
+\echo
+
+-- since anon already exists, bypass the hook
+create role anon;

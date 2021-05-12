@@ -41,11 +41,6 @@ drop role anon, fake;
 ERROR:  The "anon" role is reserved, only superusers can drop it
 \echo
 
--- cannot create a reserved role
+-- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
 ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can create it.
-\echo
-
--- cannot create a reserved role, even if it exists
-create role anon;
-ERROR:  The "anon" role is reserved, only superusers can create it.

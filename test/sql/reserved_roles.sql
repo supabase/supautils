@@ -32,9 +32,5 @@ drop role fake, supabase_storage_admin;
 drop role anon, fake;
 \echo
 
--- cannot create a reserved role
+-- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
-\echo
-
--- cannot create a reserved role, even if it exists
-create role anon;

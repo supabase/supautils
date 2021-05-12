@@ -92,6 +92,10 @@ void check_role(PlannedStmt *pstmt,
 			List	   *reserve_list;
 			ListCell *cell;
 
+			// if role already exists, bypass the hook to let it fail with the usual error
+			if (OidIsValid(get_role_oid(role, true)))
+				break;
+
 			if(!reserved_roles)
 				break;
 

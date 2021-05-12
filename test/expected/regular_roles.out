@@ -8,3 +8,8 @@ create role non_reserved;
 -- ensure we don't call the hook for invalid roles
 drop role public;
 ERROR:  cannot use special role specifier in DROP ROLE
+\echo
+
+-- since anon already exists, bypass the hook
+create role anon;
+ERROR:  role "anon" already exists
