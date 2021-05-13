@@ -36,3 +36,15 @@ alter role current_user password 'pass';
 -- cannot bypass alter-config check by using current_user
 set role supabase_storage_admin;
 alter role current_user set search_path to 'test';
+\echo
+
+-- use a role that has the SUPERUSER privilege
+set role postgres;
+\echo
+
+-- SUPERUSER can do anything with reserved roles
+create role reserved_but_not_yet_created;
+alter role reserved_but_not_yet_created set search_path to 'test';
+alter role reserved_but_not_yet_created login bypassrls;
+alter role reserved_but_not_yet_created rename to renamed_reserved_role;
+drop role supabase_storage_admin;
