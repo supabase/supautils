@@ -51,6 +51,7 @@ void check_role(PlannedStmt *pstmt,
 	switch (nodeTag(parsetree))
 	{
 
+		//GRANT <role> TO <another_role>
 		case T_GrantRoleStmt:
 		{
 			GrantRoleStmt *stmt = (GrantRoleStmt *) parsetree;
@@ -103,8 +104,17 @@ void check_role(PlannedStmt *pstmt,
 			const char *role = stmt->role;
 			bool isSuper = superuser_arg(GetUserId());
 
+			List *addroleto = NIL;	/* roles to make this a member of */
+			bool hasrolemembers = false;	/* has roles to be members of this role */
+
+			ListCell   *item;
+			ListCell   *option;
+
 			List	   *reserve_list;
 			ListCell *cell;
+
+			List	   *reserve_list1;
+			ListCell *cell1;
 
 			// if role already exists, bypass the hook to let it fail with the usual error
 			if (OidIsValid(get_role_oid(role, true)))
@@ -136,6 +146,67 @@ void check_role(PlannedStmt *pstmt,
 			}
 
 			list_free(reserve_list);
+
+			if(reserved_memberships){
+
+				if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserve_list1))
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+									"supautils.reserved_memberships")));
+				}
+
+				foreach(option, stmt->options)
+				{
+					DefElem    *defel = (DefElem *) lfirst(option);
+					if (strcmp(defel->defname, "addroleto") == 0)
+					{
+						addroleto = (List *) defel->arg;
+					}
+					if (strcmp(defel->defname, "rolemembers") == 0 || strcmp(defel->defname, "adminmembers") == 0)
+					{
+						hasrolemembers = true;
+					}
+				}
+
+				// CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership>
+				if (addroleto)
+				{
+					foreach(item, addroleto)
+					{
+						RoleSpec   *oldrole = lfirst(item);
+
+						foreach(cell1, reserve_list1)
+						{
+							const char *reserved_membership = (const char *) lfirst(cell1);
+							const char *rolename = get_rolespec_name(oldrole);
+
+							if (strcmp(rolename, reserved_membership) == 0 && !isSuper)
+								ereport(ERROR,
+										(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+										 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
+						}
+					}
+				}
+
+				// CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
+				// This is a contrived case because the "role_with_reserved_membership" should already exist, but handle it anyway.
+				if (hasrolemembers)
+				{
+					foreach(cell1, reserve_list1)
+					{
+						const char *reserved_membership = (const char *) lfirst(cell1);
+
+						if (strcmp(role, reserved_membership) == 0 && !isSuper)
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									 errmsg("Only superusers can grant membership to \"%s\"", role)));
+					}
+				}
+
+				list_free(reserve_list1);
+			}
 
 			break;
 		};

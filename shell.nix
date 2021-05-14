@@ -33,7 +33,7 @@ let
       options="-F -c listen_addresses=\"\" -k $PGDATA"
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
-      reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program"
+      reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
 
       ext_options="-c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\""
 

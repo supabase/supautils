@@ -11,7 +11,23 @@ grant pg_execute_server_program to anon;
 ERROR:  Only superusers can grant membership to "pg_execute_server_program"
 \echo
 
+-- cannot grant reserved memberships when creating a role
+create role tester in role pg_read_server_files;
+ERROR:  Only superusers can grant membership to "pg_read_server_files"
+create role tester in group anon, pg_write_server_files;
+ERROR:  Only superusers can grant membership to "pg_write_server_files"
+create role tester in role pg_execute_server_program, anon;
+ERROR:  Only superusers can grant membership to "pg_execute_server_program"
+create role role_with_reserved_membership admin anon;
+ERROR:  Only superusers can grant membership to "role_with_reserved_membership"
+\echo
+
 -- can grant non-reserved memberships
 grant pg_monitor to anon;
 grant pg_read_all_settings to anon;
 grant pg_read_all_stats to anon;
+\echo
+
+-- can grant non-reserved memberships when creating a role
+create role tester in role anon;
+create role other admin anon;
