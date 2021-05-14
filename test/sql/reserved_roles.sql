@@ -24,8 +24,22 @@ drop role fake, supabase_storage_admin;
 drop role anon, fake;
 \echo
 
+-- ensure we don't call the hook for invalid roles
+drop role public;
+\echo
+
 -- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
+\echo
+
+-- since anon already exists, bypass the hook and show normal "already exists" error
+create role anon;
+
+-- ensure our hooks don't mess regular non-reserved roles functionality
+alter role fake rename to new_fake;
+alter role new_fake createrole createdb;
+drop role new_fake;
+create role non_reserved;
 \echo
 
 -- cannot bypass alter-options check by using current_user

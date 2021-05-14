@@ -31,9 +31,24 @@ drop role anon, fake;
 ERROR:  The "anon" role is reserved, only superusers can drop it
 \echo
 
+-- ensure we don't call the hook for invalid roles
+drop role public;
+ERROR:  cannot use special role specifier in DROP ROLE
+\echo
+
 -- cannot create a reserved role that doesn't yet exist
 create role reserved_but_not_yet_created;
 ERROR:  The "reserved_but_not_yet_created" role is reserved, only superusers can create it.
+\echo
+
+-- since anon already exists, bypass the hook and show normal "already exists" error
+create role anon;
+ERROR:  role "anon" already exists
+-- ensure our hooks don't mess regular non-reserved roles functionality
+alter role fake rename to new_fake;
+alter role new_fake createrole createdb;
+drop role new_fake;
+create role non_reserved;
 \echo
 
 -- cannot bypass alter-options check by using current_user
