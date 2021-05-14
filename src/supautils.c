@@ -12,7 +12,8 @@ PG_MODULE_MAGIC;
 void _PG_init(void);
 void _PG_fini(void);
 
-static char *reserved_roles = NULL;
+static char *reserved_roles       = NULL;
+static char *reserved_memberships = NULL;
 
 static ProcessUtility_hook_type prev_utility_hook = NULL;
 
@@ -55,28 +56,41 @@ void check_role(PlannedStmt *pstmt,
 			GrantRoleStmt *stmt = (GrantRoleStmt *) parsetree;
 			ListCell *item;
 
+			if(!reserved_memberships)
+				break;
+
 			if(stmt->is_grant){
+				List	   *reserve_list;
+				ListCell *cell;
+
+				if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserve_list))
+				{
+					ereport(ERROR,
+							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+							 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
+									"supautils.reserved_memberships")));
+				}
+
 				foreach(item, stmt->granted_roles)
 				{
 					AccessPriv *priv = (AccessPriv *) lfirst(item);
 					char *rolename = priv->priv_name;
 					bool isSuper = superuser_arg(GetUserId());
 
-					if (strcmp(rolename, "pg_read_server_files") == 0 && !isSuper)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Only superusers can GRANT \"%s\"", "pg_read_server_files")));
+					foreach(cell, reserve_list)
+					{
+						const char *reserved_membership = (const char *) lfirst(cell);
 
-					if (strcmp(rolename, "pg_write_server_files") == 0 && !isSuper)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Only superusers can GRANT \"%s\"", "pg_write_server_files")));
+						if (strcmp(rolename, reserved_membership) == 0 && !isSuper)
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
 
-					if (strcmp(rolename, "pg_execute_server_program") == 0 && !isSuper)
-						ereport(ERROR,
-								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								 errmsg("Only superusers can GRANT \"%s\"", "pg_execute_server_program")));
+					}
+
 				}
+
+				list_free(reserve_list);
 			}
 
 			break;
@@ -334,6 +348,14 @@ void load_params(void)
 							   "Non-superuser roles that can only be created, altered or dropped by superusers",
 							   NULL,
 							   &reserved_roles,
+							   NULL,
+							   PGC_POSTMASTER, 0,
+								 NULL, NULL, NULL);
+
+	DefineCustomStringVariable("supautils.reserved_memberships",
+							   "Non-superuser roles that only superusers can grant membership to",
+							   NULL,
+							   &reserved_memberships,
 							   NULL,
 							   PGC_POSTMASTER, 0,
 								 NULL, NULL, NULL);

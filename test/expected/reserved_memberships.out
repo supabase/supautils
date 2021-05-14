@@ -4,11 +4,11 @@ set role rolecreator;
 
 -- cannot grant reserved memberships
 grant pg_read_server_files to anon;
-ERROR:  Only superusers can GRANT "pg_read_server_files"
+ERROR:  Only superusers can grant membership to "pg_read_server_files"
 grant pg_write_server_files to anon;
-ERROR:  Only superusers can GRANT "pg_write_server_files"
+ERROR:  Only superusers can grant membership to "pg_write_server_files"
 grant pg_execute_server_program to anon;
-ERROR:  Only superusers can GRANT "pg_execute_server_program"
+ERROR:  Only superusers can grant membership to "pg_execute_server_program"
 \echo
 
 -- can grant non-reserved memberships
