@@ -1,7 +1,6 @@
 #include "postgres.h"
 #include "tcop/utility.h"
 #include "miscadmin.h"
-#include "tcop/utility.h"
 #include "utils/varlena.h"
 #include "utils/acl.h"
 
@@ -16,8 +15,6 @@ static char *reserved_roles       = NULL;
 static char *reserved_memberships = NULL;
 
 static ProcessUtility_hook_type prev_utility_hook = NULL;
-
-static void load_params(void);
 
 static void check_role(PlannedStmt *pstmt,
 						const char *queryString,
@@ -48,6 +45,9 @@ void check_role(PlannedStmt *pstmt,
 {
 	Node		 *parsetree = pstmt->utilityStmt;
 
+	if (superuser())
+		goto chain_hooks;
+
 	switch (nodeTag(parsetree))
 	{
 
@@ -76,13 +76,12 @@ void check_role(PlannedStmt *pstmt,
 				{
 					AccessPriv *priv = (AccessPriv *) lfirst(item);
 					char *rolename = priv->priv_name;
-					bool isSuper = superuser_arg(GetUserId());
 
 					foreach(cell, reserve_list)
 					{
 						const char *reserved_membership = (const char *) lfirst(cell);
 
-						if (strcmp(rolename, reserved_membership) == 0 && !isSuper)
+						if (strcmp(rolename, reserved_membership) == 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 									 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
@@ -102,7 +101,6 @@ void check_role(PlannedStmt *pstmt,
 		{
 			CreateRoleStmt *stmt = (CreateRoleStmt *) parsetree;
 			const char *role = stmt->role;
-			bool isSuper = superuser_arg(GetUserId());
 
 			List *addroleto = NIL;	/* roles to make this a member of */
 			bool hasrolemembers = false;	/* has roles to be members of this role */
@@ -135,7 +133,7 @@ void check_role(PlannedStmt *pstmt,
 			{
 				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(role, reserved_role) == 0 && !isSuper)
+				if (strcmp(role, reserved_role) == 0)
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
@@ -182,7 +180,7 @@ void check_role(PlannedStmt *pstmt,
 							const char *reserved_membership = (const char *) lfirst(cell1);
 							const char *rolename = get_rolespec_name(oldrole);
 
-							if (strcmp(rolename, reserved_membership) == 0 && !isSuper)
+							if (strcmp(rolename, reserved_membership) == 0)
 								ereport(ERROR,
 										(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 										 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
@@ -198,7 +196,7 @@ void check_role(PlannedStmt *pstmt,
 					{
 						const char *reserved_membership = (const char *) lfirst(cell1);
 
-						if (strcmp(role, reserved_membership) == 0 && !isSuper)
+						if (strcmp(role, reserved_membership) == 0)
 							ereport(ERROR,
 									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 									 errmsg("Only superusers can grant membership to \"%s\"", role)));
@@ -216,7 +214,6 @@ void check_role(PlannedStmt *pstmt,
 		{
 			AlterRoleStmt *stmt = (AlterRoleStmt *) parsetree;
 			RoleSpec *role = stmt->role;
-			bool isSuper = superuser_arg(GetUserId());
 			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
 			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
 			const char *rolename = get_rolespec_name(role);
@@ -243,7 +240,7 @@ void check_role(PlannedStmt *pstmt,
 			{
 				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(rolename, reserved_role) == 0 && !isSuper)
+				if (strcmp(rolename, reserved_role) == 0)
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
@@ -263,7 +260,6 @@ void check_role(PlannedStmt *pstmt,
 		{
 			AlterRoleSetStmt *stmt = (AlterRoleSetStmt *) parsetree;
 			RoleSpec *role = stmt->role;
-			bool isSuper = superuser_arg(GetUserId());
 			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
 			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
 			const char *rolename = get_rolespec_name(role);
@@ -290,7 +286,7 @@ void check_role(PlannedStmt *pstmt,
 			{
 				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(rolename, reserved_role) == 0 && !isSuper)
+				if (strcmp(rolename, reserved_role) == 0)
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
@@ -309,7 +305,6 @@ void check_role(PlannedStmt *pstmt,
 		case T_RenameStmt:
 		{
 			RenameStmt *stmt = (RenameStmt *) parsetree;
-			bool isSuper = superuser_arg(GetUserId());
 
 			List	   *reserve_list;
 			ListCell *cell;
@@ -331,13 +326,13 @@ void check_role(PlannedStmt *pstmt,
 			{
 				const char *reserved_role = (const char *) lfirst(cell);
 
-				if (strcmp(stmt->subname, reserved_role) == 0 && !isSuper)
+				if (strcmp(stmt->subname, reserved_role) == 0)
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
 							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
 									stmt->subname)));
 
-				if (strcmp(stmt->newname, reserved_role) == 0 && !isSuper)
+				if (strcmp(stmt->newname, reserved_role) == 0)
 					ereport(ERROR,
 							(errcode(ERRCODE_RESERVED_NAME),
 							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
@@ -355,7 +350,6 @@ void check_role(PlannedStmt *pstmt,
 		{
 			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
 			ListCell *item;
-			bool isSuper = superuser_arg(GetUserId());
 
 			List	   *reserve_list;
 			ListCell *cell;
@@ -383,7 +377,7 @@ void check_role(PlannedStmt *pstmt,
 				{
 					const char *reserved_role = (const char *) lfirst(cell);
 
-					if (strcmp(role->rolename, reserved_role) == 0 && !isSuper)
+					if (strcmp(role->rolename, reserved_role) == 0)
 					{
 						ereport(ERROR,
 								(errcode(ERRCODE_RESERVED_NAME),
@@ -402,6 +396,7 @@ void check_role(PlannedStmt *pstmt,
 			break;
 	}
 
+chain_hooks:
 	if (prev_utility_hook)
 		(*prev_utility_hook) (pstmt, queryString,
 								context, params, queryEnv,
@@ -412,9 +407,12 @@ void check_role(PlannedStmt *pstmt,
 								dest, completionTag);
 }
 
-static
-void load_params(void)
+void
+_PG_init(void)
 {
+	prev_utility_hook = ProcessUtility_hook;
+	ProcessUtility_hook = check_role;
+
 	DefineCustomStringVariable("supautils.reserved_roles",
 							   "Non-superuser roles that can only be created, altered or dropped by superusers",
 							   NULL,
@@ -430,15 +428,6 @@ void load_params(void)
 							   NULL,
 							   PGC_POSTMASTER, 0,
 								 NULL, NULL, NULL);
-}
-
-void
-_PG_init(void)
-{
-	prev_utility_hook = ProcessUtility_hook;
-	ProcessUtility_hook = check_role;
-
-	load_params();
 }
 void
 _PG_fini(void)
