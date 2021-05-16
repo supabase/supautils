@@ -6,17 +6,35 @@
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
+#define EREPORT_RESERVED_MEMBERSHIP(name)                                 \
+				ereport(ERROR,                                                    \
+					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),                       \
+					 errmsg("\"%s\" role memberships are reserved, only superusers "\
+						 "can grant them", name)))
+
+
+#define EREPORT_RESERVED_ROLE(name)                                       \
+				ereport(ERROR,                                                    \
+					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),                       \
+					 errmsg("\"%s\" is a reserved role, only superusers can modify "\
+								"it", name)))
+
+#define EREPORT_INVALID_PARAMETER(name)                                   \
+				ereport(ERROR,                                                    \
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),                    \
+						 errmsg("parameter \"%s\" must be a comma-separated list of " \
+							 "identifiers", name)));
+
 PG_MODULE_MAGIC;
+
+static char *reserved_roles               = NULL;
+static char *reserved_memberships         = NULL;
+static ProcessUtility_hook_type prev_hook = NULL;
 
 void _PG_init(void);
 void _PG_fini(void);
 
-static char *reserved_roles       = NULL;
-static char *reserved_memberships = NULL;
-
-static ProcessUtility_hook_type prev_utility_hook = NULL;
-
-static void check_role(PlannedStmt *pstmt,
+static void supautils_hook(PlannedStmt *pstmt,
 						const char *queryString,
 						ProcessUtilityContext context,
 						ParamListInfo params,
@@ -29,389 +47,19 @@ static void check_role(PlannedStmt *pstmt,
 #endif
 );
 
-static
-void check_role(PlannedStmt *pstmt,
-						const char *queryString,
-						ProcessUtilityContext context,
-						ParamListInfo params,
-						QueryEnvironment *queryEnv,
-						DestReceiver *dest,
-#if PG13_GTE
-						QueryCompletion *completionTag
-#else
-						char *completionTag
-#endif
-)
-{
-	Node		 *parsetree = pstmt->utilityStmt;
-
-	if (superuser())
-		goto chain_hooks;
-
-	switch (nodeTag(parsetree))
-	{
-
-		//GRANT <role> TO <another_role>
-		case T_GrantRoleStmt:
-		{
-			GrantRoleStmt *stmt = (GrantRoleStmt *) parsetree;
-			ListCell *item;
-
-			if(!reserved_memberships)
-				break;
-
-			if(stmt->is_grant){
-				List	   *reserve_list;
-				ListCell *cell;
-
-				if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserve_list))
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-							 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-									"supautils.reserved_memberships")));
-				}
-
-				foreach(item, stmt->granted_roles)
-				{
-					AccessPriv *priv = (AccessPriv *) lfirst(item);
-					char *rolename = priv->priv_name;
-
-					foreach(cell, reserve_list)
-					{
-						const char *reserved_membership = (const char *) lfirst(cell);
-
-						if (strcmp(rolename, reserved_membership) == 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-									 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
-
-					}
-
-				}
-
-				list_free(reserve_list);
-			}
-
-			break;
-		}
-
-		//CREATE ROLE <role>
-		case T_CreateRoleStmt:
-		{
-			CreateRoleStmt *stmt = (CreateRoleStmt *) parsetree;
-			const char *role = stmt->role;
-
-			List *addroleto = NIL;	/* roles to make this a member of */
-			bool hasrolemembers = false;	/* has roles to be members of this role */
-
-			ListCell   *item;
-			ListCell   *option;
-
-			List	   *reserve_list;
-			ListCell *cell;
-
-			List	   *reserve_list1;
-			ListCell *cell1;
-
-			// if role already exists, bypass the hook to let it fail with the usual error
-			if (OidIsValid(get_role_oid(role, true)))
-				break;
-
-			if(!reserved_roles)
-				break;
-
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.reserved_roles")));
-			}
-
-			foreach(cell, reserve_list)
-			{
-				const char *reserved_role = (const char *) lfirst(cell);
-
-				if (strcmp(role, reserved_role) == 0)
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved, only superusers can create it.",
-									role)));
-				}
-
-			}
-
-			list_free(reserve_list);
-
-			if(reserved_memberships){
-
-				if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserve_list1))
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-							 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-									"supautils.reserved_memberships")));
-				}
-
-				foreach(option, stmt->options)
-				{
-					DefElem    *defel = (DefElem *) lfirst(option);
-					if (strcmp(defel->defname, "addroleto") == 0)
-					{
-						addroleto = (List *) defel->arg;
-					}
-					if (strcmp(defel->defname, "rolemembers") == 0 || strcmp(defel->defname, "adminmembers") == 0)
-					{
-						hasrolemembers = true;
-					}
-				}
-
-				// CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership>
-				if (addroleto)
-				{
-					foreach(item, addroleto)
-					{
-						RoleSpec   *oldrole = lfirst(item);
-
-						foreach(cell1, reserve_list1)
-						{
-							const char *reserved_membership = (const char *) lfirst(cell1);
-							const char *rolename = get_rolespec_name(oldrole);
-
-							if (strcmp(rolename, reserved_membership) == 0)
-								ereport(ERROR,
-										(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-										 errmsg("Only superusers can grant membership to \"%s\"", rolename)));
-						}
-					}
-				}
-
-				// CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
-				// This is a contrived case because the "role_with_reserved_membership" should already exist, but handle it anyway.
-				if (hasrolemembers)
-				{
-					foreach(cell1, reserve_list1)
-					{
-						const char *reserved_membership = (const char *) lfirst(cell1);
-
-						if (strcmp(role, reserved_membership) == 0)
-							ereport(ERROR,
-									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-									 errmsg("Only superusers can grant membership to \"%s\"", role)));
-					}
-				}
-
-				list_free(reserve_list1);
-			}
-
-			break;
-		};
-
-		// ALTER ROLE <role> NOLOGIN SUPERUSER..
-		case T_AlterRoleStmt:
-		{
-			AlterRoleStmt *stmt = (AlterRoleStmt *) parsetree;
-			RoleSpec *role = stmt->role;
-			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
-			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
-			const char *rolename = get_rolespec_name(role);
-
-			List	   *reserve_list;
-			ListCell *cell;
-
-			// Break immediately if the role is PUBLIC
-			if (role->roletype == ROLESPEC_PUBLIC)
-				break;
-
-			if(!reserved_roles)
-				break;
-
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.reserved_roles")));
-			}
-
-			foreach(cell, reserve_list)
-			{
-				const char *reserved_role = (const char *) lfirst(cell);
-
-				if (strcmp(rolename, reserved_role) == 0)
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved, only superusers can alter it.",
-									rolename)));
-				}
-
-			}
-
-			list_free(reserve_list);
-
-			break;
-		}
-
-		// ALTER ROLE <role> SET search_path TO ...
-		case T_AlterRoleSetStmt:
-		{
-			AlterRoleSetStmt *stmt = (AlterRoleSetStmt *) parsetree;
-			RoleSpec *role = stmt->role;
-			// Here we don't use role->rolename because it's NULL when CURRENT_USER(ROLESPEC_CURRENT_USER) or
-			// SESSION_USER(ROLESPEC_SESSION_USER) are specified
-			const char *rolename = get_rolespec_name(role);
-
-			List	   *reserve_list;
-			ListCell *cell;
-
-			// Break immediately if the role is PUBLIC
-			if (role->roletype == ROLESPEC_PUBLIC)
-				break;
-
-			if(!reserved_roles)
-				break;
-
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.reserved_roles")));
-			}
-
-			foreach(cell, reserve_list)
-			{
-				const char *reserved_role = (const char *) lfirst(cell);
-
-				if (strcmp(rolename, reserved_role) == 0)
-				{
-					ereport(ERROR,
-							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved, only superusers can alter it.",
-									rolename)));
-				}
-
-			}
-
-			list_free(reserve_list);
-
-			break;
-		}
-
-		// ALTER ROLE <role> RENAME TO ...
-		case T_RenameStmt:
-		{
-			RenameStmt *stmt = (RenameStmt *) parsetree;
-
-			List	   *reserve_list;
-			ListCell *cell;
-
-			// Break immediately if not an ALTER ROLE
-			if(stmt->renameType != OBJECT_ROLE)
-				break;
-
-			if(!reserved_roles)
-				break;
-
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.reserved_roles")));
-
-			foreach(cell, reserve_list)
-			{
-				const char *reserved_role = (const char *) lfirst(cell);
-
-				if (strcmp(stmt->subname, reserved_role) == 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
-									stmt->subname)));
-
-				if (strcmp(stmt->newname, reserved_role) == 0)
-					ereport(ERROR,
-							(errcode(ERRCODE_RESERVED_NAME),
-							 errmsg("The \"%s\" role is reserved, only superusers can rename it.",
-									stmt->newname)));
-
-			}
-
-			list_free(reserve_list);
-
-			break;
-		}
-
-		// DROP ROLE <role>
-		case T_DropRoleStmt:
-		{
-			DropRoleStmt *stmt = (DropRoleStmt *) parsetree;
-			ListCell *item;
-
-			List	   *reserve_list;
-			ListCell *cell;
-
-			if(!reserved_roles)
-				break;
-
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &reserve_list))
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("parameter \"%s\" must be a comma-separated list of identifiers",
-								"supautils.reserved_roles")));
-			}
-
-			foreach(item, stmt->roles)
-			{
-				RoleSpec *role = lfirst(item);
-
-				// Break immediately if the role is PUBLIC, CURRENT_USER or SESSION_USER.
-				if (role->roletype != ROLESPEC_CSTRING)
-					break;
-
-				foreach(cell, reserve_list)
-				{
-					const char *reserved_role = (const char *) lfirst(cell);
-
-					if (strcmp(role->rolename, reserved_role) == 0)
-					{
-						ereport(ERROR,
-								(errcode(ERRCODE_RESERVED_NAME),
-								 errmsg("The \"%s\" role is reserved, only superusers can drop it",
-										role->rolename)));
-					}
-				}
-			}
-
-			list_free(reserve_list);
-
-			break;
-		}
-
-		default:
-			break;
-	}
-
-chain_hooks:
-	if (prev_utility_hook)
-		(*prev_utility_hook) (pstmt, queryString,
-								context, params, queryEnv,
-								dest, completionTag);
-	else
-		standard_ProcessUtility(pstmt, queryString,
-								context, params, queryEnv,
-								dest, completionTag);
-}
-
+static char* look_for_reserved_membership(Node *utility_stmt,
+							List *memberships_list);
+static char* look_for_reserved_role(Node *utility_stmt,
+							List *roles_list);
+
+/*
+ * IO: module load callback
+ */
 void
 _PG_init(void)
 {
-	prev_utility_hook = ProcessUtility_hook;
-	ProcessUtility_hook = check_role;
+	prev_hook = ProcessUtility_hook;
+	ProcessUtility_hook = supautils_hook;
 
 	DefineCustomStringVariable("supautils.reserved_roles",
 							   "Non-superuser roles that can only be created, altered or dropped by superusers",
@@ -429,8 +77,308 @@ _PG_init(void)
 							   PGC_POSTMASTER, 0,
 								 NULL, NULL, NULL);
 }
+
+/*
+ * IO: module unload callback
+ */
 void
 _PG_fini(void)
 {
-	ProcessUtility_hook = prev_utility_hook;
+	ProcessUtility_hook = prev_hook;
+}
+
+/*
+ * IO: run the hook logic
+ */
+static void
+supautils_hook(PlannedStmt *pstmt,
+						const char *queryString,
+						ProcessUtilityContext context,
+						ParamListInfo params,
+						QueryEnvironment *queryEnv,
+						DestReceiver *dest,
+#if PG13_GTE
+						QueryCompletion *completionTag
+#else
+						char *completionTag
+#endif
+)
+{
+	Node		 *utility_stmt = pstmt->utilityStmt;
+
+	// Check reserved objects if not a superuser
+	if (!superuser()){
+
+		// Check if supautils.reserved_memberships is not empty
+		if(reserved_memberships){
+			List *memberships_list;
+			char *reserved_membership = NULL;
+
+			// Parse the comma-separated list of reserved memberships
+			if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &memberships_list))
+				EREPORT_INVALID_PARAMETER("supautils.reserved_memberships");
+
+			// Do the core logic
+			reserved_membership = look_for_reserved_membership(utility_stmt, memberships_list);
+
+			// Need to free the list according to the SplitIdentifierString implementation,
+			// defined in src/backend/utils/adt/varlena.c
+			list_free(memberships_list);
+
+			// Fail if there's a reserved membership in the statement
+			if(reserved_membership)
+				EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
+		}
+
+		// Ditto for supautils.reserved_roles
+		if(reserved_roles){
+			List *roles_list;
+			char *reserved_role = NULL;
+
+			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &roles_list))
+				EREPORT_INVALID_PARAMETER("supautils.reserved_roles");
+
+			reserved_role = look_for_reserved_role(utility_stmt, roles_list);
+
+			list_free(roles_list);
+
+			if(reserved_role)
+				EREPORT_RESERVED_ROLE(reserved_role);
+		}
+	}
+
+	// Chain to previously defined hooks
+	if (prev_hook)
+		prev_hook(pstmt, queryString,
+								context, params, queryEnv,
+								dest, completionTag);
+	else
+		standard_ProcessUtility(pstmt, queryString,
+								context, params, queryEnv,
+								dest, completionTag);
+}
+
+/*
+  Look if the utility statement grants a reserved membership,
+  return the membership if it does
+ */
+static char*
+look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
+{
+	switch (nodeTag(utility_stmt))
+	{
+		//GRANT <role> TO <another_role>
+		case T_GrantRoleStmt:
+		{
+			GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
+			ListCell *role_cell;
+
+			if(stmt->is_grant){
+
+				foreach(role_cell, stmt->granted_roles)
+				{
+					AccessPriv *priv = (AccessPriv *) lfirst(role_cell);
+					ListCell *membership_cell;
+					const char *rolename = priv->priv_name;
+
+					foreach(membership_cell, memberships_list)
+					{
+						char *reserved_membership = (char *) lfirst(membership_cell);
+
+						if (strcmp(rolename, reserved_membership) == 0)
+							return reserved_membership;
+					}
+
+				}
+			}
+
+			break;
+		}
+
+		// CREATE ROLE <any_role> has ways to add memberships
+		case T_CreateRoleStmt:
+		{
+			CreateRoleStmt *stmt = (CreateRoleStmt *) utility_stmt;
+
+			const char *role = stmt->role;
+			ListCell   *option_cell;
+
+			List *addroleto = NIL;	/* roles to make this a member of */
+			bool hasrolemembers = false;	/* has roles to be members of this role */
+
+			foreach(option_cell, stmt->options)
+			{
+				DefElem    *defel = (DefElem *) lfirst(option_cell);
+				if (strcmp(defel->defname, "addroleto") == 0)
+				{
+					addroleto = (List *) defel->arg;
+				}
+				if (strcmp(defel->defname, "rolemembers") == 0 || strcmp(defel->defname, "adminmembers") == 0)
+				{
+					hasrolemembers = true;
+				}
+			}
+
+			// CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership>
+			if (addroleto)
+			{
+				ListCell   *role_cell;
+
+				foreach(role_cell, addroleto)
+				{
+					RoleSpec *rolemember = lfirst(role_cell);
+					ListCell *membership_cell;
+
+					foreach(membership_cell, memberships_list)
+					{
+						char *reserved_membership = (char *) lfirst(membership_cell);
+
+						if (strcmp(get_rolespec_name(rolemember), reserved_membership) == 0)
+							return reserved_membership;
+					}
+				}
+			}
+
+			// CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
+			// This is a contrived case because the "role_with_reserved_membership" should already exist, but handle it anyway.
+			if (hasrolemembers)
+			{
+				ListCell *membership_cell;
+
+				foreach(membership_cell, memberships_list)
+				{
+					char *reserved_membership = (char *) lfirst(membership_cell);
+
+					if (strcmp(role, reserved_membership) == 0)
+						return reserved_membership;
+				}
+			}
+
+			break;
+		};
+
+		default:
+			break;
+	}
+
+	return NULL;
+}
+
+/*
+  Look if the utility statement modifies a reserved role,
+  return the role if it does
+ */
+static char*
+look_for_reserved_role(Node *utility_stmt, List *roles_list)
+{
+	switch (nodeTag(utility_stmt))
+	{
+		//CREATE ROLE <role>
+		case T_CreateRoleStmt:
+		{
+			CreateRoleStmt *stmt = (CreateRoleStmt *) utility_stmt;
+			ListCell *role_cell;
+
+			const char *role = stmt->role;
+
+			// if role already exists, bypass the hook to let it fail with the usual error
+			if (OidIsValid(get_role_oid(role, true)))
+				break;
+
+			foreach(role_cell, roles_list)
+			{
+				char *reserved_role = (char *) lfirst(role_cell);
+
+				if (strcmp(role, reserved_role) == 0)
+					return reserved_role;
+			}
+
+			break;
+		};
+
+		// ALTER ROLE <role> NOLOGIN NOINHERIT..
+		case T_AlterRoleStmt:
+		{
+			AlterRoleStmt *stmt = (AlterRoleStmt *) utility_stmt;
+			RoleSpec *role = stmt->role;
+			ListCell *role_cell;
+
+			foreach(role_cell, roles_list)
+			{
+				char *reserved_role = (char *) lfirst(role_cell);
+
+				if (strcmp(get_rolespec_name(role), reserved_role) == 0)
+					return reserved_role;
+			}
+
+			break;
+		}
+
+		// ALTER ROLE <role> SET search_path TO ...
+		case T_AlterRoleSetStmt:
+		{
+			AlterRoleSetStmt *stmt = (AlterRoleSetStmt *) utility_stmt;
+			RoleSpec *role = stmt->role;
+			ListCell *role_cell;
+
+			foreach(role_cell, roles_list)
+			{
+				char *reserved_role = (char *) lfirst(role_cell);
+
+				if (strcmp(get_rolespec_name(role), reserved_role) == 0)
+					return reserved_role;
+			}
+
+			break;
+		}
+
+		// ALTER ROLE <role> RENAME TO ...
+		case T_RenameStmt:
+		{
+			RenameStmt *stmt = (RenameStmt *) utility_stmt;
+			ListCell *role_cell;
+
+			foreach(role_cell, roles_list)
+			{
+				char *reserved_role = (char *) lfirst(role_cell);
+
+				if (strcmp(stmt->subname, reserved_role) == 0 ||
+						strcmp(stmt->newname, reserved_role) == 0)
+					return reserved_role;
+			}
+
+			break;
+		}
+
+		// DROP ROLE <role>
+		case T_DropRoleStmt:
+		{
+			DropRoleStmt *stmt = (DropRoleStmt *) utility_stmt;
+			ListCell *item;
+
+			foreach(item, stmt->roles)
+			{
+				RoleSpec *role = lfirst(item);
+				ListCell *role_cell;
+
+				// Break if the role is PUBLIC, let pg give a better error later
+				if (role->roletype == ROLESPEC_PUBLIC)
+					break;
+
+				foreach(role_cell, roles_list)
+				{
+					char *reserved_role = (char *) lfirst(role_cell);
+
+					if (strcmp(get_rolespec_name(role), reserved_role) == 0)
+						return reserved_role;
+				}
+			}
+
+			break;
+		}
+
+		default:
+			break;
+	}
+	return NULL;
 }

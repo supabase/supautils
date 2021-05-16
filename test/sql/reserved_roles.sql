@@ -24,8 +24,11 @@ drop role fake, supabase_storage_admin;
 drop role anon, fake;
 \echo
 
--- ensure we don't call the hook for invalid roles
+-- ensure the hook doesn't interfere with regular error messages
 drop role public;
+drop role current_user;
+drop role session_user;
+alter role public;
 \echo
 
 -- cannot create a reserved role that doesn't yet exist

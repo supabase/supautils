@@ -4,22 +4,22 @@ set role rolecreator;
 
 -- cannot grant reserved memberships
 grant pg_read_server_files to anon;
-ERROR:  Only superusers can grant membership to "pg_read_server_files"
+ERROR:  "pg_read_server_files" role memberships are reserved, only superusers can grant them
 grant pg_write_server_files to anon;
-ERROR:  Only superusers can grant membership to "pg_write_server_files"
+ERROR:  "pg_write_server_files" role memberships are reserved, only superusers can grant them
 grant pg_execute_server_program to anon;
-ERROR:  Only superusers can grant membership to "pg_execute_server_program"
+ERROR:  "pg_execute_server_program" role memberships are reserved, only superusers can grant them
 \echo
 
 -- cannot grant reserved memberships when creating a role
 create role tester in role pg_read_server_files;
-ERROR:  Only superusers can grant membership to "pg_read_server_files"
+ERROR:  "pg_read_server_files" role memberships are reserved, only superusers can grant them
 create role tester in group anon, pg_write_server_files;
-ERROR:  Only superusers can grant membership to "pg_write_server_files"
+ERROR:  "pg_write_server_files" role memberships are reserved, only superusers can grant them
 create role tester in role pg_execute_server_program, anon;
-ERROR:  Only superusers can grant membership to "pg_execute_server_program"
+ERROR:  "pg_execute_server_program" role memberships are reserved, only superusers can grant them
 create role role_with_reserved_membership admin anon;
-ERROR:  Only superusers can grant membership to "role_with_reserved_membership"
+ERROR:  "role_with_reserved_membership" role memberships are reserved, only superusers can grant them
 \echo
 
 -- can grant non-reserved memberships
