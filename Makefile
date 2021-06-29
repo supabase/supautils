@@ -1,5 +1,5 @@
 EXTENSION = pg_supa
-DATA = src/supa--0.1.0.sql
+DATA = src/pg_supa--0.1.0.sql
 
 MODULE_big = supautils
 OBJS = src/supautils.o

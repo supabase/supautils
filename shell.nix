@@ -12,7 +12,7 @@ let
       installPhase = ''
         mkdir -p $out/bin
         install -D supautils.so -t $out/lib
-        install -D -t $out/share/postgresql/extension src/supa-*.sql
+        install -D -t $out/share/postgresql/extension src/pg_supa--*.sql
         install -D -t $out/share/postgresql/extension pg_supa.control
       '';
     };
