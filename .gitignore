@@ -1,3 +1,5 @@
 results/
 regression.*
 *.o
+*.so
+*.bc
