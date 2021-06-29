@@ -62,24 +62,26 @@ _PG_init(void)
 	ProcessUtility_hook = supautils_hook;
 
 	DefineCustomStringVariable("supautils.reserved_roles",
-							   "Non-superuser roles that can only be created, altered or dropped by superusers",
+							   "Comma-separated list of roles that cannot be modified",
 							   NULL,
 							   &reserved_roles,
 							   NULL,
-							   PGC_POSTMASTER, 0,
+							   PGC_SIGHUP, 0,
 								 NULL, NULL, NULL);
 
 	DefineCustomStringVariable("supautils.reserved_memberships",
-							   "Non-superuser roles that only superusers can grant membership to",
+							   "Comma-separated list of roles whose memberships cannot be granted",
 							   NULL,
 							   &reserved_memberships,
 							   NULL,
-							   PGC_POSTMASTER, 0,
+							   PGC_SIGHUP, 0,
 								 NULL, NULL, NULL);
 }
 
 /*
  * IO: module unload callback
+ * This is just for completion. Right now postgres doesn't call _PG_fini, see:
+ * https://github.com/postgres/postgres/blob/master/src/backend/utils/fmgr/dfmgr.c#L388-L402
  */
 void
 _PG_fini(void)

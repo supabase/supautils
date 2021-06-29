@@ -1,17 +1,17 @@
 ## Supautils
 
-This extension prevents modifying a set of roles by non-superusers.
+This extension prevents non-superusers from modifying/granting a set of roles.
 
-Say your backend service depends on a `connector` role(not a SUPERUSER) for connecting to the database. Also, you need to give database users the ability to create their own roles, i.e. they need the CREATEROLE privilege.
+Say your backend service depends on a `connector` role for connecting to the database. Also, you need to give database users the ability to create their own roles, i.e. they need the CREATEROLE privilege.
 
 A problem arises here, because any database user with CREATEROLE can DROP or ALTER the `connector` role, making your backend service fail.
 From [role attributes docs](https://www.postgresql.org/docs/current/role-attributes.html):
 
-> A role with CREATEROLE privilege can alter and drop other roles, too, as well as grant or revoke membership in them.
+> A role with CREATEROLE privilege can **alter and drop other roles, too, as well as grant or revoke membership in them**.
 > However, to create, alter, drop, or change membership of a superuser role, superuser status is required;
 > CREATEROLE is insufficient for that.
 
-The above problem can be solved by configuring this extension to protect the `connector`role from non-superusers:
+The above problem can be solved by configuring this extension to protect the `connector` role:
 
 ```
 supautils.reserved_roles = "connector"
@@ -25,13 +25,11 @@ to expose to every database user. From [pg default roles](https://www.postgresql
 > As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
 > and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
 
-You can restrict doing `GRANT pg_read_server_files TO my_role` to non-superusers with:
+For example, you can restrict doing `GRANT pg_read_server_files TO my_role` with:
 
 ```
 supautils.reserved_memberships = "pg_read_server_files"
 ```
-
-In general, this extension aims to make the CREATEROLE privilege safer.
 
 ### Installation
 
@@ -51,13 +49,13 @@ To enable the extension, add on `postgresql.conf`:
 shared_preload_libraries = 'supautils'
 ```
 
-Protect any list of roles:
+Protect a list of roles:
 
 ```
 supautils.reserved_roles = "supabase_admin,supabase_auth_admin,supabase_storage_admin"
 ```
 
-Protect any list of memberships:
+Protect a list of memberships:
 
 ```
 supautils.reserved_memberships = "pg_read_server_files, pg_write_server_files, pg_execute_server_program"
