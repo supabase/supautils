@@ -1,9 +1,9 @@
-EXTENSION = pg_supa
-DATA = src/pg_supa--0.1.0.sql
+EXTENSION = supautils
+DATA = src/supautils--0.1.0.sql
 
 MODULE_big = supautils
 OBJS = src/supautils.o
-REGRESS = reserved_roles reserved_memberships pg_supa
+REGRESS = reserved_roles reserved_memberships supautils
 REGRESS_OPTS = --inputdir=test
 
 PG_CONFIG = pg_config
