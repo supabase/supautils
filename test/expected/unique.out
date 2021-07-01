@@ -1,6 +1,24 @@
-select supa.unique(array[1, 2, 2, 4])
+select supa.unique(array['a', 'a', 'b', 'a']);
+ unique 
+--------
+ {a,b}
+(1 row)
+
+select supa.unique(array[1, 2, 3, 2]);
  unique  
 ---------
- {1,2,4}
+ {1,2,3}
+(1 row)
+
+select supa.unique(array[]::int[]);
+ unique 
+--------
+ 
+(1 row)
+
+select supa.unique(null::int[]);
+ unique 
+--------
+ 
 (1 row)
 

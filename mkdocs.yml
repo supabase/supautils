@@ -4,6 +4,10 @@ site_description: A PostgreSQL extension for managing background tasks
 
 theme:
     name: 'material'
+    favicon: 'assets/favicon.ico'
+    # TODO
+    logo: 'assets/favicon.ico'
+    homepage: https://supabase.github.io/supautils
 
 repo_name: supabase/supautils
 repo_url: https://github.com/supabase/supautils
@@ -17,5 +21,7 @@ nav:
     - Contributing: 'contributing.md'
 
 markdown_extensions:
-  - codehilite
-  - admonition
+    - pymdownx.highlight:
+        linenums: true
+    - pymdownx.superfences
+    - pymdownx.snippets

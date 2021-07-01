@@ -2,7 +2,9 @@
 
 <p>
 
-<a href="https://github.com/supabase/supautils/actions"><img src="https://github.com/supabase/supautils/workflows/test/badge.svg" alt="Tests" height="18"></a>
+<a href="https://github.com/supabase/supautils/actions"><img src="https://github.com/supabase/supautils/actions/workflows/main.yml/badge.svg" alt="Tests" height="18"></a>
+<a href="https://github.com/olirice/alembic_utils/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/markdown-subtemplate.svg" alt="License" height="18"></a>
+<a href=""><img src="https://img.shields.io/badge/postgresql-12+-blue.svg" alt="PostgreSQL version" height="18"></a>
 
 </p>
 
