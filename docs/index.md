@@ -16,6 +16,6 @@
 
 `supautils` is a PostgreSQL extension providing:
 
-- The [supabase](https://supabase.io/) SQL standard library
 - Enhanced security for modifying roles
+- The [supabase](https://supabase.io/) SQL standard library
 - Experimental/Unstable of the supabase hosted platform (behind setting flags) 

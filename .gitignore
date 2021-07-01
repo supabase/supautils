@@ -3,3 +3,4 @@ regression.*
 *.o
 *.so
 *.bc
+venv/
