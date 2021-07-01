@@ -12,6 +12,8 @@ let
       installPhase = ''
         mkdir -p $out/bin
         install -D supautils.so -t $out/lib
+        install -D -t $out/share/postgresql/extension sql/supautils--*.sql
+        install -D -t $out/share/postgresql/extension supautils.control
       '';
     };
   pgWithExt = { postgresql } :
@@ -39,7 +41,9 @@ let
 
       pg_ctl start -o "$options" -o "$ext_options"
 
-      psql -v ON_ERROR_STOP=1 -f test/fixtures.sql
+      createdb contrib_regression
+
+      psql -v ON_ERROR_STOP=1 -f test/fixtures.sql -d contrib_regression
 
       "$@"
     '';

@@ -1,0 +1,6 @@
+select supa.unique(array[1, 2, 2, 4])
+ unique  
+---------
+ {1,2,4}
+(1 row)
+
