@@ -41,7 +41,9 @@ let
 
       pg_ctl start -o "$options" -o "$ext_options"
 
-      psql -v ON_ERROR_STOP=1 -f test/fixtures.sql
+      createdb contrib_regression
+
+      psql -v ON_ERROR_STOP=1 -f test/fixtures.sql -d contrib_regression
 
       "$@"
     '';

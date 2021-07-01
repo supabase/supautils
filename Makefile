@@ -1,10 +1,11 @@
 EXTENSION = supautils
-DATA = src/supautils--0.1.0.sql
+DATA = $(wildcard sql/*--*.sql)
 
 MODULE_big = supautils
 OBJS = src/supautils.o
-REGRESS = reserved_roles reserved_memberships supautils
-REGRESS_OPTS = --inputdir=test
+TESTS = $(wildcard test/sql/*.sql)
+REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
+REGRESS_OPTS = --use-existing --inputdir=test
 
 PG_CONFIG = pg_config
 PGXS := $(shell $(PG_CONFIG) --pgxs)

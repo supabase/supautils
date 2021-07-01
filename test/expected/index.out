@@ -1,0 +1,6 @@
+select supa.index(array['a','b','c'], 'c');
+ index 
+-------
+     3
+(1 row)
+
