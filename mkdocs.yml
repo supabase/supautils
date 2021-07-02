@@ -1,0 +1,31 @@
+site_name: supautils
+site_url: https://supabase.github.io/supautils
+site_description: A PostgreSQL extension for managing background tasks
+
+repo_name: supabase/supautils
+repo_url: https://github.com/supabase/supautils
+
+nav:
+    - Welcome: 'index.md'
+    - Installation: 'installation.md'
+    - Standard Library: 'standard_library.md'
+    - Role Security: 'role_security.md'
+    - Experimental: 'experimental.md'
+    - Contributing: 'contributing.md'
+
+
+theme:
+    name: 'material'
+    favicon: 'assets/favicon.ico'
+    # TODO
+    logo: 'assets/favicon.ico'
+    homepage: https://supabase.github.io/supautils
+    palette:
+        primary: black
+        accent: light green
+
+markdown_extensions:
+    - pymdownx.highlight:
+        linenums: true
+    - pymdownx.superfences
+    - pymdownx.snippets

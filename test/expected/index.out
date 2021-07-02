@@ -4,3 +4,21 @@ select supa.index(array['a','b','c'], 'c');
      3
 (1 row)
 
+select supa.index(array[1, 2, 3], 4);
+ index 
+-------
+      
+(1 row)
+
+select supa.index(array[]::int[], 1);
+ index 
+-------
+      
+(1 row)
+
+select supa.index(null::int[], 1);
+ index 
+-------
+      
+(1 row)
+

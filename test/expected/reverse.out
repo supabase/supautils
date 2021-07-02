@@ -1,6 +1,24 @@
-select supa.reverse(array[1, 2, 2, 4])
-  reverse  
------------
- {4,2,2,1}
+select supa.reverse(array['a', 'b', 'c']);
+ reverse 
+---------
+ {c,b,a}
+(1 row)
+
+select supa.reverse(array[1, 2, 3]);
+ reverse 
+---------
+ {3,2,1}
+(1 row)
+
+select supa.reverse(array[]::int[]);
+ reverse 
+---------
+ 
+(1 row)
+
+select supa.reverse(null::int[]);
+ reverse 
+---------
+ 
 (1 row)
 
