@@ -25,6 +25,7 @@
 						 errmsg("parameter \"%s\" must be a comma-separated list of " \
 							 "identifiers", name)));
 
+// required macro for extension libraries to work
 PG_MODULE_MAGIC;
 
 static char *reserved_roles               = NULL;
@@ -58,7 +59,9 @@ static char* look_for_reserved_role(Node *utility_stmt,
 void
 _PG_init(void)
 {
+	// Store the previous hook
 	prev_hook = ProcessUtility_hook;
+	// Set our hook
 	ProcessUtility_hook = supautils_hook;
 
 	DefineCustomStringVariable("supautils.reserved_roles",
@@ -106,6 +109,7 @@ supautils_hook(PlannedStmt *pstmt,
 #endif
 )
 {
+	// Get the utility statement from the planned statement
 	Node		 *utility_stmt = pstmt->utilityStmt;
 
 	// Check reserved objects if not a superuser
@@ -116,8 +120,10 @@ supautils_hook(PlannedStmt *pstmt,
 			List *memberships_list;
 			char *reserved_membership = NULL;
 
-			// Parse the comma-separated list of reserved memberships
+			// split the comma-separated string into a List by using a
+			// helper function from varlena.h
 			if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &memberships_list))
+				// abort and report an error if the splitting fails
 				EREPORT_INVALID_PARAMETER("supautils.reserved_memberships");
 
 			// Do the core logic
@@ -167,7 +173,8 @@ supautils_hook(PlannedStmt *pstmt,
 static char*
 look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
 {
-	switch (nodeTag(utility_stmt))
+	// Check the utility statement type
+	switch (utility_stmt->type)
 	{
 		//GRANT <role> TO <another_role>
 		case T_GrantRoleStmt:
