@@ -8,3 +8,4 @@ results/*.out
 results/stdlib/*.out
 results/stdlib/array/*.out
 results/stdlib/inspect/*.out
+results/stdlib/ast/*.out
