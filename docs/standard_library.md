@@ -11,7 +11,7 @@ All examples assume `supautils` was created in a schema named `supa`.
 Return one-based index in the array of the first item whose value is equal to x. Returns `null` if there is no such item.
 
 ```sql
---8<-- "test/expected/index.out"
+--8<-- "test/expected/stdlib/array/index.out"
 ```
 
 #### reverse
@@ -19,7 +19,7 @@ Return one-based index in the array of the first item whose value is equal to x.
 Return an array that is in reverse order from the input array.
 
 ```sql
---8<-- "test/expected/reverse.out"
+--8<-- "test/expected/stdlib/array/reverse.out"
 ```
 
 #### unique
@@ -27,5 +27,24 @@ Return an array that is in reverse order from the input array.
 Return an array containing unique elements of the input array.
 
 ```sql
---8<-- "test/expected/unique.out"
+--8<-- "test/expected/stdlib/array/unique.out"
 ```
+
+
+### Inspect
+
+#### table_row_count_estimate
+Return the approximate number of rows in a table.
+
+```sql
+--8<-- "test/expected/stdlib/inspect/table_row_count_estimate.out"
+```
+
+
+#### query_row_count_estimate
+Return the approximate number of rows to be selected in a query.
+
+```sql
+--8<-- "test/expected/stdlib/inspect/query_row_count_estimate.out"
+```
+

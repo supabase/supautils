@@ -1,0 +1,9 @@
+select supa.query_row_count_estimate($$
+    select *
+    from generate_series(1, 100);
+$$::text);
+ query_row_count_estimate 
+--------------------------
+                      100
+(1 row)
+
