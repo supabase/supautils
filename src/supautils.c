@@ -7,9 +7,6 @@
 #include "parser/parser.h"
 #include "utils/builtins.h"
 #include "nodes/print.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
