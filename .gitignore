@@ -4,3 +4,7 @@ regression.*
 *.bc
 venv/
 site/
+results/*.out
+results/stdlib/*.out
+results/stdlib/array/*.out
+results/stdlib/inspect/*.out
