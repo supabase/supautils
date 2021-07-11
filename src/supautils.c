@@ -34,16 +34,17 @@ static ProcessUtility_hook_type prev_hook	= NULL;
 void _PG_init(void);
 void _PG_fini(void);
 
-static void supautils_hook(PlannedStmt *pstmt,
-						const char *queryString,
-						ProcessUtilityContext context,
-						ParamListInfo params,
-						QueryEnvironment *queryEnv,
-						DestReceiver *dest,
+static void
+supautils_hook(PlannedStmt *pstmt,
+				const char *queryString,
+				ProcessUtilityContext context,
+				ParamListInfo params,
+				QueryEnvironment *queryEnv,
+				DestReceiver *dest,
 #if PG13_GTE
-						QueryCompletion *completionTag
+				QueryCompletion *completionTag
 #else
-						char *completionTag
+				char *completionTag
 #endif
 );
 
@@ -113,10 +114,12 @@ supautils_hook(PlannedStmt *pstmt,
 	Node   *utility_stmt = pstmt->utilityStmt;
 
 	// Check reserved objects if not a superuser
-	if (!superuser()){
+	if (!superuser())
+	{
 
 		// Check if supautils.reserved_memberships is not empty
-		if(reserved_memberships){
+		if(reserved_memberships)
+		{
 			List *memberships_list;
 			char *reserved_membership = NULL;
 
@@ -139,7 +142,8 @@ supautils_hook(PlannedStmt *pstmt,
 		}
 
 		// Ditto for supautils.reserved_roles
-		if(reserved_roles){
+		if(reserved_roles)
+		{
 			List *roles_list;
 			char *reserved_role = NULL;
 
@@ -167,8 +171,8 @@ supautils_hook(PlannedStmt *pstmt,
 }
 
 /*
-  Look if the utility statement grants a reserved membership,
-  return the membership if it does
+ * Look if the utility statement grants a reserved membership,
+ * return the membership if it does
  */
 static char*
 look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
@@ -182,7 +186,8 @@ look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
 				GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
 				ListCell *role_cell;
 
-				if(stmt->is_grant){
+				if(stmt->is_grant)
+				{
 					foreach(role_cell, stmt->granted_roles)
 					{
 						AccessPriv *priv = (AccessPriv *) lfirst(role_cell);
@@ -262,7 +267,7 @@ look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
 				}
 
 				break;
-			};
+			}
 		default:
 			break;
 	}
@@ -271,8 +276,8 @@ look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
 }
 
 /*
-  Look if the utility statement modifies a reserved role,
-  return the role if it does
+ * Look if the utility statement modifies a reserved role,
+ * return the role if it does
  */
 static char*
 look_for_reserved_role(Node *utility_stmt, List *roles_list)
@@ -300,7 +305,7 @@ look_for_reserved_role(Node *utility_stmt, List *roles_list)
 				}
 
 				break;
-			};
+			}
 		// ALTER ROLE <role> NOLOGIN NOINHERIT..
 		case T_AlterRoleStmt:
 			{
