@@ -368,15 +368,26 @@ look_for_reserved_role(Node *utility_stmt, List *roles_list)
 					RoleSpec *role = lfirst(item);
 					ListCell *role_cell;
 
-					// Break if the role is PUBLIC, let pg give a better error later
-					if (role->roletype == ROLESPEC_PUBLIC)
+					/*
+					 * We check only for a named role being dropped; we ignore
+					 * the special values like PUBLIC, CURRENT_USER, and
+					 * SESSION_USER. We let Postgres throw its usual error messages
+					 * for those special values.
+					 */
+					if (role->roletype != ROLESPEC_CSTRING)
 						break;
 
 					foreach(role_cell, roles_list)
 					{
 						char *reserved_role = (char *) lfirst(role_cell);
-
-						if (strcmp(get_rolespec_name(role), reserved_role) == 0)
+						/*
+						 * We extract the string from RoleSpec, instead of using get_rolespec_name(),
+						 * because that function does a syscache lookup, and that would fail for
+						 * non-existent roles. E.g when IF EXISTS clause is being used, which is not
+						 * supposed to ERROR on non-existent roles. We leave handling of
+						 * non-existent roles up to Postgres.
+						 */
+						if (strcmp(role->rolename, reserved_role) == 0)
 							return reserved_role;
 					}
 				}

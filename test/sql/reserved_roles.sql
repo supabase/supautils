@@ -29,6 +29,7 @@ drop role public;
 drop role current_user;
 drop role session_user;
 alter role public;
+drop role if exists nonexistent, rol;
 \echo
 
 -- cannot create a reserved role that doesn't yet exist
