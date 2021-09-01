@@ -30,6 +30,7 @@ drop role current_user;
 drop role session_user;
 alter role public;
 drop role if exists nonexistent, rol;
+alter table foo rename to bar;
 \echo
 
 -- cannot create a reserved role that doesn't yet exist

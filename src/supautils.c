@@ -340,11 +340,17 @@ look_for_reserved_role(Node *utility_stmt, List *roles_list)
 
 				break;
 			}
-		// ALTER ROLE <role> RENAME TO ...
+		// All RENAME statements are caught here
 		case T_RenameStmt:
 			{
 				RenameStmt *stmt = (RenameStmt *) utility_stmt;
+
 				ListCell *role_cell;
+
+				// Make sure we only catch
+				// ALTER ROLE <role> RENAME TO
+				if (stmt->renameType != OBJECT_ROLE)
+					break;
 
 				foreach(role_cell, roles_list)
 				{
