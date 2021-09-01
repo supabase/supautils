@@ -43,6 +43,8 @@ ERROR:  role "public" does not exist
 drop role if exists nonexistent, rol;
 NOTICE:  role "nonexistent" does not exist, skipping
 NOTICE:  role "rol" does not exist, skipping
+alter table foo rename to bar;
+ERROR:  relation "foo" does not exist
 \echo
 
 -- cannot create a reserved role that doesn't yet exist
