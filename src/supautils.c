@@ -400,6 +400,28 @@ look_for_reserved_role(Node *utility_stmt, List *roles_list)
 
 				break;
 			}
+		// GRANT <role> TO <reserved_roles>
+		// REVOKE <role> FROM <reserved_roles>
+		case T_GrantRoleStmt:
+			{
+				GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
+				ListCell *grantee_role_cell;
+
+				foreach(grantee_role_cell, stmt->grantee_roles)
+				{
+					AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
+					ListCell *role_cell;
+					char *grantee_role = priv->priv_name;
+
+					foreach(role_cell, roles_list)
+					{
+						char *rolename = (char *) lfirst(role_cell);
+
+						if (strcmp(grantee_role, rolename) == 0)
+							return rolename;
+					}
+				}
+			}
 		default:
 			break;
 	}
