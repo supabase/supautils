@@ -47,6 +47,18 @@ drop role new_fake;
 create role non_reserved;
 \echo
 
+-- cannnot grant memberships to reserved-roles
+grant pg_monitor to anon;
+grant pg_read_all_settings to anon;
+grant pg_read_all_stats to anon;
+\echo
+
+-- cannnot revoke memberships from reserved-roles
+revoke pg_monitor from anon;
+revoke pg_read_all_settings from anon;
+revoke pg_read_all_stats from anon;
+\echo
+
 -- cannot bypass alter-options check by using current_user
 set role anon;
 alter role current_user password 'pass';

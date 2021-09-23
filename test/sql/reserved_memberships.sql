@@ -16,9 +16,9 @@ create role role_with_reserved_membership admin anon;
 \echo
 
 -- can grant non-reserved memberships
-grant pg_monitor to anon;
-grant pg_read_all_settings to anon;
-grant pg_read_all_stats to anon;
+grant pg_monitor to fake;
+grant pg_read_all_settings to fake;
+grant pg_read_all_stats to fake;
 \echo
 
 -- can grant non-reserved memberships when creating a role
