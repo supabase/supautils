@@ -80,6 +80,8 @@ _PG_init(void)
 								NULL,
 								PGC_SIGHUP, 0,
 								NULL, NULL, NULL);
+
+	EmitWarningsOnPlaceholders("supautils");
 }
 
 /*
