@@ -3,6 +3,8 @@
 #include "miscadmin.h"
 #include "utils/varlena.h"
 #include "utils/acl.h"
+#include "utils/guc.h"
+#include "utils/guc_tables.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 
@@ -48,6 +50,14 @@ supautils_hook(PlannedStmt *pstmt,
 #endif
 );
 
+static bool
+reserved_roles_check_hook(char **newval, void **extra, GucSource source);
+
+static bool
+reserved_memberships_check_hook(char **newval, void **extra, GucSource source);
+
+static void check_parameter(char *val, char *name);
+
 static char* look_for_reserved_membership(Node *utility_stmt,
 							List *memberships_list);
 static char* look_for_reserved_role(Node *utility_stmt,
@@ -71,7 +81,9 @@ _PG_init(void)
 								&reserved_roles,
 								NULL,
 								PGC_SIGHUP, 0,
-								NULL, NULL, NULL);
+								reserved_roles_check_hook,
+								NULL,
+								NULL);
 
 	DefineCustomStringVariable("supautils.reserved_memberships",
 								"Comma-separated list of roles whose memberships cannot be granted",
@@ -79,7 +91,9 @@ _PG_init(void)
 								&reserved_memberships,
 								NULL,
 								PGC_SIGHUP, 0,
-								NULL, NULL, NULL);
+								reserved_memberships_check_hook,
+								NULL,
+								NULL);
 
 	EmitWarningsOnPlaceholders("supautils");
 }
@@ -428,4 +442,34 @@ look_for_reserved_role(Node *utility_stmt, List *roles_list)
 			break;
 	}
 	return NULL;
+}
+
+static bool
+reserved_roles_check_hook(char **newval, void **extra, GucSource source)
+{
+	check_parameter(*newval, "supautils.reserved_roles");
+
+	return true;
+}
+
+static bool
+reserved_memberships_check_hook(char **newval, void **extra, GucSource source)
+{
+	check_parameter(*newval, "supautils.reserved_memberships");
+
+	return true;
+}
+
+static void
+check_parameter(char *val, char *name)
+{
+	List *comma_separated_list;
+	
+	if (val != NULL)
+	{
+		if (!SplitIdentifierString(pstrdup(val), ',', &comma_separated_list))
+			EREPORT_INVALID_PARAMETER(name);
+
+		list_free(comma_separated_list);
+	}
 }
