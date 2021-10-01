@@ -12,7 +12,7 @@ From [role attributes docs](https://www.postgresql.org/docs/current/role-attribu
 The above problem can be solved by configuring this extension to protect the `connector` role:
 
 ```
-supautils.reserved_roles = "connector"
+supautils.reserved_roles = 'connector'
 ```
 
 This extension also allows restricting memberships grants for a set of roles. Certain default postgres roles are dangerous
@@ -26,7 +26,7 @@ to expose to every database user. From [pg default roles](https://www.postgresql
 For example, you can restrict doing `GRANT pg_read_server_files TO my_role` with:
 
 ```
-supautils.reserved_memberships = "pg_read_server_files"
+supautils.reserved_memberships = 'pg_read_server_files'
 ```
 
 ## Configuration
@@ -35,12 +35,12 @@ Settings available in `postgresql.conf`:
 
 ### Protect Roles
 ```
-supautils.reserved_roles = "supabase_admin,supabase_auth_admin,supabase_storage_admin"
+supautils.reserved_roles = 'supabase_admin,supabase_auth_admin,supabase_storage_admin'
 ```
 
 ### Protect Memberships
 ```
-supautils.reserved_memberships = "pg_read_server_files, pg_write_server_files, pg_execute_server_program"
+supautils.reserved_memberships = 'pg_read_server_files, pg_write_server_files, pg_execute_server_program'
 ```
 
 
