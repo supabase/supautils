@@ -13,4 +13,4 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Run tests
-      run: nix-shell --run "supautils-with-pg-12 make installcheck && supautils-with-pg-13 make installcheck"
+      run: nix-shell --run "supautils-with-pg-12 make installcheck && supautils-with-pg-13 make installcheck && supautils-with-pg-14 make installcheck"

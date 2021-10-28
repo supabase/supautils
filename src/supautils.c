@@ -7,6 +7,7 @@
 #include "utils/guc_tables.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
+#define PG14_GTE (PG_VERSION_NUM >= 140000)
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)									\
 	ereport(ERROR,															\
@@ -39,6 +40,9 @@ void _PG_fini(void);
 static void
 supautils_hook(PlannedStmt *pstmt,
 				const char *queryString,
+#if PG14_GTE
+				bool readOnlyTree,
+#endif
 				ProcessUtilityContext context,
 				ParamListInfo params,
 				QueryEnvironment *queryEnv,
@@ -115,6 +119,9 @@ _PG_fini(void)
 static void
 supautils_hook(PlannedStmt *pstmt,
 				const char *queryString,
+#if PG14_GTE
+				bool readOnlyTree,
+#endif
 				ProcessUtilityContext context,
 				ParamListInfo params,
 				QueryEnvironment *queryEnv,
@@ -178,10 +185,16 @@ supautils_hook(PlannedStmt *pstmt,
 	// Chain to previously defined hooks
 	if (prev_hook)
 		prev_hook(pstmt, queryString,
-								context, params, queryEnv,
-								dest, completionTag);
+#if PG14_GTE
+				  readOnlyTree,
+#endif
+				  context, params, queryEnv,
+				  dest, completionTag);
 	else
 		standard_ProcessUtility(pstmt, queryString,
+#if PG14_GTE
+								readOnlyTree,
+#endif
 								context, params, queryEnv,
 								dest, completionTag);
 }
