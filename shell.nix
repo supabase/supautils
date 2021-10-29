@@ -1,7 +1,7 @@
 with import (builtins.fetchTarball {
-  name = "2020-12-22";
-  url = "https://github.com/NixOS/nixpkgs/archive/2a058487cb7a50e7650f1657ee0151a19c59ec3b.tar.gz";
-  sha256 = "1h8c0mk6jlxdmjqch6ckj30pax3hqh6kwjlvp2021x3z4pdzrn9p";
+  name = "2021-09-29";
+  url = "https://github.com/NixOS/nixpkgs/archive/76b1e16c6659ccef7187ca69b287525fea133244.tar.gz";
+  sha256 = "1vsahpcx80k2bgslspb0sa6j4bmhdx77sw6la455drqcrqhdqj6a";
 }) {};
 let
   supautils = { postgresql }:
@@ -53,7 +53,8 @@ let
     '';
   supautils-with-pg-12 = writeShellScriptBin "supautils-with-pg-12" (pgWithExt { postgresql = postgresql_12; });
   supautils-with-pg-13 = writeShellScriptBin "supautils-with-pg-13" (pgWithExt { postgresql = postgresql_13; });
+  supautils-with-pg-14 = writeShellScriptBin "supautils-with-pg-14" (pgWithExt { postgresql = postgresql_14; });
 in
 mkShell {
-  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 ];
+  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 supautils-with-pg-14];
 }

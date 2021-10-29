@@ -19,6 +19,9 @@ $ supautils-with-pg-12 make installcheck
 # test on pg 13
 $ supautils-with-pg-13 make installcheck
 
+# test on pg 14
+$ supautils-with-pg-14 make installcheck
+
 # you can also test manually with
 $ supautils-with-pg-12 psql -U rolecreator
 ```
