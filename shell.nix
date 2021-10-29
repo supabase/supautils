@@ -1,5 +1,5 @@
 with import (builtins.fetchTarball {
-  name = "2020-12-22";
+  name = "2021-09-29";
   url = "https://github.com/NixOS/nixpkgs/archive/76b1e16c6659ccef7187ca69b287525fea133244.tar.gz";
   sha256 = "1vsahpcx80k2bgslspb0sa6j4bmhdx77sw6la455drqcrqhdqj6a";
 }) {};
