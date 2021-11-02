@@ -1,4 +1,5 @@
 #include "postgres.h"
+#include "access/xact.h"
 #include "tcop/utility.h"
 #include "miscadmin.h"
 #include "utils/varlena.h"
@@ -137,7 +138,7 @@ supautils_hook(PlannedStmt *pstmt,
 	Node   *utility_stmt = pstmt->utilityStmt;
 
 	// Check reserved objects if not a superuser
-	if (!superuser())
+	if (IsTransactionState() && !superuser())
 	{
 
 		// Check if supautils.reserved_memberships is not empty
