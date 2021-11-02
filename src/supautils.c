@@ -1,11 +1,12 @@
 #include "postgres.h"
+
 #include "access/xact.h"
-#include "tcop/utility.h"
 #include "miscadmin.h"
-#include "utils/varlena.h"
+#include "tcop/utility.h"
 #include "utils/acl.h"
 #include "utils/guc.h"
 #include "utils/guc_tables.h"
+#include "utils/varlena.h"
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
