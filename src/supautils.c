@@ -174,6 +174,9 @@ supautils_hook(PlannedStmt *pstmt,
 					if (OidIsValid(get_role_oid(created_role, true)))
 						break;
 
+					/* CREATE ROLE <reserved_role> */
+					comfirm_reserved_roles(created_role);
+
 					/* Check to see if there are any descriptions related to membership. */
 					foreach(option_cell, stmt->options)
 					{
@@ -185,9 +188,6 @@ supautils_hook(PlannedStmt *pstmt,
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
 					}
-					
-					/* CREATE ROLE <reserved_role> */
-					comfirm_reserved_roles(created_role);
 
 					/* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
 					if (addroleto)
