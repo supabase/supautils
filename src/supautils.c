@@ -56,6 +56,12 @@ supautils_hook(PlannedStmt *pstmt,
 #endif
 );
 
+static void
+comfirm_reserved_roles(const char *target);
+
+static void
+comfirm_reserved_memberships(const char *target);
+
 static bool
 reserved_roles_check_hook(char **newval, void **extra, GucSource source);
 
@@ -64,10 +70,6 @@ reserved_memberships_check_hook(char **newval, void **extra, GucSource source);
 
 static void check_parameter(char *val, char *name);
 
-static char* look_for_reserved_membership(Node *utility_stmt,
-							List *memberships_list);
-static char* look_for_reserved_role(Node *utility_stmt,
-							List *roles_list);
 
 /*
  * IO: module load callback
@@ -138,50 +140,162 @@ supautils_hook(PlannedStmt *pstmt,
 	// Get the utility statement from the planned statement
 	Node   *utility_stmt = pstmt->utilityStmt;
 
-	// Check reserved objects if not a superuser
-	if (IsTransactionState() && !superuser())
+	switch (utility_stmt->type)
 	{
+		/*
+		 * ALTER ROLE <role> NOLOGIN NOINHERIT..
+		 * ALTER ROLE <role> SET search_path TO ...
+		 */
+		case T_AlterRoleStmt:
+		case T_AlterRoleSetStmt:
+			{
+				if (IsTransactionState() && !superuser())
+				{
+					AlterRoleStmt *stmt = (AlterRoleStmt *) utility_stmt;
+					comfirm_reserved_roles(get_rolespec_name(stmt->role));
+				}
+				break;
+			}
 
-		// Check if supautils.reserved_memberships is not empty
-		if(reserved_memberships)
-		{
-			List *memberships_list;
-			char *reserved_membership = NULL;
+		/* 
+		 * CREATE ROLE
+		 */
+		case T_CreateRoleStmt:
+			{
+				if (IsTransactionState() && !superuser())
+				{
+					CreateRoleStmt *stmt = (CreateRoleStmt *) utility_stmt;
+					const char *created_role = stmt->role;
+					List *addroleto = NIL;	/* roles to make this a member of */
+					bool hasrolemembers = false;	/* has roles to be members of this role */
+					ListCell *option_cell;
 
-			// split the comma-separated string into a List by using a
-			// helper function from varlena.h
-			if (!SplitIdentifierString(pstrdup(reserved_memberships), ',', &memberships_list))
-				// abort and report an error if the splitting fails
-				EREPORT_INVALID_PARAMETER("supautils.reserved_memberships");
+					/* if role already exists, bypass the hook to let it fail with the usual error */
+					if (OidIsValid(get_role_oid(created_role, true)))
+						break;
 
-			// Do the core logic
-			reserved_membership = look_for_reserved_membership(utility_stmt, memberships_list);
+					/* CREATE ROLE <reserved_role> */
+					comfirm_reserved_roles(created_role);
 
-			// Need to free the list according to the SplitIdentifierString implementation,
-			// defined in src/backend/utils/adt/varlena.c
-			list_free(memberships_list);
+					/* Check to see if there are any descriptions related to membership. */
+					foreach(option_cell, stmt->options)
+					{
+						DefElem *defel = (DefElem *) lfirst(option_cell);
+						if (strcmp(defel->defname, "addroleto") == 0)
+							addroleto = (List *) defel->arg;
 
-			// Fail if there's a reserved membership in the statement
-			if(reserved_membership)
-				EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
-		}
+						if (strcmp(defel->defname, "rolemembers") == 0 || 
+							strcmp(defel->defname, "adminmembers") == 0)
+							hasrolemembers = true;
+					}
 
-		// Ditto for supautils.reserved_roles
-		if(reserved_roles)
-		{
-			List *roles_list;
-			char *reserved_role = NULL;
+					/* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
+					if (addroleto)
+					{
+						ListCell *role_cell;
+						foreach(role_cell, addroleto)
+						{
+							RoleSpec *rolemember = lfirst(role_cell);
+							comfirm_reserved_memberships(get_rolespec_name(rolemember));
+						}
+					}
 
-			if (!SplitIdentifierString(pstrdup(reserved_roles), ',', &roles_list))
-				EREPORT_INVALID_PARAMETER("supautils.reserved_roles");
+					/* 
+					 * CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
+					 *
+					 * This is a contrived case because the "role_with_reserved_membership" 
+					 * should already exist, but handle it anyway.
+					 */
+					if (hasrolemembers)
+						comfirm_reserved_memberships(created_role);
+				}
+				break;
+			}
 
-			reserved_role = look_for_reserved_role(utility_stmt, roles_list);
+		/*
+		 * DROP ROLE
+		 */
+		case T_DropRoleStmt:
+			{
+				if (IsTransactionState() && !superuser())
+				{
+					DropRoleStmt *stmt = (DropRoleStmt *) utility_stmt;
+					ListCell *item;
 
-			list_free(roles_list);
+					foreach(item, stmt->roles)
+					{
+						RoleSpec *role = lfirst(item);
 
-			if(reserved_role)
-				EREPORT_RESERVED_ROLE(reserved_role);
-		}
+						/*
+						 * We check only for a named role being dropped; we ignore
+						 * the special values like PUBLIC, CURRENT_USER, and
+						 * SESSION_USER. We let Postgres throw its usual error messages
+						 * for those special values.
+						 */
+						if (role->roletype != ROLESPEC_CSTRING)
+							break;
+
+						comfirm_reserved_roles(role->rolename);
+					}
+				}
+				break;
+			}
+
+		/*
+		 * GRANT <role> and REVOKE <role>
+		 */
+		case T_GrantRoleStmt:
+			{
+				if (IsTransactionState() && !superuser())
+				{
+					GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
+					ListCell *grantee_role_cell;
+					ListCell *role_cell;
+
+					/* GRANT <role> TO <another_role> */
+					if (stmt->is_grant)
+					{
+						foreach(role_cell, stmt->granted_roles)
+						{
+							AccessPriv *priv = (AccessPriv *) lfirst(role_cell);
+							comfirm_reserved_memberships(priv->priv_name);
+						}
+					}
+
+					/*
+					 * GRANT <role> TO <reserved_roles>
+					 * REVOKE <role> FROM <reserved_roles>
+					 */
+					foreach(grantee_role_cell, stmt->grantee_roles)
+					{
+						AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
+						comfirm_reserved_roles(priv->priv_name);
+					}
+				}
+				break;
+			}
+
+		/*
+		 * All RENAME statements are caught here
+		 */
+		case T_RenameStmt:
+			{
+				if (IsTransactionState() && !superuser())
+				{
+					RenameStmt *stmt = (RenameStmt *) utility_stmt;
+
+					/* Make sure we only catch "ALTER ROLE <role> RENAME TO" */
+					if (stmt->renameType != OBJECT_ROLE)
+						break;
+
+					comfirm_reserved_roles(stmt->subname);
+					comfirm_reserved_roles(stmt->newname);
+				}
+				break;
+			}
+
+		default:
+			break;
 	}
 
 	// Chain to previously defined hooks
@@ -201,263 +315,6 @@ supautils_hook(PlannedStmt *pstmt,
 								dest, completionTag);
 }
 
-/*
- * Look if the utility statement grants a reserved membership,
- * return the membership if it does
- */
-static char*
-look_for_reserved_membership(Node *utility_stmt, List *memberships_list)
-{
-	// Check the utility statement type
-	switch (utility_stmt->type)
-	{
-		//GRANT <role> TO <another_role>
-		case T_GrantRoleStmt:
-			{
-				GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
-				ListCell *role_cell;
-
-				if(stmt->is_grant)
-				{
-					foreach(role_cell, stmt->granted_roles)
-					{
-						AccessPriv *priv = (AccessPriv *) lfirst(role_cell);
-						ListCell *membership_cell;
-						const char *rolename = priv->priv_name;
-
-						foreach(membership_cell, memberships_list)
-						{
-							char *reserved_membership = (char *) lfirst(membership_cell);
-
-							if (strcmp(rolename, reserved_membership) == 0)
-								return reserved_membership;
-						}
-					}
-				}
-
-				break;
-			}
-		// CREATE ROLE <any_role> has ways to add memberships
-		case T_CreateRoleStmt:
-			{
-				CreateRoleStmt *stmt = (CreateRoleStmt *) utility_stmt;
-
-				const char *role = stmt->role;
-				ListCell   *option_cell;
-
-				List *addroleto = NIL;	/* roles to make this a member of */
-				bool hasrolemembers = false;	/* has roles to be members of this role */
-
-				foreach(option_cell, stmt->options)
-				{
-					DefElem   *defel = (DefElem *) lfirst(option_cell);
-					if (strcmp(defel->defname, "addroleto") == 0)
-					{
-						addroleto = (List *) defel->arg;
-					}
-
-					if (strcmp(defel->defname, "rolemembers") == 0 || strcmp(defel->defname, "adminmembers") == 0)
-					{
-						hasrolemembers = true;
-					}
-				}
-
-				// CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership>
-				if (addroleto)
-				{
-					ListCell   *role_cell;
-
-					foreach(role_cell, addroleto)
-					{
-						RoleSpec *rolemember = lfirst(role_cell);
-						ListCell *membership_cell;
-
-						foreach(membership_cell, memberships_list)
-						{
-							char *reserved_membership = (char *) lfirst(membership_cell);
-
-							if (strcmp(get_rolespec_name(rolemember), reserved_membership) == 0)
-								return reserved_membership;
-						}
-					}
-				}
-
-				// CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
-				// This is a contrived case because the "role_with_reserved_membership" should already exist, but handle it anyway.
-				if (hasrolemembers)
-				{
-					ListCell *membership_cell;
-
-					foreach(membership_cell, memberships_list)
-					{
-						char *reserved_membership = (char *) lfirst(membership_cell);
-
-						if (strcmp(role, reserved_membership) == 0)
-							return reserved_membership;
-					}
-				}
-
-				break;
-			}
-		default:
-			break;
-	}
-
-	return NULL;
-}
-
-/*
- * Look if the utility statement modifies a reserved role,
- * return the role if it does
- */
-static char*
-look_for_reserved_role(Node *utility_stmt, List *roles_list)
-{
-	switch (nodeTag(utility_stmt))
-	{
-		//CREATE ROLE <role>
-		case T_CreateRoleStmt:
-			{
-				CreateRoleStmt *stmt = (CreateRoleStmt *) utility_stmt;
-				ListCell *role_cell;
-
-				const char *role = stmt->role;
-
-				// if role already exists, bypass the hook to let it fail with the usual error
-				if (OidIsValid(get_role_oid(role, true)))
-					break;
-
-				foreach(role_cell, roles_list)
-				{
-					char *reserved_role = (char *) lfirst(role_cell);
-
-					if (strcmp(role, reserved_role) == 0)
-						return reserved_role;
-				}
-
-				break;
-			}
-		// ALTER ROLE <role> NOLOGIN NOINHERIT..
-		case T_AlterRoleStmt:
-			{
-				AlterRoleStmt *stmt = (AlterRoleStmt *) utility_stmt;
-				RoleSpec *role = stmt->role;
-				ListCell *role_cell;
-
-				foreach(role_cell, roles_list)
-				{
-					char *reserved_role = (char *) lfirst(role_cell);
-
-					if (strcmp(get_rolespec_name(role), reserved_role) == 0)
-						return reserved_role;
-				}
-
-				break;
-			}
-		// ALTER ROLE <role> SET search_path TO ...
-		case T_AlterRoleSetStmt:
-			{
-				AlterRoleSetStmt *stmt = (AlterRoleSetStmt *) utility_stmt;
-				RoleSpec *role = stmt->role;
-				ListCell *role_cell;
-
-				foreach(role_cell, roles_list)
-				{
-					char *reserved_role = (char *) lfirst(role_cell);
-
-					if (strcmp(get_rolespec_name(role), reserved_role) == 0)
-						return reserved_role;
-				}
-
-				break;
-			}
-		// All RENAME statements are caught here
-		case T_RenameStmt:
-			{
-				RenameStmt *stmt = (RenameStmt *) utility_stmt;
-
-				ListCell *role_cell;
-
-				// Make sure we only catch
-				// ALTER ROLE <role> RENAME TO
-				if (stmt->renameType != OBJECT_ROLE)
-					break;
-
-				foreach(role_cell, roles_list)
-				{
-					char *reserved_role = (char *) lfirst(role_cell);
-
-					if (strcmp(stmt->subname, reserved_role) == 0 ||
-							strcmp(stmt->newname, reserved_role) == 0)
-						return reserved_role;
-				}
-
-				break;
-			}
-		// DROP ROLE <role>
-		case T_DropRoleStmt:
-			{
-				DropRoleStmt *stmt = (DropRoleStmt *) utility_stmt;
-				ListCell *item;
-
-				foreach(item, stmt->roles)
-				{
-					RoleSpec *role = lfirst(item);
-					ListCell *role_cell;
-
-					/*
-					 * We check only for a named role being dropped; we ignore
-					 * the special values like PUBLIC, CURRENT_USER, and
-					 * SESSION_USER. We let Postgres throw its usual error messages
-					 * for those special values.
-					 */
-					if (role->roletype != ROLESPEC_CSTRING)
-						break;
-
-					foreach(role_cell, roles_list)
-					{
-						char *reserved_role = (char *) lfirst(role_cell);
-						/*
-						 * We extract the string from RoleSpec, instead of using get_rolespec_name(),
-						 * because that function does a syscache lookup, and that would fail for
-						 * non-existent roles. E.g when IF EXISTS clause is being used, which is not
-						 * supposed to ERROR on non-existent roles. We leave handling of
-						 * non-existent roles up to Postgres.
-						 */
-						if (strcmp(role->rolename, reserved_role) == 0)
-							return reserved_role;
-					}
-				}
-
-				break;
-			}
-		// GRANT <role> TO <reserved_roles>
-		// REVOKE <role> FROM <reserved_roles>
-		case T_GrantRoleStmt:
-			{
-				GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
-				ListCell *grantee_role_cell;
-
-				foreach(grantee_role_cell, stmt->grantee_roles)
-				{
-					AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
-					ListCell *role_cell;
-					char *grantee_role = priv->priv_name;
-
-					foreach(role_cell, roles_list)
-					{
-						char *rolename = (char *) lfirst(role_cell);
-
-						if (strcmp(grantee_role, rolename) == 0)
-							return rolename;
-					}
-				}
-			}
-		default:
-			break;
-	}
-	return NULL;
-}
 
 static bool
 reserved_roles_check_hook(char **newval, void **extra, GucSource source)
@@ -487,4 +344,46 @@ check_parameter(char *val, char *name)
 
 		list_free(comma_separated_list);
 	}
+}
+
+static void
+comfirm_reserved_roles(const char *target)
+{
+	List *reserved_roles_list;
+	ListCell *role;
+
+	SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
+
+	foreach(role, reserved_roles_list)
+	{
+		char *reserved_role = (char *) lfirst(role);
+
+		if (strcmp(target, reserved_role) == 0)
+		{
+			list_free(reserved_roles_list);
+			EREPORT_RESERVED_ROLE(reserved_role);
+		}
+	}
+	list_free(reserved_roles_list);
+}
+
+static void
+comfirm_reserved_memberships(const char *target)
+{
+	List *reserved_memberships_list;
+	ListCell *membership;
+
+	SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserved_memberships_list);
+	
+	foreach(membership, reserved_memberships_list)
+	{
+		char *reserved_membership = (char *) lfirst(membership);
+
+		if (strcmp(target, reserved_membership) == 0)
+		{
+			list_free(reserved_memberships_list);
+			EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
+		}
+	}
+	list_free(reserved_memberships_list);
 }
