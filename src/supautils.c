@@ -352,19 +352,22 @@ comfirm_reserved_roles(const char *target)
 	List *reserved_roles_list;
 	ListCell *role;
 
-	SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
-
-	foreach(role, reserved_roles_list)
+	if (reserved_roles)
 	{
-		char *reserved_role = (char *) lfirst(role);
+		SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
 
-		if (strcmp(target, reserved_role) == 0)
+		foreach(role, reserved_roles_list)
 		{
-			list_free(reserved_roles_list);
-			EREPORT_RESERVED_ROLE(reserved_role);
+			char *reserved_role = (char *) lfirst(role);
+
+			if (strcmp(target, reserved_role) == 0)
+			{
+				list_free(reserved_roles_list);
+				EREPORT_RESERVED_ROLE(reserved_role);
+			}
 		}
+		list_free(reserved_roles_list);
 	}
-	list_free(reserved_roles_list);
 }
 
 static void
@@ -373,17 +376,20 @@ comfirm_reserved_memberships(const char *target)
 	List *reserved_memberships_list;
 	ListCell *membership;
 
-	SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserved_memberships_list);
-	
-	foreach(membership, reserved_memberships_list)
+	if (reserved_memberships)
 	{
-		char *reserved_membership = (char *) lfirst(membership);
-
-		if (strcmp(target, reserved_membership) == 0)
+		SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserved_memberships_list);
+		
+		foreach(membership, reserved_memberships_list)
 		{
-			list_free(reserved_memberships_list);
-			EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
+			char *reserved_membership = (char *) lfirst(membership);
+
+			if (strcmp(target, reserved_membership) == 0)
+			{
+				list_free(reserved_memberships_list);
+				EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
+			}
 		}
+		list_free(reserved_memberships_list);
 	}
-	list_free(reserved_memberships_list);
 }
