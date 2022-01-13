@@ -15,21 +15,21 @@
 	ereport(ERROR,															\
 			(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),						\
 			 errmsg("\"%s\" role memberships are reserved, only superusers "\
-				 "can grant them", name)))
+					"can grant them", name)))
 
 #define EREPORT_RESERVED_ROLE(name)											\
 	ereport(ERROR,															\
 			(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),						\
 			 errmsg("\"%s\" is a reserved role, only superusers can modify "\
-				 "it", name)))
+					"it", name)))
 
 #define EREPORT_INVALID_PARAMETER(name)										\
 	ereport(ERROR,															\
 			(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
 			 errmsg("parameter \"%s\" must be a comma-separated list of "	\
-				 "identifiers", name)));
+					"identifiers", name)));
 
-// required macro for extension libraries to work
+/* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
 
 static char *reserved_roles					= NULL;
@@ -41,18 +41,18 @@ void _PG_fini(void);
 
 static void
 supautils_hook(PlannedStmt *pstmt,
-				const char *queryString,
+			   const char *queryString,
 #if PG14_GTE
-				bool readOnlyTree,
+			   bool readOnlyTree,
 #endif
-				ProcessUtilityContext context,
-				ParamListInfo params,
-				QueryEnvironment *queryEnv,
-				DestReceiver *dest,
+			   ProcessUtilityContext context,
+			   ParamListInfo params,
+			   QueryEnvironment *queryEnv,
+			   DestReceiver *dest,
 #if PG13_GTE
-				QueryCompletion *completionTag
+			   QueryCompletion *completionTag
 #else
-				char *completionTag
+			   char *completionTag
 #endif
 );
 
@@ -77,31 +77,31 @@ static void check_parameter(char *val, char *name);
 void
 _PG_init(void)
 {
-	// Store the previous hook
+	/* Store the previous hook */
 	prev_hook = ProcessUtility_hook;
 
-	// Set our hook
+	/* Set our hook */
 	ProcessUtility_hook = supautils_hook;
 
 	DefineCustomStringVariable("supautils.reserved_roles",
-								"Comma-separated list of roles that cannot be modified",
-								NULL,
-								&reserved_roles,
-								NULL,
-								PGC_SIGHUP, 0,
-								reserved_roles_check_hook,
-								NULL,
-								NULL);
+							   "Comma-separated list of roles that cannot be modified",
+							   NULL,
+							   &reserved_roles,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   reserved_roles_check_hook,
+							   NULL,
+							   NULL);
 
 	DefineCustomStringVariable("supautils.reserved_memberships",
-								"Comma-separated list of roles whose memberships cannot be granted",
-								NULL,
-								&reserved_memberships,
-								NULL,
-								PGC_SIGHUP, 0,
-								reserved_memberships_check_hook,
-								NULL,
-								NULL);
+							   "Comma-separated list of roles whose memberships cannot be granted",
+							   NULL,
+							   &reserved_memberships,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   reserved_memberships_check_hook,
+							   NULL,
+							   NULL);
 
 	EmitWarningsOnPlaceholders("supautils");
 }
@@ -122,22 +122,22 @@ _PG_fini(void)
  */
 static void
 supautils_hook(PlannedStmt *pstmt,
-				const char *queryString,
+			   const char *queryString,
 #if PG14_GTE
-				bool readOnlyTree,
+			   bool readOnlyTree,
 #endif
-				ProcessUtilityContext context,
-				ParamListInfo params,
-				QueryEnvironment *queryEnv,
-				DestReceiver *dest,
+			   ProcessUtilityContext context,
+			   ParamListInfo params,
+			   QueryEnvironment *queryEnv,
+			   DestReceiver *dest,
 #if PG13_GTE
-				QueryCompletion *completionTag
+			   QueryCompletion *completionTag
 #else
-				char *completionTag
+			   char *completionTag
 #endif
 )
 {
-	// Get the utility statement from the planned statement
+	/* Get the utility statement from the planned statement */
 	Node   *utility_stmt = pstmt->utilityStmt;
 
 	switch (utility_stmt->type)
@@ -157,7 +157,7 @@ supautils_hook(PlannedStmt *pstmt,
 				break;
 			}
 
-		/* 
+		/*
 		 * CREATE ROLE
 		 */
 		case T_CreateRoleStmt:
@@ -184,7 +184,7 @@ supautils_hook(PlannedStmt *pstmt,
 						if (strcmp(defel->defname, "addroleto") == 0)
 							addroleto = (List *) defel->arg;
 
-						if (strcmp(defel->defname, "rolemembers") == 0 || 
+						if (strcmp(defel->defname, "rolemembers") == 0 ||
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
 					}
@@ -200,10 +200,10 @@ supautils_hook(PlannedStmt *pstmt,
 						}
 					}
 
-					/* 
+					/*
 					 * CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
 					 *
-					 * This is a contrived case because the "role_with_reserved_membership" 
+					 * This is a contrived case because the "role_with_reserved_membership"
 					 * should already exist, but handle it anyway.
 					 */
 					if (hasrolemembers)
@@ -298,7 +298,7 @@ supautils_hook(PlannedStmt *pstmt,
 			break;
 	}
 
-	// Chain to previously defined hooks
+	/* Chain to previously defined hooks */
 	if (prev_hook)
 		prev_hook(pstmt, queryString,
 #if PG14_GTE
@@ -336,7 +336,7 @@ static void
 check_parameter(char *val, char *name)
 {
 	List *comma_separated_list;
-	
+
 	if (val != NULL)
 	{
 		if (!SplitIdentifierString(pstrdup(val), ',', &comma_separated_list))
@@ -379,7 +379,7 @@ comfirm_reserved_memberships(const char *target)
 	if (reserved_memberships)
 	{
 		SplitIdentifierString(pstrdup(reserved_memberships), ',', &reserved_memberships_list);
-		
+
 		foreach(membership, reserved_memberships_list)
 		{
 			char *reserved_membership = (char *) lfirst(membership);
