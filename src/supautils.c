@@ -1,12 +1,16 @@
-#include "postgres.h"
+#include <postgres.h>
 
-#include "access/xact.h"
-#include "miscadmin.h"
-#include "tcop/utility.h"
-#include "utils/acl.h"
-#include "utils/guc.h"
-#include "utils/guc_tables.h"
-#include "utils/varlena.h"
+#include <access/xact.h>
+#include <fmgr.h>
+#include <miscadmin.h>
+#include <tcop/utility.h>
+#include <tsearch/ts_locale.h>
+#include <utils/acl.h>
+#include <utils/guc.h>
+#include <utils/guc_tables.h>
+#include <utils/varlena.h>
+#include <utils/jsonb.h>
+#include <utils/fmgrprotos.h>
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
@@ -34,6 +38,9 @@ PG_MODULE_MAGIC;
 
 static char *reserved_roles					= NULL;
 static char *reserved_memberships			= NULL;
+static char *placeholders			= NULL;
+static char *placeholders_disallowed_values			= NULL;
+static char *empty_placeholder = NULL;
 static ProcessUtility_hook_type prev_hook	= NULL;
 
 void _PG_init(void);
@@ -68,8 +75,16 @@ reserved_roles_check_hook(char **newval, void **extra, GucSource source);
 static bool
 reserved_memberships_check_hook(char **newval, void **extra, GucSource source);
 
-static void check_parameter(char *val, char *name);
+static bool
+placeholders_check_hook(char **newval, void **extra, GucSource source);
 
+static bool
+placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource source);
+
+static bool
+restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
+
+static void check_parameter(char *val, char *name);
 
 /*
  * IO: module load callback
@@ -102,6 +117,49 @@ _PG_init(void)
 							   reserved_memberships_check_hook,
 							   NULL,
 							   NULL);
+
+	DefineCustomStringVariable("supautils.placeholders",
+								 NULL,
+								 NULL,
+								 &placeholders,
+								 NULL,
+								 PGC_SIGHUP, 0,
+								 placeholders_check_hook,
+								 NULL,
+								 NULL);
+
+	DefineCustomStringVariable("supautils.placeholders_disallowed_values",
+								 NULL,
+								 NULL,
+								 &placeholders_disallowed_values,
+								 NULL,
+								 PGC_SIGHUP, 0,
+								 placeholders_disallowed_values_check_hook,
+								 NULL,
+								 NULL);
+
+	if(placeholders){
+		List* comma_separated_list;
+		ListCell* cell;
+
+		SplitIdentifierString(pstrdup(placeholders), ',', &comma_separated_list);
+
+		foreach(cell, comma_separated_list)
+		{
+			char *pholder = (char *) lfirst(cell);
+
+			DefineCustomStringVariable(pholder,
+										 NULL,
+										 NULL,
+										 &empty_placeholder,
+										 NULL,
+										 PGC_USERSET, 0,
+										 restrict_placeholders_check_hook,
+										 NULL,
+										 NULL);
+		}
+		list_free(comma_separated_list);
+	}
 
 	EmitWarningsOnPlaceholders("supautils");
 }
@@ -315,7 +373,6 @@ supautils_hook(PlannedStmt *pstmt,
 								dest, completionTag);
 }
 
-
 static bool
 reserved_roles_check_hook(char **newval, void **extra, GucSource source)
 {
@@ -328,6 +385,14 @@ static bool
 reserved_memberships_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.reserved_memberships");
+
+	return true;
+}
+
+static bool
+placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource source)
+{
+	check_parameter(*newval, "supautils.placeholders_disallowed_values");
 
 	return true;
 }
@@ -392,4 +457,68 @@ comfirm_reserved_memberships(const char *target)
 		}
 		list_free(reserved_memberships_list);
 	}
+}
+
+static bool
+placeholders_check_hook(char **newval, void **extra, GucSource source)
+{
+	char* val = *newval;
+
+	if (val)
+	{
+		List* comma_separated_list;
+		ListCell* cell;
+		bool saw_sep = false;
+
+		if(!SplitIdentifierString(pstrdup(val), ',', &comma_separated_list))
+			EREPORT_INVALID_PARAMETER("supautils.placeholders");
+
+		foreach(cell, comma_separated_list)
+		{
+			for (const char *p = lfirst(cell); *p; p++)
+			{
+				// check if the GUC has a "." in it(if it's a placeholder)
+				if (*p == GUC_QUALIFIER_SEPARATOR)
+					saw_sep = true;
+			}
+		}
+
+		list_free(comma_separated_list);
+
+		if(!saw_sep)
+			ereport(ERROR,															\
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
+					 errmsg("supautils.placeholders must contain guc placeholders")));
+
+	}
+
+	return true;
+}
+
+static bool
+restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
+{
+	char* val = *newval;
+
+	if(val && placeholders_disallowed_values){
+		List* comma_separated_list;
+		ListCell* cell;
+
+		SplitIdentifierString(pstrdup(placeholders_disallowed_values), ',', &comma_separated_list);
+
+		foreach(cell, comma_separated_list)
+		{
+			char* disallowed_value = (char *) lfirst(cell);
+			if (strstr(lowerstr(val), disallowed_value))
+			{
+				list_free(comma_separated_list);
+				ereport(ERROR,															\
+						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
+						 errmsg("The placeholder contains the \"%s\" disallowed value", disallowed_value)));
+			}
+		}
+		list_free(comma_separated_list);
+	}
+
+	return true;
 }

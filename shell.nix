@@ -12,7 +12,7 @@ let
       installPhase = ''
         mkdir -p $out/bin
         install -D supautils.so -t $out/lib
-        
+
         # Build stdlib
         ./bin/build_stdlib.sh
 
@@ -36,14 +36,15 @@ let
 
       PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 
-      options="-F -c listen_addresses=\"\" -k $PGDATA"
+      options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\""
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
 
-      ext_options="-c shared_preload_libraries=\"supautils\" -c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\""
+      reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\""
+      placeholder_stuff_options="-c supautils.placeholders=\"response.headers, another.placeholder\" -c supautils.placeholders_disallowed_values=\"content-type, x-special-header, special-value\""
 
-      pg_ctl start -o "$options" -o "$ext_options"
+      pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options"
 
       createdb contrib_regression
 
