@@ -36,12 +36,12 @@
 /* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
 
-static char *reserved_roles					= NULL;
-static char *reserved_memberships			= NULL;
-static char *placeholders			= NULL;
-static char *placeholders_disallowed_values			= NULL;
-static char *empty_placeholder = NULL;
-static ProcessUtility_hook_type prev_hook	= NULL;
+static char *reserved_roles                  = NULL;
+static char *reserved_memberships            = NULL;
+static char *placeholders                    = NULL;
+static char *placeholders_disallowed_values  = NULL;
+static char *empty_placeholder               = NULL;
+static ProcessUtility_hook_type prev_hook    = NULL;
 
 void _PG_init(void);
 void _PG_fini(void);
