@@ -8,3 +8,10 @@ select set_config('response.headers', '[{"X-Special-Header": "a-value"}]', true)
 
 -- placeholder restricted values fail on a SET
 set another.placeholder to 'special-value';
+\echo
+
+-- doesn't crash after a show all
+\o /dev/null
+show all;
+\o
+select 1;
