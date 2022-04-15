@@ -119,7 +119,7 @@ _PG_init(void)
 							   NULL);
 
 	DefineCustomStringVariable("supautils.placeholders",
-								 NULL,
+								 "GUC placeholders which will get values disallowed according to supautils.placeholders_disallowed_values",
 								 NULL,
 								 &placeholders,
 								 NULL,
@@ -129,7 +129,7 @@ _PG_init(void)
 								 NULL);
 
 	DefineCustomStringVariable("supautils.placeholders_disallowed_values",
-								 NULL,
+								 "disallowed values for the GUC placeholders defined in supautils.placeholders",
 								 NULL,
 								 &placeholders_disallowed_values,
 								 NULL,
@@ -149,7 +149,7 @@ _PG_init(void)
 			char *pholder = (char *) lfirst(cell);
 
 			DefineCustomStringVariable(pholder,
-										 NULL,
+										 "",
 										 NULL,
 										 &empty_placeholder,
 										 NULL,
