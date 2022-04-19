@@ -2,7 +2,7 @@ EXTENSION = supautils
 DATA = $(wildcard sql/*--*.sql)
 
 MODULE_big = supautils
-OBJS = src/supautils.o
+OBJS = src/supautils.o src/allowed_extensions.o
 
 TESTS = $(wildcard test/sql/*.sql test/sql/stdlib/array/*.sql test/sql/stdlib/inspect/*.sql)
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))

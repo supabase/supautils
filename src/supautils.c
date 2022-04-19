@@ -12,8 +12,8 @@
 #include <utils/jsonb.h>
 #include <utils/fmgrprotos.h>
 
-#define PG13_GTE (PG_VERSION_NUM >= 130000)
-#define PG14_GTE (PG_VERSION_NUM >= 140000)
+#include "allowed_extensions.h"
+#include "utils.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)									\
 	ereport(ERROR,															\
@@ -41,27 +41,15 @@ static char *reserved_memberships            = NULL;
 static char *placeholders                    = NULL;
 static char *placeholders_disallowed_values  = NULL;
 static char *empty_placeholder               = NULL;
+static char *allowed_extensions              = NULL;
+static char *extensions_superuser            = NULL;
 static ProcessUtility_hook_type prev_hook    = NULL;
 
 void _PG_init(void);
 void _PG_fini(void);
 
 static void
-supautils_hook(PlannedStmt *pstmt,
-			   const char *queryString,
-#if PG14_GTE
-			   bool readOnlyTree,
-#endif
-			   ProcessUtilityContext context,
-			   ParamListInfo params,
-			   QueryEnvironment *queryEnv,
-			   DestReceiver *dest,
-#if PG13_GTE
-			   QueryCompletion *completionTag
-#else
-			   char *completionTag
-#endif
-);
+supautils_hook(PROCESS_UTILITY_PARAMS);
 
 static void
 comfirm_reserved_roles(const char *target);
@@ -83,6 +71,9 @@ placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource
 
 static bool
 restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
+
+static bool
+allowed_extensions_check_hook(char **newval, void **extra, GucSource source);
 
 static void check_parameter(char *val, char *name);
 
@@ -138,6 +129,26 @@ _PG_init(void)
 								 NULL,
 								 NULL);
 
+	DefineCustomStringVariable("supautils.allowed_extensions",
+							   "TODO",
+							   NULL,
+							   &allowed_extensions,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   allowed_extensions_check_hook,
+							   NULL,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.extensions_superuser",
+							   "TODO",
+							   NULL,
+							   &extensions_superuser,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   NULL,
+							   NULL,
+							   NULL);
+
 	if(placeholders){
 		List* comma_separated_list;
 		ListCell* cell;
@@ -179,21 +190,7 @@ _PG_fini(void)
  * IO: run the hook logic
  */
 static void
-supautils_hook(PlannedStmt *pstmt,
-			   const char *queryString,
-#if PG14_GTE
-			   bool readOnlyTree,
-#endif
-			   ProcessUtilityContext context,
-			   ParamListInfo params,
-			   QueryEnvironment *queryEnv,
-			   DestReceiver *dest,
-#if PG13_GTE
-			   QueryCompletion *completionTag
-#else
-			   char *completionTag
-#endif
-)
+supautils_hook(PROCESS_UTILITY_PARAMS)
 {
 	/* Get the utility statement from the planned statement */
 	Node   *utility_stmt = pstmt->utilityStmt;
@@ -352,25 +349,93 @@ supautils_hook(PlannedStmt *pstmt,
 				break;
 			}
 
+		/*
+		 * CREATE EXTENSION <extension>
+		 */
+		case T_CreateExtensionStmt:
+		{
+			CreateExtensionStmt *stmt;
+
+			if (superuser()) {
+				break;
+			}
+			if (allowed_extensions == NULL) {
+				break;
+			}
+
+			stmt = (CreateExtensionStmt *)utility_stmt;
+			handle_create_extension(prev_hook,
+									PROCESS_UTILITY_ARGS,
+									stmt,
+									allowed_extensions,
+									extensions_superuser);
+			return;
+        }
+
+		/*
+		 * ALTER EXTENSION <extension> [ UPDATE | SET SCHEMA ]
+		 */
+		case T_AlterExtensionStmt:
+		{
+			AlterExtensionStmt *stmt;
+
+			if (superuser()) {
+				break;
+			}
+			if (allowed_extensions == NULL) {
+				break;
+			}
+
+			stmt = (AlterExtensionStmt *)utility_stmt;
+			handle_alter_extension(prev_hook,
+								   PROCESS_UTILITY_ARGS,
+								   stmt,
+								   allowed_extensions,
+								   extensions_superuser);
+			return;
+		}
+
+		/*
+		 * ALTER EXTENSION <extension> [ ADD | DROP ]
+		 *
+		 * Not supported. Fall back to normal behavior.
+		 */
+		case T_AlterExtensionContentsStmt:
+			break;
+
+		case T_DropStmt:
+		{
+            DropStmt *stmt;
+
+			if (superuser()) {
+				break;
+			}
+			if (allowed_extensions == NULL) {
+				break;
+			}
+
+            stmt = (DropStmt *)utility_stmt;
+			/*
+			 * DROP EXTENSION <extension>
+			 */
+			if (stmt->removeType == OBJECT_EXTENSION) {
+				handle_drop_extension(prev_hook,
+									  PROCESS_UTILITY_ARGS,
+									  stmt,
+									  allowed_extensions,
+									  extensions_superuser);
+				return;
+			}
+
+			break;
+		}
+
 		default:
 			break;
 	}
 
 	/* Chain to previously defined hooks */
-	if (prev_hook)
-		prev_hook(pstmt, queryString,
-#if PG14_GTE
-				  readOnlyTree,
-#endif
-				  context, params, queryEnv,
-				  dest, completionTag);
-	else
-		standard_ProcessUtility(pstmt, queryString,
-#if PG14_GTE
-								readOnlyTree,
-#endif
-								context, params, queryEnv,
-								dest, completionTag);
+	run_process_utility_hook(prev_hook);
 }
 
 static bool
@@ -393,6 +458,14 @@ static bool
 placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.placeholders_disallowed_values");
+
+	return true;
+}
+
+static bool
+allowed_extensions_check_hook(char **newval, void **extra, GucSource source)
+{
+	check_parameter(*newval, "supautils.allowed_extensions");
 
 	return true;
 }
