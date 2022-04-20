@@ -42,7 +42,7 @@ static char *placeholders                    = NULL;
 static char *placeholders_disallowed_values  = NULL;
 static char *empty_placeholder               = NULL;
 static char *privileged_extensions           = NULL;
-static char *extensions_superuser            = NULL;
+static char *privileged_extensions_superuser = NULL;
 static ProcessUtility_hook_type prev_hook    = NULL;
 
 void _PG_init(void);
@@ -130,7 +130,7 @@ _PG_init(void)
 								 NULL);
 
 	DefineCustomStringVariable("supautils.privileged_extensions",
-							   "Comma-separated list of extensions which get installed using supautils.extensions_superuser",
+							   "Comma-separated list of extensions which get installed using supautils.privileged_extensions_superuser",
 							   NULL,
 							   &privileged_extensions,
 							   NULL,
@@ -139,10 +139,10 @@ _PG_init(void)
 							   NULL,
 							   NULL);
 
-	DefineCustomStringVariable("supautils.extensions_superuser",
+	DefineCustomStringVariable("supautils.privileged_extensions_superuser",
 							   "Superuser to install extensions in supautils.privileged_extensions as",
 							   NULL,
-							   &extensions_superuser,
+							   &privileged_extensions_superuser,
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
@@ -368,7 +368,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 									PROCESS_UTILITY_ARGS,
 									stmt,
 									privileged_extensions,
-									extensions_superuser);
+									privileged_extensions_superuser);
 			return;
         }
 
@@ -391,7 +391,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 								   PROCESS_UTILITY_ARGS,
 								   stmt,
 								   privileged_extensions,
-								   extensions_superuser);
+								   privileged_extensions_superuser);
 			return;
 		}
 
@@ -423,7 +423,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 									  PROCESS_UTILITY_ARGS,
 									  stmt,
 									  privileged_extensions,
-									  extensions_superuser);
+									  privileged_extensions_superuser);
 				return;
 			}
 
