@@ -12,7 +12,7 @@
 #include <utils/jsonb.h>
 #include <utils/fmgrprotos.h>
 
-#include "allowed_extensions.h"
+#include "privileged_extensions.h"
 #include "utils.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)									\
@@ -41,7 +41,7 @@ static char *reserved_memberships            = NULL;
 static char *placeholders                    = NULL;
 static char *placeholders_disallowed_values  = NULL;
 static char *empty_placeholder               = NULL;
-static char *allowed_extensions              = NULL;
+static char *privileged_extensions           = NULL;
 static char *extensions_superuser            = NULL;
 static ProcessUtility_hook_type prev_hook    = NULL;
 
@@ -73,7 +73,7 @@ static bool
 restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
-allowed_extensions_check_hook(char **newval, void **extra, GucSource source);
+privileged_extensions_check_hook(char **newval, void **extra, GucSource source);
 
 static void check_parameter(char *val, char *name);
 
@@ -129,18 +129,18 @@ _PG_init(void)
 								 NULL,
 								 NULL);
 
-	DefineCustomStringVariable("supautils.allowed_extensions",
-							   "TODO",
+	DefineCustomStringVariable("supautils.privileged_extensions",
+							   "Comma-separated list of extensions which get installed using supautils.extensions_superuser",
 							   NULL,
-							   &allowed_extensions,
+							   &privileged_extensions,
 							   NULL,
 							   PGC_SIGHUP, 0,
-							   allowed_extensions_check_hook,
+							   privileged_extensions_check_hook,
 							   NULL,
 							   NULL);
 
 	DefineCustomStringVariable("supautils.extensions_superuser",
-							   "TODO",
+							   "Superuser to install extensions in supautils.privileged_extensions as",
 							   NULL,
 							   &extensions_superuser,
 							   NULL,
@@ -359,7 +359,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (allowed_extensions == NULL) {
+			if (privileged_extensions == NULL) {
 				break;
 			}
 
@@ -367,7 +367,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			handle_create_extension(prev_hook,
 									PROCESS_UTILITY_ARGS,
 									stmt,
-									allowed_extensions,
+									privileged_extensions,
 									extensions_superuser);
 			return;
         }
@@ -382,7 +382,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (allowed_extensions == NULL) {
+			if (privileged_extensions == NULL) {
 				break;
 			}
 
@@ -390,7 +390,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			handle_alter_extension(prev_hook,
 								   PROCESS_UTILITY_ARGS,
 								   stmt,
-								   allowed_extensions,
+								   privileged_extensions,
 								   extensions_superuser);
 			return;
 		}
@@ -410,7 +410,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (allowed_extensions == NULL) {
+			if (privileged_extensions == NULL) {
 				break;
 			}
 
@@ -422,7 +422,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
 									  stmt,
-									  allowed_extensions,
+									  privileged_extensions,
 									  extensions_superuser);
 				return;
 			}
@@ -463,9 +463,9 @@ placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource
 }
 
 static bool
-allowed_extensions_check_hook(char **newval, void **extra, GucSource source)
+privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
 {
-	check_parameter(*newval, "supautils.allowed_extensions");
+	check_parameter(*newval, "supautils.privileged_extensions");
 
 	return true;
 }

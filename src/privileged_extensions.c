@@ -10,26 +10,27 @@
 #include <utils/lsyscache.h>
 #include <utils/varlena.h>
 
-#include "allowed_extensions.h"
+#include "privileged_extensions.h"
 
-static bool is_extension_allowed(char *name, char *allowed_extensions) {
-	bool allowed = false;
-    List *allowed_extensions_list;
+static bool is_extension_privileged(char *name, char *privileged_extensions) {
+    bool extension_is_privileged = false;
+    List *privileged_extensions_list;
     ListCell *lc;
 
-    SplitIdentifierString(pstrdup(allowed_extensions), ',', &allowed_extensions_list);
+    SplitIdentifierString(pstrdup(privileged_extensions), ',',
+                          &privileged_extensions_list);
 
-    foreach (lc, allowed_extensions_list) {
-        char *allowed_extension = (char *)lfirst(lc);
+    foreach (lc, privileged_extensions_list) {
+        char *privileged_extension = (char *)lfirst(lc);
 
-        if (strcmp(name, allowed_extension) == 0) {
-			allowed = true;
-			break;
+        if (strcmp(name, privileged_extension) == 0) {
+            extension_is_privileged = true;
+            break;
         }
     }
-	list_free(allowed_extensions_list);
+    list_free(privileged_extensions_list);
 
-    return allowed;
+    return extension_is_privileged;
 }
 
 static void run_process_utility_hook_as_superuser(
@@ -55,9 +56,9 @@ static void run_process_utility_hook_as_superuser(
 
 void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, CreateExtensionStmt *stmt, char *allowed_extensions,
-    char *extensions_superuser) {
-    if (is_extension_allowed(stmt->extname, allowed_extensions)) {
+    PROCESS_UTILITY_PARAMS, CreateExtensionStmt *stmt,
+    char *privileged_extensions, char *extensions_superuser) {
+    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
         run_process_utility_hook_as_superuser(
             process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
     } else {
@@ -67,9 +68,9 @@ void handle_create_extension(
 
 void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, AlterExtensionStmt *stmt, char *allowed_extensions,
-    char *extensions_superuser) {
-    if (is_extension_allowed(stmt->extname, allowed_extensions)) {
+    PROCESS_UTILITY_PARAMS, AlterExtensionStmt *stmt,
+    char *privileged_extensions, char *extensions_superuser) {
+    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
         run_process_utility_hook_as_superuser(
             process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
     } else {
@@ -79,21 +80,21 @@ void handle_alter_extension(
 
 void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
                            PROCESS_UTILITY_PARAMS, DropStmt *stmt,
-                           char *allowed_extensions,
+                           char *privileged_extensions,
                            char *extensions_superuser) {
-    bool all_are_allowed = true;
+    bool all_extensions_are_privileged = true;
     ListCell *lc;
 
     foreach (lc, stmt->objects) {
         char *name = strVal((Value *)lfirst(lc));
 
-        if (!is_extension_allowed(name, allowed_extensions)) {
-            all_are_allowed = false;
+        if (!is_extension_privileged(name, privileged_extensions)) {
+            all_extensions_are_privileged = false;
             break;
         }
     }
 
-    if (all_are_allowed) {
+    if (all_extensions_are_privileged) {
         run_process_utility_hook_as_superuser(
             process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
     } else {
