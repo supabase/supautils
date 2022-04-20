@@ -35,13 +35,13 @@ static bool is_extension_privileged(char *name, char *privileged_extensions) {
 
 static void run_process_utility_hook_as_superuser(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, char *extensions_superuser) {
+    PROCESS_UTILITY_PARAMS, char *privileged_extensions_superuser) {
     Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
     Oid prev_role_oid;
     int prev_role_sec_context;
 
-    if (extensions_superuser != NULL) {
-        superuser_oid = get_role_oid(extensions_superuser, false);
+    if (privileged_extensions_superuser != NULL) {
+        superuser_oid = get_role_oid(privileged_extensions_superuser, false);
     }
 
     GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
@@ -57,10 +57,11 @@ static void run_process_utility_hook_as_superuser(
 void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, CreateExtensionStmt *stmt,
-    char *privileged_extensions, char *extensions_superuser) {
+    char *privileged_extensions, char *privileged_extensions_superuser) {
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
+        run_process_utility_hook_as_superuser(process_utility_hook,
+                                              PROCESS_UTILITY_ARGS,
+                                              privileged_extensions_superuser);
     } else {
         run_process_utility_hook(process_utility_hook);
     }
@@ -69,10 +70,11 @@ void handle_create_extension(
 void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, AlterExtensionStmt *stmt,
-    char *privileged_extensions, char *extensions_superuser) {
+    char *privileged_extensions, char *privileged_extensions_superuser) {
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
+        run_process_utility_hook_as_superuser(process_utility_hook,
+                                              PROCESS_UTILITY_ARGS,
+                                              privileged_extensions_superuser);
     } else {
         run_process_utility_hook(process_utility_hook);
     }
@@ -81,7 +83,7 @@ void handle_alter_extension(
 void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
                            PROCESS_UTILITY_PARAMS, DropStmt *stmt,
                            char *privileged_extensions,
-                           char *extensions_superuser) {
+                           char *privileged_extensions_superuser) {
     bool all_extensions_are_privileged = true;
     ListCell *lc;
 
@@ -95,8 +97,9 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     }
 
     if (all_extensions_are_privileged) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS, extensions_superuser);
+        run_process_utility_hook_as_superuser(process_utility_hook,
+                                              PROCESS_UTILITY_ARGS,
+                                              privileged_extensions_superuser);
     } else {
         run_process_utility_hook(process_utility_hook);
     }
