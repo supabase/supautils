@@ -36,14 +36,15 @@
 /* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
 
-static char *reserved_roles                  = NULL;
-static char *reserved_memberships            = NULL;
-static char *placeholders                    = NULL;
-static char *placeholders_disallowed_values  = NULL;
-static char *empty_placeholder               = NULL;
-static char *privileged_extensions           = NULL;
-static char *privileged_extensions_superuser = NULL;
-static ProcessUtility_hook_type prev_hook    = NULL;
+static char *reserved_roles                            = NULL;
+static char *reserved_memberships                      = NULL;
+static char *placeholders                              = NULL;
+static char *placeholders_disallowed_values            = NULL;
+static char *empty_placeholder                         = NULL;
+static char *privileged_extensions                     = NULL;
+static char *privileged_extensions_superuser           = NULL;
+static char *privileged_extensions_custom_scripts_path = NULL;
+static ProcessUtility_hook_type prev_hook              = NULL;
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -143,6 +144,16 @@ _PG_init(void)
 							   "Superuser to install extensions in supautils.privileged_extensions as",
 							   NULL,
 							   &privileged_extensions_superuser,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   NULL,
+							   NULL,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
+							   "Path to load privileged extensions' custom scripts from",
+							   NULL,
+							   &privileged_extensions_custom_scripts_path,
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
@@ -354,8 +365,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_CreateExtensionStmt:
 		{
-			CreateExtensionStmt *stmt;
-
 			if (superuser()) {
 				break;
 			}
@@ -363,12 +372,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			stmt = (CreateExtensionStmt *)utility_stmt;
 			handle_create_extension(prev_hook,
 									PROCESS_UTILITY_ARGS,
-									stmt,
 									privileged_extensions,
-									privileged_extensions_superuser);
+									privileged_extensions_superuser,
+									privileged_extensions_custom_scripts_path);
 			return;
         }
 
@@ -377,8 +385,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_AlterExtensionStmt:
 		{
-			AlterExtensionStmt *stmt;
-
 			if (superuser()) {
 				break;
 			}
@@ -386,12 +392,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			stmt = (AlterExtensionStmt *)utility_stmt;
 			handle_alter_extension(prev_hook,
 								   PROCESS_UTILITY_ARGS,
-								   stmt,
 								   privileged_extensions,
-								   privileged_extensions_superuser);
+								   privileged_extensions_superuser,
+								   privileged_extensions_custom_scripts_path);
 			return;
 		}
 
@@ -405,8 +410,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 		case T_DropStmt:
 		{
-            DropStmt *stmt;
-
 			if (superuser()) {
 				break;
 			}
@@ -414,16 +417,15 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-            stmt = (DropStmt *)utility_stmt;
 			/*
 			 * DROP EXTENSION <extension>
 			 */
-			if (stmt->removeType == OBJECT_EXTENSION) {
+			if (((DropStmt *)utility_stmt)->removeType == OBJECT_EXTENSION) {
 				handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
-									  stmt,
 									  privileged_extensions,
-									  privileged_extensions_superuser);
+									  privileged_extensions_superuser,
+									  privileged_extensions_custom_scripts_path);
 				return;
 			}
 
