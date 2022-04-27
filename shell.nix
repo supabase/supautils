@@ -40,11 +40,17 @@ let
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
+      privileged_extensions="hstore"
+      privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
 
-      reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\""
+      reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\""
       placeholder_stuff_options="-c supautils.placeholders=\"response.headers, another.placeholder\" -c supautils.placeholders_disallowed_values=\"content-type, x-special-header, special-value\""
 
       pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options"
+
+      mkdir -p "$tmpdir/privileged_extensions_custom_scripts/hstore"
+      echo 'create table t1();' > "$tmpdir/privileged_extensions_custom_scripts/hstore/before-create.sql"
+      echo 'drop table t1; create table t2 as values (1);' > "$tmpdir/privileged_extensions_custom_scripts/hstore/after-create.sql"
 
       createdb contrib_regression
 

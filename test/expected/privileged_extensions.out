@@ -1,0 +1,29 @@
+-- non-superuser extensions role
+create role extensions_role login;
+alter default privileges for role postgres in schema public grant all on tables to extensions_role;
+set role extensions_role;
+\echo
+
+-- can create a privileged extension
+create extension hstore;
+select '1=>2'::hstore;
+  hstore  
+----------
+ "1"=>"2"
+(1 row)
+
+\echo
+
+-- can run custom scripts
+select * from t2;
+ column1 
+---------
+       1
+(1 row)
+
+\echo
+
+-- cannot create other extensions
+create extension moddatetime;
+ERROR:  permission denied to create extension "moddatetime"
+HINT:  Must be superuser to create this extension.
