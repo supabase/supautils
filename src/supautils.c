@@ -91,7 +91,7 @@ _PG_init(void)
 	ProcessUtility_hook = supautils_hook;
 
 	DefineCustomStringVariable("supautils.reserved_roles",
-							   "Comma-separated list of roles that cannot be modified",
+							   NULL,
 							   NULL,
 							   &reserved_roles,
 							   NULL,
