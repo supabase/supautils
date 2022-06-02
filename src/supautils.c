@@ -575,24 +575,24 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 {
 	char* val = *newval;
 
-	if(val && placeholders_disallowed_values){
-		List* comma_separated_list;
-		ListCell* cell;
+	if(val && placeholders_disallowed_values)
+	{
+		char *token, *string, *tofree;
 
-		SplitIdentifierString(pstrdup(placeholders_disallowed_values), ',', &comma_separated_list);
+		tofree = string = pstrdup(placeholders_disallowed_values);
 
-		foreach(cell, comma_separated_list)
+		while( (token = strsep(&string, ",")) != NULL )
 		{
-			char* disallowed_value = (char *) lfirst(cell);
-			if (strstr(lowerstr(val), disallowed_value))
+			if (strstr(lowerstr(val), token))
 			{
-				list_free(comma_separated_list);
+				pfree(tofree);
 				ereport(ERROR,															\
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
-						 errmsg("The placeholder contains the \"%s\" disallowed value", disallowed_value)));
+						 errmsg("The placeholder contains the \"%s\" disallowed value", token)));
 			}
 		}
-		list_free(comma_separated_list);
+
+		pfree(tofree);
 	}
 
 	return true;

@@ -6,6 +6,8 @@ select set_config('response.headers', '[{"Content-Type": "application/vnd.my.mal
 select set_config('response.headers', '[{"X-Special-Header": "a-value"}]', true);
 \echo
 
+select set_config('response.headers', '[{"X-Content-Type-Options": "nosniff"}]', true);
+
 -- placeholder restricted values fail on a SET
 set another.placeholder to 'special-value';
 \echo
