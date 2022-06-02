@@ -7,10 +7,16 @@ select set_config('response.headers', '[{"Cache-Control": "public"}, {"Cache-Con
 
 -- placeholder restricted values fail on a set_config
 select set_config('response.headers', '[{"Content-Type": "application/vnd.my.malicious.type"}, {"Cache-Control": "public"}]', true);
-ERROR:  The placeholder contains the "content-type" disallowed value
+ERROR:  The placeholder contains the ""content-type"" disallowed value
 select set_config('response.headers', '[{"X-Special-Header": "a-value"}]', true);
-ERROR:  The placeholder contains the "x-special-header" disallowed value
+ERROR:  The placeholder contains the ""x-special-header"" disallowed value
 \echo
+
+select set_config('response.headers', '[{"X-Content-Type-Options": "nosniff"}]', true);
+               set_config                
+-----------------------------------------
+ [{"X-Content-Type-Options": "nosniff"}]
+(1 row)
 
 -- placeholder restricted values fail on a SET
 set another.placeholder to 'special-value';
