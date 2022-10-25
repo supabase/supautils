@@ -1,7 +1,7 @@
 with import (builtins.fetchTarball {
-  name = "2022-10-14";
-  url = "https://github.com/NixOS/nixpkgs/archive/cc090d2b942f76fad83faf6e9c5ed44b73ba7114.tar.gz";
-  sha256 = "0a1wwpbn2f38pcays6acq1gz19vw4jadl8yd3i3cd961f1x2vdq2";
+  name = "2022-10-25";
+  url = "https://github.com/NixOS/nixpkgs/archive/a11f8032aa9de58be11190b71320f98f9a3c395b.tar.gz";
+  sha256 = "101y90kqqfqc5vkigw5rbcqw01cg9nndknz4q4gb28zi4918r1hz";
 }) {};
 let
   supautils = { postgresql }:
