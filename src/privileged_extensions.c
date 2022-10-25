@@ -55,10 +55,11 @@ static void run_custom_script(char *filename) {
                          "$$;";
         size_t sql_len = strlen(sql_tmp1) + strlen(sql_tmp2) + strlen(sql_tmp3);
         char *sql = (char *)palloc(sql_len);
+        int rc;
 
         snprintf(sql, sql_len, "%s%s%s", sql_tmp1, sql_tmp2, sql_tmp3);
 
-        int rc = SPI_execute(sql, false, 0);
+        rc = SPI_execute(sql, false, 0);
         if (rc != SPI_OK_UTILITY) {
             elog(ERROR, "SPI_execute failed with error code %d", rc);
         }
@@ -157,7 +158,7 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     ListCell *lc;
 
     foreach (lc, stmt->objects) {
-        char *name = strVal((Value *)lfirst(lc));
+        char *name = strVal(lfirst(lc));
 
         if (!is_extension_privileged(name, privileged_extensions)) {
             all_extensions_are_privileged = false;

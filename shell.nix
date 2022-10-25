@@ -1,7 +1,7 @@
 with import (builtins.fetchTarball {
-  name = "2021-09-29";
-  url = "https://github.com/NixOS/nixpkgs/archive/76b1e16c6659ccef7187ca69b287525fea133244.tar.gz";
-  sha256 = "1vsahpcx80k2bgslspb0sa6j4bmhdx77sw6la455drqcrqhdqj6a";
+  name = "2022-10-14";
+  url = "https://github.com/NixOS/nixpkgs/archive/cc090d2b942f76fad83faf6e9c5ed44b73ba7114.tar.gz";
+  sha256 = "0a1wwpbn2f38pcays6acq1gz19vw4jadl8yd3i3cd961f1x2vdq2";
 }) {};
 let
   supautils = { postgresql }:
@@ -61,7 +61,8 @@ let
   supautils-with-pg-12 = writeShellScriptBin "supautils-with-pg-12" (pgWithExt { postgresql = postgresql_12; });
   supautils-with-pg-13 = writeShellScriptBin "supautils-with-pg-13" (pgWithExt { postgresql = postgresql_13; });
   supautils-with-pg-14 = writeShellScriptBin "supautils-with-pg-14" (pgWithExt { postgresql = postgresql_14; });
+  supautils-with-pg-15 = writeShellScriptBin "supautils-with-pg-15" (pgWithExt { postgresql = postgresql_15; });
 in
 mkShell {
-  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 supautils-with-pg-14];
+  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 supautils-with-pg-14 supautils-with-pg-15];
 }
