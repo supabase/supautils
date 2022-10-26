@@ -1,6 +1,7 @@
 #include <postgres.h>
 
 #include <access/xact.h>
+#include <catalog/pg_authid.h>
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <tcop/utility.h>
@@ -44,6 +45,7 @@ static char *empty_placeholder                         = NULL;
 static char *privileged_extensions                     = NULL;
 static char *privileged_extensions_superuser           = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
+static char *privileged_role                           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
 void _PG_init(void);
@@ -154,6 +156,16 @@ _PG_init(void)
 							   "Path to load privileged extensions' custom scripts from",
 							   NULL,
 							   &privileged_extensions_custom_scripts_path,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   NULL,
+							   NULL,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.privileged_role",
+							   "Non-superuser role to be granted with additional privileges",
+							   NULL,
+							   &privileged_role,
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
@@ -430,6 +442,45 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 
 			break;
+		}
+
+		case T_CommentStmt:
+		{
+			if (!IsTransactionState()) {
+				break;
+			}
+			if (superuser()) {
+				break;
+			}
+			if (((CommentStmt *)utility_stmt)->objtype != OBJECT_EXTENSION) {
+				break;
+			}
+			if (privileged_role == NULL) {
+				break;
+			}
+			if (!OidIsValid(get_role_oid(privileged_role, true))) {
+				break;
+			}
+			if (GetUserId() != get_role_oid(privileged_role, false)) {
+				break;
+			}
+
+			{
+				Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
+				Oid prev_role_oid;
+				int prev_role_sec_context;
+
+				GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
+				SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
+									   SECURITY_LOCAL_USERID_CHANGE |
+									   SECURITY_RESTRICTED_OPERATION);
+
+				run_process_utility_hook(prev_hook);
+
+				SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+
+				return;
+			}
 		}
 
 		default:
