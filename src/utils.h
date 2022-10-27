@@ -3,6 +3,9 @@
 
 #include <postgres.h>
 
+#include <catalog/pg_authid.h>
+#include <commands/user.h>
+#include <miscadmin.h>
 #include <nodes/params.h>
 #include <tcop/dest.h>
 #include <tcop/utility.h>
@@ -10,6 +13,7 @@
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
+#define PG15_GTE (PG_VERSION_NUM >= 150000)
 
 #if PG14_GTE
 
@@ -47,5 +51,9 @@
     } else {                                                                   \
         standard_ProcessUtility(PROCESS_UTILITY_ARGS);                         \
     }
+
+extern void
+alter_role_with_bypassrls_option_as_superuser(const char *role_name,
+                                              DefElem *bypassrls_option);
 
 #endif
