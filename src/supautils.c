@@ -483,6 +483,46 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 		}
 
+		case T_VariableSetStmt:
+		{
+			if (!IsTransactionState()) {
+				break;
+			}
+			if (superuser()) {
+				break;
+			}
+			// TODO: refactor to support other variables
+			if (strcmp(((VariableSetStmt *)utility_stmt)->name, "session_replication_role") != 0) {
+				break;
+			}
+			if (privileged_role == NULL) {
+				break;
+			}
+			if (!OidIsValid(get_role_oid(privileged_role, true))) {
+				break;
+			}
+			if (GetUserId() != get_role_oid(privileged_role, false)) {
+				break;
+			}
+
+			{
+				Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
+				Oid prev_role_oid;
+				int prev_role_sec_context;
+
+				GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
+				SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
+									   SECURITY_LOCAL_USERID_CHANGE |
+									   SECURITY_RESTRICTED_OPERATION);
+
+				run_process_utility_hook(prev_hook);
+
+				SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+
+				return;
+			}
+		}
+
 		default:
 			break;
 	}
