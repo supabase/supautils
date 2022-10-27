@@ -1,13 +1,18 @@
 #include "utils.h"
 
 void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
-                                                   DefElem *bypassrls_option) {
+                                                   DefElem *bypassrls_option,
+                                                   const char *superuser_name) {
     Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
     Oid prev_role_oid = 0;
     int prev_role_sec_context = 0;
 
     RoleSpec *role = makeNode(RoleSpec);
     AlterRoleStmt *bypassrls_stmt = makeNode(AlterRoleStmt);
+
+    if (superuser_name != NULL) {
+        superuser_oid = get_role_oid(superuser_name, false);
+    }
 
     role->roletype = ROLESPEC_CSTRING;
     role->rolename = pstrdup(role_name);
