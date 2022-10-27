@@ -4,14 +4,17 @@
 #include <catalog/pg_authid.h>
 #include <fmgr.h>
 #include <miscadmin.h>
+#include <nodes/makefuncs.h>
+#include <nodes/pg_list.h>
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>
 #include <utils/acl.h>
+#include <utils/fmgrprotos.h>
 #include <utils/guc.h>
 #include <utils/guc_tables.h>
-#include <utils/varlena.h>
 #include <utils/jsonb.h>
-#include <utils/fmgrprotos.h>
+#include <utils/snapmgr.h>
+#include <utils/varlena.h>
 
 #include "privileged_extensions.h"
 #include "utils.h"
@@ -225,14 +228,60 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 * ALTER ROLE <role> SET search_path TO ...
 		 */
 		case T_AlterRoleStmt:
+			// fallthrough
 		case T_AlterRoleSetStmt:
 			{
-				if (IsTransactionState() && !superuser())
-				{
-					AlterRoleStmt *stmt = (AlterRoleStmt *) utility_stmt;
-					comfirm_reserved_roles(get_rolespec_name(stmt->role));
+				AlterRoleStmt *stmt = (AlterRoleStmt *)utility_stmt;
+				DefElem *bypassrls_option = NULL;
+				ListCell *option_cell = NULL;
+
+				if (!IsTransactionState()) {
+					break;
 				}
-				break;
+				if (superuser()) {
+					break;
+				}
+
+				comfirm_reserved_roles(get_rolespec_name(stmt->role));
+
+				if (!IsA(utility_stmt, AlterRoleStmt)) {
+					break;
+				}
+				if (privileged_role == NULL) {
+					break;
+				}
+				if (!OidIsValid(get_role_oid(privileged_role, true))) {
+					break;
+				}
+				if (GetUserId() != get_role_oid(privileged_role, false)) {
+					break;
+				}
+
+				/* Check to see if there are any descriptions related to bypassrls. */
+				foreach(option_cell, stmt->options)
+				{
+					DefElem *defel = (DefElem *) lfirst(option_cell);
+
+					if (strcmp(defel->defname, "bypassrls") == 0) {
+						if (bypassrls_option != NULL) {
+							ereport(ERROR,
+									(errcode(ERRCODE_SYNTAX_ERROR),
+									 errmsg("conflicting or redundant options")));
+						}
+						bypassrls_option = defel;
+					}
+				}
+
+				// Defer setting bypassrls attribute if using `privileged_role`.
+				if (bypassrls_option != NULL) {
+					stmt->options = list_delete_ptr(stmt->options, bypassrls_option);
+				}
+
+				run_process_utility_hook(prev_hook);
+
+				alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option);
+
+				return;
 			}
 
 		/*
@@ -246,6 +295,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					const char *created_role = stmt->role;
 					List *addroleto = NIL;	/* roles to make this a member of */
 					bool hasrolemembers = false;	/* has roles to be members of this role */
+					bool stmt_has_bypassrls = false;
+					bool bypassrls_is_allowed = true;
 					ListCell *option_cell;
 
 					/* if role already exists, bypass the hook to let it fail with the usual error */
@@ -255,7 +306,18 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					/* CREATE ROLE <reserved_role> */
 					comfirm_reserved_roles(created_role);
 
-					/* Check to see if there are any descriptions related to membership. */
+					// Allow bypassrls attribute if using `privileged_role`.
+					if (privileged_role == NULL) {
+						bypassrls_is_allowed = false;
+					}
+					if (!OidIsValid(get_role_oid(privileged_role, true))) {
+						bypassrls_is_allowed = false;
+					}
+					if (GetUserId() != get_role_oid(privileged_role, false)) {
+						bypassrls_is_allowed = false;
+					}
+
+					/* Check to see if there are any descriptions related to membership and bypassrls. */
 					foreach(option_cell, stmt->options)
 					{
 						DefElem *defel = (DefElem *) lfirst(option_cell);
@@ -265,6 +327,16 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						if (strcmp(defel->defname, "rolemembers") == 0 ||
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
+
+						// Defer setting bypassrls attribute if using `privileged_role`.
+						//
+						// Duplicate/conflicting attributes will be caught by
+						// the standard process utility hook, so we can assume
+						// there's at most one bypassrls DefElem.
+						if (bypassrls_is_allowed && strcmp(defel->defname, "bypassrls") == 0) {
+							stmt_has_bypassrls = intVal(defel->arg) != 0;
+							intVal(defel->arg) = 0;
+						}
 					}
 
 					/* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
@@ -286,6 +358,26 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					 */
 					if (hasrolemembers)
 						comfirm_reserved_memberships(created_role);
+
+					// CREATE ROLE <any_role> BYPASSRLS
+					//
+					// Allow `privileged_role` (in addition to superusers) to
+					// set bypassrls attribute. The setting of the attribute is
+					// deferred in the original CREATE ROLE - the actual setting
+					// is done here.
+					if (bypassrls_is_allowed && stmt_has_bypassrls) {
+						Node *true_node = (Node *)makeInteger(true);
+						DefElem *bypassrls_option = makeDefElem("bypassrls", true_node, -1);
+
+						run_process_utility_hook(prev_hook);
+
+						alter_role_with_bypassrls_option_as_superuser(stmt->role, bypassrls_option);
+
+						pfree(true_node);
+						pfree(bypassrls_option);
+
+						return;
+					}
 				}
 				break;
 			}
