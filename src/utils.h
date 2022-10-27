@@ -9,6 +9,7 @@
 #include <nodes/params.h>
 #include <tcop/dest.h>
 #include <tcop/utility.h>
+#include <utils/acl.h>
 #include <utils/queryenvironment.h>
 
 #define PG13_GTE (PG_VERSION_NUM >= 130000)
@@ -54,6 +55,7 @@
 
 extern void
 alter_role_with_bypassrls_option_as_superuser(const char *role_name,
-                                              DefElem *bypassrls_option);
+                                              DefElem *bypassrls_option,
+                                              const char *superuser_name);
 
 #endif
