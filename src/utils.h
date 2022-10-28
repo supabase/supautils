@@ -58,4 +58,6 @@ alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                               DefElem *bypassrls_option,
                                               const char *superuser_name);
 
+extern bool is_string_in_comma_delimited_string(const char *s1, char *s2);
+
 #endif

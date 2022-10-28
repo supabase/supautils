@@ -1,3 +1,7 @@
+#include <postgres.h>
+
+#include <utils/varlena.h>
+
 #include "utils.h"
 
 void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
@@ -40,4 +44,24 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     pfree(bypassrls_stmt);
 
     return;
+}
+
+bool is_string_in_comma_delimited_string(const char *s1, char *s2) {
+    bool s1_is_in_s2 = false;
+    List *split_s2 = NIL;
+    ListCell *lc;
+
+    SplitIdentifierString(s2, ',', &split_s2);
+
+    foreach (lc, split_s2) {
+        char *s2_elem = (char *)lfirst(lc);
+
+        if (strcmp(s1, s2_elem) == 0) {
+            s1_is_in_s2 = true;
+            break;
+        }
+    }
+    list_free(split_s2);
+
+    return s1_is_in_s2;
 }
