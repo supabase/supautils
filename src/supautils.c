@@ -49,6 +49,7 @@ static char *privileged_extensions                     = NULL;
 static char *privileged_extensions_superuser           = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
 static char *privileged_role                           = NULL;
+static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
 void _PG_init(void);
@@ -80,6 +81,9 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source);
+
+static bool
+privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source);
 
 static void check_parameter(char *val, char *name);
 
@@ -172,6 +176,16 @@ _PG_init(void)
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
+							   NULL,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.privileged_role_allowed_configs",
+							   "Superuser-only configs that the privileged_role is allowed to configure",
+							   NULL,
+							   &privileged_role_allowed_configs,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   privileged_role_allowed_configs_check_hook,
 							   NULL,
 							   NULL);
 
@@ -587,9 +601,16 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			// TODO: refactor to support other variables
-			if (strcmp(((VariableSetStmt *)utility_stmt)->name, "session_replication_role") != 0) {
+			if (privileged_role_allowed_configs == NULL) {
 				break;
+			} else {
+				char *allowed_configs = pstrdup(privileged_role_allowed_configs);
+				bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)utility_stmt)->name, allowed_configs);
+				pfree(allowed_configs);
+
+				if (!is_privileged_role_allowed_config) {
+					break;
+				}
 			}
 			if (privileged_role == NULL) {
 				break;
@@ -659,6 +680,14 @@ static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.privileged_extensions");
+
+	return true;
+}
+
+static bool
+privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source)
+{
+	check_parameter(*newval, "supautils.privileged_role_allowed_configs");
 
 	return true;
 }
