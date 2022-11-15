@@ -239,11 +239,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 	{
 		/*
 		 * ALTER ROLE <role> NOLOGIN NOINHERIT..
-		 * ALTER ROLE <role> SET search_path TO ...
 		 */
 		case T_AlterRoleStmt:
-			// fallthrough
-		case T_AlterRoleSetStmt:
 			{
 				AlterRoleStmt *stmt = (AlterRoleStmt *)utility_stmt;
 				DefElem *bypassrls_option = NULL;
@@ -258,9 +255,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				comfirm_reserved_roles(get_rolespec_name(stmt->role));
 
-				if (!IsA(utility_stmt, AlterRoleStmt)) {
-					break;
-				}
 				if (privileged_role == NULL) {
 					break;
 				}
@@ -295,6 +289,67 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				if (bypassrls_option != NULL) {
 					alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option, privileged_extensions_superuser);
+				}
+
+				return;
+			}
+
+		/*
+		 * ALTER ROLE <role> SET search_path TO ...
+		 */
+		case T_AlterRoleSetStmt:
+			{
+				AlterRoleSetStmt *stmt = (AlterRoleSetStmt *)utility_stmt;
+
+				if (!IsTransactionState()) {
+					break;
+				}
+				if (superuser()) {
+					break;
+				}
+
+				comfirm_reserved_roles(get_rolespec_name(stmt->role));
+
+				if (privileged_role_allowed_configs == NULL) {
+					break;
+				} else {
+					char *allowed_configs = pstrdup(privileged_role_allowed_configs);
+					bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)stmt->setstmt)->name, allowed_configs);
+					pfree(allowed_configs);
+
+					if (!is_privileged_role_allowed_config) {
+						break;
+					}
+				}
+				if (privileged_role == NULL) {
+					break;
+				}
+				if (!OidIsValid(get_role_oid(privileged_role, true))) {
+					break;
+				}
+				if (GetUserId() != get_role_oid(privileged_role, false)) {
+					break;
+				}
+
+				{
+					Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
+					Oid prev_role_oid;
+					int prev_role_sec_context;
+
+					if (privileged_extensions_superuser != NULL) {
+						superuser_oid = get_role_oid(privileged_extensions_superuser, false);
+					}
+
+					GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
+					SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
+										   SECURITY_LOCAL_USERID_CHANGE |
+										   SECURITY_RESTRICTED_OPERATION);
+
+					run_process_utility_hook(prev_hook);
+
+					SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+
+					return;
 				}
 
 				return;
