@@ -2,7 +2,7 @@
 set role privileged_role;
 \echo
 
--- can set session_replication_role config
+-- can set privileged_role_allowed_configs
 set session_replication_role to 'replica';
 begin;
   set local session_replication_role to 'origin';
@@ -10,7 +10,7 @@ commit;
 reset session_replication_role;
 \echo
 
--- non-superuser non-privileged role cannot set session_replication_role config
+-- non-superuser non-privileged role cannot set privileged_role_allowed_configs
 set role rolecreator;
 
 set session_replication_role to 'replica';
@@ -22,7 +22,7 @@ reset session_replication_role;
 set role privileged_role;
 \echo
 
--- superuser can set session_replication_role config
+-- superuser can set privileged_role_allowed_configs
 set role postgres;
 
 set session_replication_role to 'replica';
@@ -32,6 +32,12 @@ commit;
 reset session_replication_role;
 
 set role privileged_role;
+\echo
+
+-- can set privileged_role_allowed_configs for a role
+create role r;
+alter role r set session_replication_role to 'replica';
+drop role r;
 \echo
 
 -- can manage bypassrls role attribute
