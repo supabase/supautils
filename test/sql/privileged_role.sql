@@ -75,3 +75,8 @@ select rolbypassrls from pg_roles where rolname = 'r';
 drop role r;
 
 set role privileged_role;
+\echo
+
+-- regression: https://github.com/supabase/supautils/issues/34
+create role tmp;
+alter role tmp;

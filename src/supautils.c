@@ -293,7 +293,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				run_process_utility_hook(prev_hook);
 
-				alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option, privileged_extensions_superuser);
+				if (bypassrls_option != NULL) {
+					alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option, privileged_extensions_superuser);
+				}
 
 				return;
 			}
