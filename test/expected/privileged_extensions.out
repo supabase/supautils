@@ -12,15 +12,33 @@ select '1=>2'::hstore;
  "1"=>"2"
 (1 row)
 
+drop extension hstore;
 \echo
 
--- can run custom scripts
+-- custom scripts are run
 select * from t2;
  column1 
 ---------
        1
 (1 row)
 
+reset role;
+drop table t2;
+set role extensions_role;
+\echo
+
+-- custom scripts are run even for superusers
+reset role;
+create extension hstore;
+drop extension hstore;
+select * from t2;
+ column1 
+---------
+       1
+(1 row)
+
+drop table t2;
+set role extensions_role;
 \echo
 
 -- cannot create other extensions
