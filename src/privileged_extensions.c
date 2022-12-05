@@ -72,68 +72,51 @@ static void run_custom_script(char *filename) {
     PopActiveSnapshot();
 }
 
-static void run_process_utility_hook_as_superuser(
-    void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, char *privileged_extensions_superuser,
-    char *privileged_extensions_custom_scripts_path) {
-    switch_to_superuser(privileged_extensions_superuser);
-
-    if (IsA(pstmt->utilityStmt, CreateExtensionStmt)) {
-        CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
-        char *filename = (char *)palloc(MAXPGPATH);
-
-        snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
-                 privileged_extensions_custom_scripts_path, stmt->extname);
-        run_custom_script(filename);
-
-        pfree(filename);
-    }
-
-    run_process_utility_hook(process_utility_hook);
-
-    if (IsA(pstmt->utilityStmt, CreateExtensionStmt)) {
-        CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
-        char *filename = (char *)palloc(MAXPGPATH);
-
-        snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
-                 privileged_extensions_custom_scripts_path, stmt->extname);
-        run_custom_script(filename);
-
-        pfree(filename);
-    }
-
-    switch_to_original_role();
-}
-
 void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, char *privileged_extensions,
     char *privileged_extensions_superuser,
     char *privileged_extensions_custom_scripts_path) {
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
+    char *filename = (char *)palloc(MAXPGPATH);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS,
-            privileged_extensions_superuser,
-            privileged_extensions_custom_scripts_path);
+        switch_to_superuser(privileged_extensions_superuser);
+
+        {
+            snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
+                     privileged_extensions_custom_scripts_path, stmt->extname);
+            run_custom_script(filename);
+        }
+
+        run_process_utility_hook(process_utility_hook);
+
+        {
+            snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
+                     privileged_extensions_custom_scripts_path, stmt->extname);
+            run_custom_script(filename);
+        }
+
+        switch_to_original_role();
     } else {
         run_process_utility_hook(process_utility_hook);
     }
+
+    pfree(filename);
 }
 
 void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, char *privileged_extensions,
-    char *privileged_extensions_superuser,
-    char *privileged_extensions_custom_scripts_path) {
+    char *privileged_extensions_superuser) {
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS,
-            privileged_extensions_superuser,
-            privileged_extensions_custom_scripts_path);
+        switch_to_superuser(privileged_extensions_superuser);
+
+        run_process_utility_hook(process_utility_hook);
+
+        switch_to_original_role();
     } else {
         run_process_utility_hook(process_utility_hook);
     }
@@ -141,8 +124,7 @@ void handle_alter_extension(
 
 void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
                            PROCESS_UTILITY_PARAMS, char *privileged_extensions,
-                           char *privileged_extensions_superuser,
-                           char *privileged_extensions_custom_scripts_path) {
+                           char *privileged_extensions_superuser) {
     DropStmt *stmt = (DropStmt *)pstmt->utilityStmt;
     bool all_extensions_are_privileged = true;
     ListCell *lc;
@@ -157,10 +139,11 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     }
 
     if (all_extensions_are_privileged) {
-        run_process_utility_hook_as_superuser(
-            process_utility_hook, PROCESS_UTILITY_ARGS,
-            privileged_extensions_superuser,
-            privileged_extensions_custom_scripts_path);
+        switch_to_superuser(privileged_extensions_superuser);
+
+        run_process_utility_hook(process_utility_hook);
+
+        switch_to_original_role();
     } else {
         run_process_utility_hook(process_utility_hook);
     }

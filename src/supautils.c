@@ -559,8 +559,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			handle_alter_extension(prev_hook,
 								   PROCESS_UTILITY_ARGS,
 								   privileged_extensions,
-								   privileged_extensions_superuser,
-								   privileged_extensions_custom_scripts_path);
+								   privileged_extensions_superuser);
 			return;
 		}
 
@@ -588,8 +587,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
 									  privileged_extensions,
-									  privileged_extensions_superuser,
-									  privileged_extensions_custom_scripts_path);
+									  privileged_extensions_superuser);
 				return;
 			}
 
