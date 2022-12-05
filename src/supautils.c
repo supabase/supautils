@@ -313,9 +313,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				if (privileged_role_allowed_configs == NULL) {
 					break;
 				} else {
-					char *allowed_configs = pstrdup(privileged_role_allowed_configs);
-					bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)stmt->setstmt)->name, allowed_configs);
-					pfree(allowed_configs);
+					bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)stmt->setstmt)->name, privileged_role_allowed_configs);
 
 					if (!is_privileged_role_allowed_config) {
 						break;
@@ -637,9 +635,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (privileged_role_allowed_configs == NULL) {
 				break;
 			} else {
-				char *allowed_configs = pstrdup(privileged_role_allowed_configs);
-				bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)utility_stmt)->name, allowed_configs);
-				pfree(allowed_configs);
+				bool is_privileged_role_allowed_config = is_string_in_comma_delimited_string(((VariableSetStmt *)utility_stmt)->name, privileged_role_allowed_configs);
 
 				if (!is_privileged_role_allowed_config) {
 					break;
