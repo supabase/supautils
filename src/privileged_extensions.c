@@ -18,27 +18,6 @@
 #include "privileged_extensions.h"
 #include "utils.h"
 
-static bool is_extension_privileged(char *name, char *privileged_extensions) {
-    bool extension_is_privileged = false;
-    List *privileged_extensions_list;
-    ListCell *lc;
-
-    SplitIdentifierString(pstrdup(privileged_extensions), ',',
-                          &privileged_extensions_list);
-
-    foreach (lc, privileged_extensions_list) {
-        char *privileged_extension = (char *)lfirst(lc);
-
-        if (strcmp(name, privileged_extension) == 0) {
-            extension_is_privileged = true;
-            break;
-        }
-    }
-    list_free(privileged_extensions_list);
-
-    return extension_is_privileged;
-}
-
 // TODO: interpolate extschema, current_role, current_database_owner
 static void run_custom_script(char *filename) {
     PushActiveSnapshot(GetTransactionSnapshot());
@@ -80,7 +59,8 @@ void handle_create_extension(
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
     char *filename = (char *)palloc(MAXPGPATH);
 
-    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
+    if (is_string_in_comma_delimited_string(stmt->extname,
+                                            privileged_extensions)) {
         switch_to_superuser(privileged_extensions_superuser);
 
         {
@@ -111,7 +91,8 @@ void handle_alter_extension(
     char *privileged_extensions_superuser) {
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
-    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
+    if (is_string_in_comma_delimited_string(stmt->extname,
+                                            privileged_extensions)) {
         switch_to_superuser(privileged_extensions_superuser);
 
         run_process_utility_hook(process_utility_hook);
@@ -132,7 +113,7 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     foreach (lc, stmt->objects) {
         char *name = strVal(lfirst(lc));
 
-        if (!is_extension_privileged(name, privileged_extensions)) {
+        if (!is_string_in_comma_delimited_string(name, privileged_extensions)) {
             all_extensions_are_privileged = false;
             break;
         }
