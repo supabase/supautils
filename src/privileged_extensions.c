@@ -19,7 +19,7 @@
 #include "utils.h"
 
 // TODO: interpolate extschema, current_role, current_database_owner
-static void run_custom_script(char *filename) {
+static void run_custom_script(const char *filename) {
     PushActiveSnapshot(GetTransactionSnapshot());
     SPI_connect();
     {
@@ -53,9 +53,9 @@ static void run_custom_script(char *filename) {
 
 void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, char *privileged_extensions,
-    char *privileged_extensions_superuser,
-    char *privileged_extensions_custom_scripts_path) {
+    PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
+    const char *privileged_extensions_superuser,
+    const char *privileged_extensions_custom_scripts_path) {
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
     char *filename = (char *)palloc(MAXPGPATH);
 
@@ -87,8 +87,8 @@ void handle_create_extension(
 
 void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, char *privileged_extensions,
-    char *privileged_extensions_superuser) {
+    PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
+    const char *privileged_extensions_superuser) {
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
     if (is_string_in_comma_delimited_string(stmt->extname,
@@ -104,8 +104,9 @@ void handle_alter_extension(
 }
 
 void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-                           PROCESS_UTILITY_PARAMS, char *privileged_extensions,
-                           char *privileged_extensions_superuser) {
+                           PROCESS_UTILITY_PARAMS,
+                           const char *privileged_extensions,
+                           const char *privileged_extensions_superuser) {
     DropStmt *stmt = (DropStmt *)pstmt->utilityStmt;
     bool all_extensions_are_privileged = true;
     ListCell *lc;
