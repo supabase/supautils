@@ -55,12 +55,19 @@ void switch_to_original_role(void) {
     SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
 }
 
-bool is_string_in_comma_delimited_string(const char *s1, char *s2) {
+bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
     bool s1_is_in_s2 = false;
+    char *s2_tmp;
     List *split_s2 = NIL;
     ListCell *lc;
 
-    SplitIdentifierString(s2, ',', &split_s2);
+    if (s1 == NULL || s2 == NULL) {
+        return false;
+    }
+
+    s2_tmp = pstrdup(s2);
+
+    SplitIdentifierString(s2_tmp, ',', &split_s2);
 
     foreach (lc, split_s2) {
         char *s2_elem = (char *)lfirst(lc);
@@ -71,6 +78,8 @@ bool is_string_in_comma_delimited_string(const char *s1, char *s2) {
         }
     }
     list_free(split_s2);
+
+    pfree(s2_tmp);
 
     return s1_is_in_s2;
 }

@@ -70,6 +70,9 @@ extern void switch_to_superuser(const char *privileged_extensions_superuser);
  */
 extern void switch_to_original_role(void);
 
-extern bool is_string_in_comma_delimited_string(const char *s1, char *s2);
+/**
+ * Returns `false` if either s1 or s2 is NULL.
+ */
+extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
 
 #endif
