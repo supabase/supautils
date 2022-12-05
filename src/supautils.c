@@ -527,13 +527,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_CreateExtensionStmt:
 		{
-			if (superuser()) {
-				break;
-			}
-			if (privileged_extensions == NULL) {
-				break;
-			}
-
 			handle_create_extension(prev_hook,
 									PROCESS_UTILITY_ARGS,
 									privileged_extensions,

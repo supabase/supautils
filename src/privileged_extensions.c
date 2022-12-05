@@ -59,27 +59,38 @@ void handle_create_extension(
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
     char *filename = (char *)palloc(MAXPGPATH);
 
-    if (is_string_in_comma_delimited_string(stmt->extname,
-                                            privileged_extensions)) {
+    // Run before-create script.
+    {
         switch_to_superuser(privileged_extensions_superuser);
 
-        {
-            snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
-                     privileged_extensions_custom_scripts_path, stmt->extname);
-            run_custom_script(filename);
-        }
+        snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
+                 privileged_extensions_custom_scripts_path, stmt->extname);
+        run_custom_script(filename);
+
+        switch_to_original_role();
+    }
+
+    // Run `CREATE EXTENSION`.
+    if (!superuser() && is_string_in_comma_delimited_string(
+                            stmt->extname, privileged_extensions)) {
+        switch_to_superuser(privileged_extensions_superuser);
 
         run_process_utility_hook(process_utility_hook);
-
-        {
-            snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
-                     privileged_extensions_custom_scripts_path, stmt->extname);
-            run_custom_script(filename);
-        }
 
         switch_to_original_role();
     } else {
         run_process_utility_hook(process_utility_hook);
+    }
+
+    // Run after-create script.
+    {
+        switch_to_superuser(privileged_extensions_superuser);
+
+        snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
+                 privileged_extensions_custom_scripts_path, stmt->extname);
+        run_custom_script(filename);
+
+        switch_to_original_role();
     }
 
     pfree(filename);
