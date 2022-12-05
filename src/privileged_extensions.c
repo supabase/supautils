@@ -16,6 +16,7 @@
 #include <utils/varlena.h>
 
 #include "privileged_extensions.h"
+#include "utils.h"
 
 static bool is_extension_privileged(char *name, char *privileged_extensions) {
     bool extension_is_privileged = false;
@@ -75,18 +76,7 @@ static void run_process_utility_hook_as_superuser(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, char *privileged_extensions_superuser,
     char *privileged_extensions_custom_scripts_path) {
-    Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-    Oid prev_role_oid;
-    int prev_role_sec_context;
-
-    if (privileged_extensions_superuser != NULL) {
-        superuser_oid = get_role_oid(privileged_extensions_superuser, false);
-    }
-
-    GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-    SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-                                              SECURITY_LOCAL_USERID_CHANGE |
-                                              SECURITY_RESTRICTED_OPERATION);
+    switch_to_superuser(privileged_extensions_superuser);
 
     if (IsA(pstmt->utilityStmt, CreateExtensionStmt)) {
         CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
@@ -112,7 +102,7 @@ static void run_process_utility_hook_as_superuser(
         pfree(filename);
     }
 
-    SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+    switch_to_original_role();
 }
 
 void handle_create_extension(

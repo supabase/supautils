@@ -4,19 +4,14 @@
 
 #include "utils.h"
 
+static Oid prev_role_oid = 0;
+static int prev_role_sec_context = 0;
+
 void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                                    DefElem *bypassrls_option,
                                                    const char *superuser_name) {
-    Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-    Oid prev_role_oid = 0;
-    int prev_role_sec_context = 0;
-
     RoleSpec *role = makeNode(RoleSpec);
     AlterRoleStmt *bypassrls_stmt = makeNode(AlterRoleStmt);
-
-    if (superuser_name != NULL) {
-        superuser_oid = get_role_oid(superuser_name, false);
-    }
 
     role->roletype = ROLESPEC_CSTRING;
     role->rolename = pstrdup(role_name);
@@ -25,10 +20,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     bypassrls_stmt->role = role;
     bypassrls_stmt->options = list_make1(bypassrls_option);
 
-    GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-    SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-                                              SECURITY_LOCAL_USERID_CHANGE |
-                                              SECURITY_RESTRICTED_OPERATION);
+	switch_to_superuser(superuser_name);
 
 #if PG15_GTE
     AlterRole(NULL, bypassrls_stmt);
@@ -36,7 +28,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     AlterRole(bypassrls_stmt);
 #endif
 
-    SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+	switch_to_original_role();
 
     pfree(role->rolename);
     pfree(role);
@@ -44,6 +36,23 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     pfree(bypassrls_stmt);
 
     return;
+}
+
+void switch_to_superuser(const char *privileged_extensions_superuser) {
+    Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
+
+    if (privileged_extensions_superuser != NULL) {
+        superuser_oid = get_role_oid(privileged_extensions_superuser, false);
+    }
+
+    GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
+    SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
+                                              SECURITY_LOCAL_USERID_CHANGE |
+                                              SECURITY_RESTRICTED_OPERATION);
+}
+
+void switch_to_original_role(void) {
+    SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
 }
 
 bool is_string_in_comma_delimited_string(const char *s1, char *s2) {

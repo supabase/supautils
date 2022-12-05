@@ -58,6 +58,18 @@ alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                               DefElem *bypassrls_option,
                                               const char *superuser_name);
 
+/**
+ * Switch to a superuser and save the original role. Caller is responsible for
+ * calling switch_to_original_role() afterwards.
+ */
+extern void switch_to_superuser(const char *privileged_extensions_superuser);
+
+/**
+ * Restore the saved original role. Caller is responsible for ensuring
+ * switch_to_superuser() was called.
+ */
+extern void switch_to_original_role(void);
+
 extern bool is_string_in_comma_delimited_string(const char *s1, char *s2);
 
 #endif

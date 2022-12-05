@@ -332,22 +332,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				}
 
 				{
-					Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-					Oid prev_role_oid;
-					int prev_role_sec_context;
-
-					if (privileged_extensions_superuser != NULL) {
-						superuser_oid = get_role_oid(privileged_extensions_superuser, false);
-					}
-
-					GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-					SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-										   SECURITY_LOCAL_USERID_CHANGE |
-										   SECURITY_RESTRICTED_OPERATION);
+					switch_to_superuser(privileged_extensions_superuser);
 
 					run_process_utility_hook(prev_hook);
 
-					SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+					switch_to_original_role();
 
 					return;
 				}
@@ -629,22 +618,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 
 			{
-				Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-				Oid prev_role_oid;
-				int prev_role_sec_context;
-
-				if (privileged_extensions_superuser != NULL) {
-					superuser_oid = get_role_oid(privileged_extensions_superuser, false);
-				}
-
-				GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-				SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-									   SECURITY_LOCAL_USERID_CHANGE |
-									   SECURITY_RESTRICTED_OPERATION);
+				switch_to_superuser(privileged_extensions_superuser);
 
 				run_process_utility_hook(prev_hook);
 
-				SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+				switch_to_original_role();
 
 				return;
 			}
@@ -680,22 +658,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 
 			{
-				Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-				Oid prev_role_oid;
-				int prev_role_sec_context;
-
-				if (privileged_extensions_superuser != NULL) {
-					superuser_oid = get_role_oid(privileged_extensions_superuser, false);
-				}
-
-				GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-				SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-									   SECURITY_LOCAL_USERID_CHANGE |
-									   SECURITY_RESTRICTED_OPERATION);
+				switch_to_superuser(privileged_extensions_superuser);
 
 				run_process_utility_hook(prev_hook);
 
-				SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+				switch_to_original_role();
 
 				return;
 			}
