@@ -566,10 +566,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 		/**
 		 * CREATE FOREIGN DATA WRAPPER <fdw>
-		 * ALTER FOREIGN DATA WRAPPER <fdw>
 		 */
 		case T_CreateFdwStmt:
-		case T_AlterFdwStmt:
 		{
 			if (superuser()) {
 				break;
@@ -589,7 +587,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			run_process_utility_hook(prev_hook);
 
 			// Change FDW owner to privileged_role
-			if (IsA(utility_stmt, CreateFdwStmt)) {
+			{
 				CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
 				const char *privileged_role_name_ident = quote_identifier(privileged_role);
@@ -650,27 +648,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 									  PROCESS_UTILITY_ARGS,
 									  privileged_extensions,
 									  privileged_extensions_superuser);
-				return;
-			/*
-			 * DROP FOREIGN DATA WRAPPER <fdw>
-			 */
-			} else if (stmt->removeType == OBJECT_FDW) {
-				if (privileged_role == NULL) {
-					break;
-				}
-				if (!OidIsValid(get_role_oid(privileged_role, true))) {
-					break;
-				}
-				if (GetUserId() != get_role_oid(privileged_role, false)) {
-					break;
-				}
-
-				switch_to_superuser(privileged_extensions_superuser);
-
-				run_process_utility_hook(prev_hook);
-
-				switch_to_original_role();
-
 				return;
 			}
 
