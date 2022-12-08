@@ -50,8 +50,18 @@ select rolbypassrls from pg_roles where rolname = 'r';
 drop role r;
 \echo
 
+-- can manage foreign data wrappers
+create extension postgres_fdw;
+create foreign data wrapper new_fdw
+  handler postgres_fdw_handler
+  validator postgres_fdw_validator;
+
+drop extension postgres_fdw cascade;
+\echo
+
 -- non-superuser non-privileged role cannot manage bypassrls role attribute
 set role rolecreator;
+\echo
 
 -- the error message changed in PG14
 do $$
