@@ -588,14 +588,19 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 			run_process_utility_hook(prev_hook);
 
-			// GRANT USAGE on the FDW so we can do CREATE SERVER.
+			// Change FDW owner to privileged_role
 			if (IsA(utility_stmt, CreateFdwStmt)) {
 				CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
 				const char *privileged_role_name_ident = quote_identifier(privileged_role);
 				const char *fdw_name_ident = quote_identifier(stmt->fdwname);
-				char *sql_template = "grant usage on foreign data wrapper %s to %s;";
-				size_t sql_len = strlen(sql_template) + strlen(fdw_name_ident) + strlen(privileged_role_name_ident);
+				// Need to temporarily make the privileged role a superuser because non SUs can't own FDWs.
+				char *sql_template = "alter role %s superuser;\n"
+					"alter foreign data wrapper %s owner to %s;\n"
+					"alter role %s nosuperuser;\n";
+				size_t sql_len = strlen(sql_template)
+					+ (3 * strlen(privileged_role_name_ident))
+					+ strlen(fdw_name_ident);
 				char *sql = (char *)palloc(sql_len);
 				int rc;
 
@@ -605,7 +610,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				snprintf(sql,
 						 sql_len,
 						 sql_template,
+						 privileged_role_name_ident,
 						 fdw_name_ident,
+						 privileged_role_name_ident,
 						 privileged_role_name_ident);
 
 				rc = SPI_execute(sql, false, 0);
