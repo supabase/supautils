@@ -2,6 +2,7 @@
 
 #include <access/xact.h>
 #include <catalog/pg_authid.h>
+#include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <nodes/makefuncs.h>
@@ -9,6 +10,7 @@
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>
 #include <utils/acl.h>
+#include <utils/builtins.h>
 #include <utils/fmgrprotos.h>
 #include <utils/guc.h>
 #include <utils/guc_tables.h>
@@ -562,8 +564,70 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_AlterExtensionContentsStmt:
 			break;
 
+		/**
+		 * CREATE FOREIGN DATA WRAPPER <fdw>
+		 * ALTER FOREIGN DATA WRAPPER <fdw>
+		 */
+		case T_CreateFdwStmt:
+		case T_AlterFdwStmt:
+		{
+			if (superuser()) {
+				break;
+			}
+			if (privileged_role == NULL) {
+				break;
+			}
+			if (!OidIsValid(get_role_oid(privileged_role, true))) {
+				break;
+			}
+			if (GetUserId() != get_role_oid(privileged_role, false)) {
+				break;
+			}
+
+			switch_to_superuser(privileged_extensions_superuser);
+
+			run_process_utility_hook(prev_hook);
+
+			// GRANT USAGE on the FDW so we can do CREATE SERVER.
+			if (IsA(utility_stmt, CreateFdwStmt)) {
+				CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
+
+				const char *privileged_role_name_ident = quote_identifier(privileged_role);
+				const char *fdw_name_ident = quote_identifier(stmt->fdwname);
+				char *sql_template = "grant usage on foreign data wrapper %s to %s;";
+				size_t sql_len = strlen(sql_template) + strlen(fdw_name_ident) + strlen(privileged_role_name_ident);
+				char *sql = (char *)palloc(sql_len);
+				int rc;
+
+				PushActiveSnapshot(GetTransactionSnapshot());
+				SPI_connect();
+
+				snprintf(sql,
+						 sql_len,
+						 sql_template,
+						 fdw_name_ident,
+						 privileged_role_name_ident);
+
+				rc = SPI_execute(sql, false, 0);
+				if (rc != SPI_OK_UTILITY) {
+					elog(ERROR, "SPI_execute failed with error code %d", rc);
+				}
+
+				pfree(sql);
+
+				SPI_finish();
+				PopActiveSnapshot();
+			}
+
+			switch_to_original_role();
+
+			return;
+		}
+
 		case T_DropStmt:
 		{
+			DropStmt *stmt = (DropStmt *)utility_stmt;
+
 			if (superuser()) {
 				break;
 			}
@@ -574,11 +638,32 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			/*
 			 * DROP EXTENSION <extension>
 			 */
-			if (((DropStmt *)utility_stmt)->removeType == OBJECT_EXTENSION) {
+			if (stmt->removeType == OBJECT_EXTENSION) {
 				handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
 									  privileged_extensions,
 									  privileged_extensions_superuser);
+				return;
+			/*
+			 * DROP FOREIGN DATA WRAPPER <fdw>
+			 */
+			} else if (stmt->removeType == OBJECT_FDW) {
+				if (privileged_role == NULL) {
+					break;
+				}
+				if (!OidIsValid(get_role_oid(privileged_role, true))) {
+					break;
+				}
+				if (GetUserId() != get_role_oid(privileged_role, false)) {
+					break;
+				}
+
+				switch_to_superuser(privileged_extensions_superuser);
+
+				run_process_utility_hook(prev_hook);
+
+				switch_to_original_role();
+
 				return;
 			}
 

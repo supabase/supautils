@@ -20,7 +20,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     bypassrls_stmt->role = role;
     bypassrls_stmt->options = list_make1(bypassrls_option);
 
-	switch_to_superuser(superuser_name);
+    switch_to_superuser(superuser_name);
 
 #if PG15_GTE
     AlterRole(NULL, bypassrls_stmt);
@@ -28,7 +28,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     AlterRole(bypassrls_stmt);
 #endif
 
-	switch_to_original_role();
+    switch_to_original_role();
 
     pfree(role->rolename);
     pfree(role);
