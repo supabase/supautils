@@ -40,7 +40,7 @@ let
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-      privileged_extensions="hstore"
+      privileged_extensions="hstore, postgres_fdw"
       privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
       privileged_role="privileged_role"
       privileged_role_allowed_configs="session_replication_role"
