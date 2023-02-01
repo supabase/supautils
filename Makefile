@@ -4,7 +4,7 @@ DATA = $(wildcard sql/*--*.sql)
 MODULE_big = supautils
 OBJS = src/supautils.o src/privileged_extensions.o src/utils.o
 
-TESTS = $(wildcard test/sql/*.sql test/sql/stdlib/array/*.sql test/sql/stdlib/inspect/*.sql)
+TESTS = $(wildcard test/sql/*.sql)
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 

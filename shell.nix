@@ -13,10 +13,6 @@ let
         mkdir -p $out/bin
         install -D supautils.so -t $out/lib
 
-        # Build stdlib
-        ./bin/build_stdlib.sh
-
-        install -D -t $out/share/postgresql/extension sql/supautils--*.sql
         install -D -t $out/share/postgresql/extension supautils.control
       '';
     };
