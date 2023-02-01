@@ -8,7 +8,6 @@ repo_url: https://github.com/supabase/supautils
 nav:
     - Welcome: 'index.md'
     - Installation: 'installation.md'
-    - Standard Library: 'standard_library.md'
     - Role Security: 'role_security.md'
     - Experimental: 'experimental.md'
     - Contributing: 'contributing.md'

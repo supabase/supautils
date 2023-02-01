@@ -12,7 +12,3 @@ create role fake noinherit;
 create role privileged_role login createrole;
 create role testme noinherit;
 create role authenticator login noinherit;
-
--- create extension
-create schema supa;
-create extension supautils with schema supa;
