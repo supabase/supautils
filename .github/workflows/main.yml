@@ -6,6 +6,9 @@ jobs:
   test:
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        pg-version: ['12', '13', '14', '15']
 
     steps:
     - uses: actions/checkout@v3
@@ -13,4 +16,4 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Run tests
-      run: nix-shell --run "supautils-with-pg-12 make installcheck && supautils-with-pg-13 make installcheck && supautils-with-pg-14 make installcheck && supautils-with-pg-15 make installcheck"
+      run: nix-shell --run "supautils-with-pg-${{ matrix.pg-version }} make installcheck"

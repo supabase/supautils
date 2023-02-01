@@ -21,8 +21,10 @@ let
       '';
     };
   pgWithExt = { postgresql } :
-    let pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
-    in ''
+  let
+    pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
+    ver = builtins.head (builtins.splitVersion postgresql.version);
+    script = ''
       export PATH=${pg}/bin:"$PATH"
 
       tmpdir="$(mktemp -d)"
@@ -60,11 +62,11 @@ let
 
       "$@"
     '';
-  supautils-with-pg-12 = writeShellScriptBin "supautils-with-pg-12" (pgWithExt { postgresql = postgresql_12; });
-  supautils-with-pg-13 = writeShellScriptBin "supautils-with-pg-13" (pgWithExt { postgresql = postgresql_13; });
-  supautils-with-pg-14 = writeShellScriptBin "supautils-with-pg-14" (pgWithExt { postgresql = postgresql_14; });
-  supautils-with-pg-15 = writeShellScriptBin "supautils-with-pg-15" (pgWithExt { postgresql = postgresql_15; });
+  in
+    writeShellScriptBin "supautils-with-pg-${ver}" script;
+  supportedPgVersions = [  postgresql_12 postgresql_13 postgresql_14 postgresql_15 ];
+  extAll = map (x: pgWithExt { postgresql = x;}) supportedPgVersions;
 in
 mkShell {
-  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 supautils-with-pg-14 supautils-with-pg-15];
+  buildInputs = [ extAll ];
 }
