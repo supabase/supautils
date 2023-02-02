@@ -10,6 +10,8 @@ grant supabase_storage_admin to rolecreator;
 -- other roles
 create role fake noinherit;
 create role privileged_role login createrole;
+create role testme noinherit;
+create role authenticator login noinherit;
 
 -- create extension
 create schema supa;

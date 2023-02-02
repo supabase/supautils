@@ -40,12 +40,12 @@ let
 
       options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\""
 
-      reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
+      reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
       privileged_extensions="hstore, postgres_fdw"
       privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
       privileged_role="privileged_role"
-      privileged_role_allowed_configs="session_replication_role"
+      privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
 
       reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
       placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
