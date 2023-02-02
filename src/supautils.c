@@ -89,6 +89,9 @@ privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSourc
 
 static void check_parameter(char *val, char *name);
 
+static bool
+has_privileged_role(void);
+
 /*
  * IO: module load callback
  */
@@ -257,13 +260,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				comfirm_reserved_roles(get_rolespec_name(stmt->role));
 
-				if (privileged_role == NULL) {
-					break;
-				}
-				if (!OidIsValid(get_role_oid(privileged_role, true))) {
-					break;
-				}
-				if (GetUserId() != get_role_oid(privileged_role, false)) {
+				if (!has_privileged_role()){
 					break;
 				}
 
@@ -321,13 +318,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						break;
 					}
 				}
-				if (privileged_role == NULL) {
-					break;
-				}
-				if (!OidIsValid(get_role_oid(privileged_role, true))) {
-					break;
-				}
-				if (GetUserId() != get_role_oid(privileged_role, false)) {
+
+				if (!has_privileged_role()){
 					break;
 				}
 
@@ -367,13 +359,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					comfirm_reserved_roles(created_role);
 
 					// Allow bypassrls attribute if using `privileged_role`.
-					if (privileged_role == NULL) {
-						bypassrls_is_allowed = false;
-					}
-					if (!OidIsValid(get_role_oid(privileged_role, true))) {
-						bypassrls_is_allowed = false;
-					}
-					if (GetUserId() != get_role_oid(privileged_role, false)) {
+					if (!has_privileged_role()){
 						bypassrls_is_allowed = false;
 					}
 
@@ -896,4 +882,12 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 	}
 
 	return true;
+}
+
+bool has_privileged_role(void) {
+	Oid role_oid = get_role_oid(privileged_role, true);
+	return
+		privileged_role &&
+		OidIsValid(role_oid) &&
+		GetUserId() == role_oid;
 }
