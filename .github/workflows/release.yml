@@ -39,15 +39,26 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v13
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-
-      - name: Build supautils
-        run: nix-shell --run "supautils-with-pg-${{ matrix.postgres }} make"
-
       - name: build release artifacts
         run: |
+          # Add postgres package repo
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
+
+          sudo apt-get update
+
+          # Install requested postgres version
+          sudo apt-get install -y --no-install-recommends postgresql-${{ matrix.postgres }} postgresql-server-dev-${{ matrix.postgres }}
+
+          # Ensure installed pg_config is first on path
+          export PATH="/usr/lib/postgresql/${{ matrix.postgres }}/bin:$PATH"
+
+          # Install supautils dependencies
+          sudo apt-get install -y --no-install-recommends libicu-dev
+
+          # Build supautils
+          make
+
           # name of the package directory before packaging
           package_dir=${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu
 
