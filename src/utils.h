@@ -75,6 +75,6 @@ extern void switch_to_original_role(void);
  */
 extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
 
-extern bool remove_ending_wildcard(char*);
+extern bool remove_ending_wildcard(char *);
 
 #endif

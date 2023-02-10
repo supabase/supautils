@@ -7,7 +7,7 @@
 static Oid prev_role_oid = 0;
 static int prev_role_sec_context = 0;
 
-static bool strstarts(const char*, const char*);
+static bool strstarts(const char *, const char *);
 
 void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                                    DefElem *bypassrls_option,
@@ -74,7 +74,8 @@ bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
     foreach (lc, split_s2) {
         char *s2_elem = (char *)lfirst(lc);
 
-        if ((remove_ending_wildcard(s2_elem) && strstarts(s1, s2_elem)) || strcmp(s1, s2_elem) == 0) {
+        if ((remove_ending_wildcard(s2_elem) && strstarts(s1, s2_elem)) ||
+            strcmp(s1, s2_elem) == 0) {
             s1_is_in_s2 = true;
             break;
         }
@@ -86,22 +87,21 @@ bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
     return s1_is_in_s2;
 }
 
-bool remove_ending_wildcard(char* elem)
-{
-  bool wildcard_removed = false;
-  if(elem){
-    size_t elem_size = strlen(elem);
+bool remove_ending_wildcard(char *elem) {
+    bool wildcard_removed = false;
+    if (elem) {
+        size_t elem_size = strlen(elem);
 
-    if(elem_size > 1 && elem[elem_size - 1] == '*'){
-      wildcard_removed = true;
-      elem[elem_size - 1] = '\0'; //remove the '*' from the end of the string
+        if (elem_size > 1 && elem[elem_size - 1] == '*') {
+            wildcard_removed = true;
+            elem[elem_size - 1] =
+                '\0'; // remove the '*' from the end of the string
+        }
     }
-  }
 
-  return wildcard_removed;
+    return wildcard_removed;
 }
 
-bool strstarts(const char *str, const char *prefix)
-{
-  return strncmp(str, prefix, strlen(prefix)) == 0;
+bool strstarts(const char *str, const char *prefix) {
+    return strncmp(str, prefix, strlen(prefix)) == 0;
 }
