@@ -61,7 +61,7 @@ static void
 supautils_hook(PROCESS_UTILITY_PARAMS);
 
 static void
-confirm_reserved_roles(const char *target, bool is_privileged_role);
+confirm_reserved_roles(const char *target, bool allow_configurable_roles);
 
 static void
 confirm_reserved_memberships(const char *target);
@@ -780,7 +780,7 @@ check_parameter(char *val, char *name)
 }
 
 static void
-confirm_reserved_roles(const char *target, bool is_privileged_role)
+confirm_reserved_roles(const char *target, bool allow_configurable_roles)
 {
 	List *reserved_roles_list;
 	ListCell *role;
@@ -793,7 +793,7 @@ confirm_reserved_roles(const char *target, bool is_privileged_role)
 		{
 			char *reserved_role = (char *) lfirst(role);
 			bool is_configurable_role = remove_ending_wildcard(reserved_role);
-			bool should_modify_role = is_configurable_role && is_privileged_role;
+			bool should_modify_role = is_configurable_role && allow_configurable_roles;
 
 			if (strcmp(target, reserved_role) == 0)
 			{
