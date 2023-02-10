@@ -61,10 +61,10 @@ static void
 supautils_hook(PROCESS_UTILITY_PARAMS);
 
 static void
-comfirm_reserved_roles(const char *target);
+confirm_reserved_roles(const char *target, bool allow_configurable_roles);
 
 static void
-comfirm_reserved_memberships(const char *target);
+confirm_reserved_memberships(const char *target);
 
 static bool
 reserved_roles_check_hook(char **newval, void **extra, GucSource source);
@@ -88,6 +88,9 @@ static bool
 privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source);
 
 static void check_parameter(char *val, char *name);
+
+static bool
+has_privileged_role(void);
 
 /*
  * IO: module load callback
@@ -255,15 +258,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 
-				comfirm_reserved_roles(get_rolespec_name(stmt->role));
+				confirm_reserved_roles(get_rolespec_name(stmt->role), false);
 
-				if (privileged_role == NULL) {
-					break;
-				}
-				if (!OidIsValid(get_role_oid(privileged_role, true))) {
-					break;
-				}
-				if (GetUserId() != get_role_oid(privileged_role, false)) {
+				if (!has_privileged_role()){
 					break;
 				}
 
@@ -302,6 +299,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_AlterRoleSetStmt:
 			{
 				AlterRoleSetStmt *stmt = (AlterRoleSetStmt *)utility_stmt;
+				bool is_privileged_role = false;
 
 				if (!IsTransactionState()) {
 					break;
@@ -310,7 +308,13 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 
-				comfirm_reserved_roles(get_rolespec_name(stmt->role));
+				is_privileged_role = has_privileged_role();
+
+				confirm_reserved_roles(get_rolespec_name(stmt->role), is_privileged_role);
+
+				if (!is_privileged_role){
+					break;
+				}
 
 				if (privileged_role_allowed_configs == NULL) {
 					break;
@@ -320,15 +324,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (!is_privileged_role_allowed_config) {
 						break;
 					}
-				}
-				if (privileged_role == NULL) {
-					break;
-				}
-				if (!OidIsValid(get_role_oid(privileged_role, true))) {
-					break;
-				}
-				if (GetUserId() != get_role_oid(privileged_role, false)) {
-					break;
 				}
 
 				{
@@ -364,16 +359,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						break;
 
 					/* CREATE ROLE <reserved_role> */
-					comfirm_reserved_roles(created_role);
+					confirm_reserved_roles(created_role, false);
 
 					// Allow bypassrls attribute if using `privileged_role`.
-					if (privileged_role == NULL) {
-						bypassrls_is_allowed = false;
-					}
-					if (!OidIsValid(get_role_oid(privileged_role, true))) {
-						bypassrls_is_allowed = false;
-					}
-					if (GetUserId() != get_role_oid(privileged_role, false)) {
+					if (!has_privileged_role()){
 						bypassrls_is_allowed = false;
 					}
 
@@ -406,7 +395,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						foreach(role_cell, addroleto)
 						{
 							RoleSpec *rolemember = lfirst(role_cell);
-							comfirm_reserved_memberships(get_rolespec_name(rolemember));
+							confirm_reserved_memberships(get_rolespec_name(rolemember));
 						}
 					}
 
@@ -417,7 +406,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					 * should already exist, but handle it anyway.
 					 */
 					if (hasrolemembers)
-						comfirm_reserved_memberships(created_role);
+						confirm_reserved_memberships(created_role);
 
 					// CREATE ROLE <any_role> BYPASSRLS
 					//
@@ -465,7 +454,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						if (role->roletype != ROLESPEC_CSTRING)
 							break;
 
-						comfirm_reserved_roles(role->rolename);
+						confirm_reserved_roles(role->rolename, false);
 					}
 				}
 				break;
@@ -481,16 +470,19 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
 					ListCell *grantee_role_cell;
 					ListCell *role_cell;
+					bool is_privileged_role = false;
 
-					/* GRANT <role> TO <another_role> */
+					/* GRANT <reserved_role> TO <role> */
 					if (stmt->is_grant)
 					{
 						foreach(role_cell, stmt->granted_roles)
 						{
 							AccessPriv *priv = (AccessPriv *) lfirst(role_cell);
-							comfirm_reserved_memberships(priv->priv_name);
+							confirm_reserved_memberships(priv->priv_name);
 						}
 					}
+
+					is_privileged_role = has_privileged_role();
 
 					/*
 					 * GRANT <role> TO <reserved_roles>
@@ -499,7 +491,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					foreach(grantee_role_cell, stmt->grantee_roles)
 					{
 						AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
-						comfirm_reserved_roles(priv->priv_name);
+						// privileged_role can do GRANT <role> to <reserved_role>
+						confirm_reserved_roles(priv->priv_name, is_privileged_role);
 					}
 				}
 				break;
@@ -518,8 +511,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (stmt->renameType != OBJECT_ROLE)
 						break;
 
-					comfirm_reserved_roles(stmt->subname);
-					comfirm_reserved_roles(stmt->newname);
+					confirm_reserved_roles(stmt->subname, false);
+					confirm_reserved_roles(stmt->newname, false);
 				}
 				break;
 			}
@@ -787,7 +780,7 @@ check_parameter(char *val, char *name)
 }
 
 static void
-comfirm_reserved_roles(const char *target)
+confirm_reserved_roles(const char *target, bool allow_configurable_roles)
 {
 	List *reserved_roles_list;
 	ListCell *role;
@@ -799,11 +792,17 @@ comfirm_reserved_roles(const char *target)
 		foreach(role, reserved_roles_list)
 		{
 			char *reserved_role = (char *) lfirst(role);
+			bool is_configurable_role = remove_ending_wildcard(reserved_role);
+			bool should_modify_role = is_configurable_role && allow_configurable_roles;
 
 			if (strcmp(target, reserved_role) == 0)
 			{
-				list_free(reserved_roles_list);
-				EREPORT_RESERVED_ROLE(reserved_role);
+				if(should_modify_role){
+					continue;
+				} else {
+					list_free(reserved_roles_list);
+					EREPORT_RESERVED_ROLE(reserved_role);
+				}
 			}
 		}
 		list_free(reserved_roles_list);
@@ -811,7 +810,7 @@ comfirm_reserved_roles(const char *target)
 }
 
 static void
-comfirm_reserved_memberships(const char *target)
+confirm_reserved_memberships(const char *target)
 {
 	List *reserved_memberships_list;
 	ListCell *membership;
@@ -896,4 +895,12 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 	}
 
 	return true;
+}
+
+bool has_privileged_role(void) {
+	Oid role_oid = get_role_oid(privileged_role, true);
+	return
+		privileged_role &&
+		OidIsValid(role_oid) &&
+		GetUserId() == role_oid;
 }

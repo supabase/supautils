@@ -96,3 +96,26 @@ set role privileged_role;
 -- regression: https://github.com/supabase/supautils/issues/34
 create role tmp;
 alter role tmp;
+\echo
+
+-- privileged_role can modify reserved roles GUCs
+set role privileged_role;
+alter role authenticator set search_path to public;
+alter role authenticator set statement_timeout = '15s';
+\echo
+
+-- privileged_role can do GRANT <role> to <reserved_role>
+grant testme to authenticator;
+\echo
+
+-- privileged_role can set wildcard privileged_role_allowed_configs
+alter role authenticator set pgrst.db_plan_enabled to true;
+alter role authenticator set pgrst.db_prepared_statements to false;
+alter role authenticator set other.nested.foo to true;
+alter role authenticator set other.nested.bar to true;
+\echo
+
+-- privileged_role cannot drop, rename or nologin reserved role
+drop role authenticator;
+alter role authenticator rename to authorized;
+alter role authenticator nologin;

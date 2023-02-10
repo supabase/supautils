@@ -21,8 +21,10 @@ let
       '';
     };
   pgWithExt = { postgresql } :
-    let pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
-    in ''
+  let
+    pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
+    ver = builtins.head (builtins.splitVersion postgresql.version);
+    script = ''
       export PATH=${pg}/bin:"$PATH"
 
       tmpdir="$(mktemp -d)"
@@ -38,12 +40,12 @@ let
 
       options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\""
 
-      reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created"
+      reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
       privileged_extensions="hstore, postgres_fdw"
       privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
       privileged_role="privileged_role"
-      privileged_role_allowed_configs="session_replication_role"
+      privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
 
       reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
       placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
@@ -60,11 +62,11 @@ let
 
       "$@"
     '';
-  supautils-with-pg-12 = writeShellScriptBin "supautils-with-pg-12" (pgWithExt { postgresql = postgresql_12; });
-  supautils-with-pg-13 = writeShellScriptBin "supautils-with-pg-13" (pgWithExt { postgresql = postgresql_13; });
-  supautils-with-pg-14 = writeShellScriptBin "supautils-with-pg-14" (pgWithExt { postgresql = postgresql_14; });
-  supautils-with-pg-15 = writeShellScriptBin "supautils-with-pg-15" (pgWithExt { postgresql = postgresql_15; });
+  in
+    writeShellScriptBin "supautils-with-pg-${ver}" script;
+  supportedPgVersions = [  postgresql_12 postgresql_13 postgresql_14 postgresql_15 ];
+  extAll = map (x: pgWithExt { postgresql = x;}) supportedPgVersions;
 in
 mkShell {
-  buildInputs = [ supautils-with-pg-12 supautils-with-pg-13 supautils-with-pg-14 supautils-with-pg-15];
+  buildInputs = [ extAll ];
 }
