@@ -2,6 +2,7 @@ regression.*
 *.o
 *.so
 *.bc
+*.dylib
 venv/
 site/
 results/*.out
