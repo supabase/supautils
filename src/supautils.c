@@ -873,8 +873,9 @@ static bool
 restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 {
 	char* val = *newval;
+	bool not_empty = placeholders_disallowed_values && placeholders_disallowed_values[0] != '\0';
 
-	if(val && placeholders_disallowed_values)
+	if(val && not_empty)
 	{
 		char *token, *string, *tofree;
 
