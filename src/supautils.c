@@ -897,10 +897,14 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 	return true;
 }
 
-bool has_privileged_role(void) {
-	Oid role_oid = get_role_oid(privileged_role, true);
-	return
-		privileged_role &&
-		OidIsValid(role_oid) &&
-		GetUserId() == role_oid;
+static bool
+has_privileged_role(void)
+{
+	Oid	role_oid;
+
+	if (privileged_role == NULL)
+		return false;
+
+	role_oid = get_role_oid(privileged_role, true);
+	return OidIsValid(role_oid) && (GetUserId() == role_oid);
 }
