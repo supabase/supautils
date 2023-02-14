@@ -872,27 +872,30 @@ placeholders_check_hook(char **newval, void **extra, GucSource source)
 static bool
 restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 {
-	char* val = *newval;
 	bool not_empty = placeholders_disallowed_values && placeholders_disallowed_values[0] != '\0';
 
-	if(val && not_empty)
+	if(*newval && not_empty)
 	{
 		char *token, *string, *tofree;
+		char *val = lowerstr(*newval);
 
 		tofree = string = pstrdup(placeholders_disallowed_values);
 
 		while( (token = strsep(&string, ",")) != NULL )
 		{
-			if (strstr(lowerstr(val), token))
+			if (strstr(val, token))
 			{
+				GUC_check_errcode(ERRCODE_INVALID_PARAMETER_VALUE);
+				GUC_check_errmsg("The placeholder contains the \"%s\" disallowed value",
+								 token);
 				pfree(tofree);
-				ereport(ERROR,															\
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
-						 errmsg("The placeholder contains the \"%s\" disallowed value", token)));
+				pfree(val);
+				return false;
 			}
 		}
 
 		pfree(tofree);
+		pfree(val);
 	}
 
 	return true;
