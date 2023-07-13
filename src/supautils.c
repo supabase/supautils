@@ -90,7 +90,7 @@ privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSourc
 static void check_parameter(char *val, char *name);
 
 static bool
-has_privileged_role(void);
+is_privileged_role(void);
 
 /*
  * IO: module load callback
@@ -260,7 +260,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				confirm_reserved_roles(get_rolespec_name(stmt->role), false);
 
-				if (!has_privileged_role()){
+				if (!is_privileged_role()){
 					break;
 				}
 
@@ -299,7 +299,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_AlterRoleSetStmt:
 			{
 				AlterRoleSetStmt *stmt = (AlterRoleSetStmt *)utility_stmt;
-				bool is_privileged_role = false;
+				bool role_is_privileged = false;
 
 				if (!IsTransactionState()) {
 					break;
@@ -308,11 +308,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 
-				is_privileged_role = has_privileged_role();
+				role_is_privileged = is_privileged_role();
 
-				confirm_reserved_roles(get_rolespec_name(stmt->role), is_privileged_role);
+				confirm_reserved_roles(get_rolespec_name(stmt->role), role_is_privileged);
 
-				if (!is_privileged_role){
+				if (!role_is_privileged){
 					break;
 				}
 
@@ -362,7 +362,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					confirm_reserved_roles(created_role, false);
 
 					// Allow bypassrls attribute if using `privileged_role`.
-					if (!has_privileged_role()){
+					if (!is_privileged_role()){
 						bypassrls_is_allowed = false;
 					}
 
@@ -470,7 +470,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					GrantRoleStmt *stmt = (GrantRoleStmt *) utility_stmt;
 					ListCell *grantee_role_cell;
 					ListCell *role_cell;
-					bool is_privileged_role = false;
+					bool role_is_privileged = false;
 
 					/* GRANT <reserved_role> TO <role> */
 					if (stmt->is_grant)
@@ -482,7 +482,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						}
 					}
 
-					is_privileged_role = has_privileged_role();
+					role_is_privileged = is_privileged_role();
 
 					/*
 					 * GRANT <role> TO <reserved_roles>
@@ -492,7 +492,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					{
 						AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
 						// privileged_role can do GRANT <role> to <reserved_role>
-						confirm_reserved_roles(priv->priv_name, is_privileged_role);
+						confirm_reserved_roles(priv->priv_name, role_is_privileged);
 					}
 				}
 				break;
@@ -562,16 +562,12 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_CreateFdwStmt:
 		{
+			const Oid current_user_id = GetUserId();
+
 			if (superuser()) {
 				break;
 			}
-			if (privileged_role == NULL) {
-				break;
-			}
-			if (!OidIsValid(get_role_oid(privileged_role, true))) {
-				break;
-			}
-			if (GetUserId() != get_role_oid(privileged_role, false)) {
+			if (!is_privileged_role()) {
 				break;
 			}
 
@@ -579,18 +575,19 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 			run_process_utility_hook(prev_hook);
 
-			// Change FDW owner to privileged_role
+			// Change FDW owner to the current role (which is a privileged role)
 			{
 				CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
-				const char *privileged_role_name_ident = quote_identifier(privileged_role);
+				const char *current_role_name = GetUserNameFromId(current_user_id, false);
+				const char *current_role_name_ident = quote_identifier(current_role_name);
 				const char *fdw_name_ident = quote_identifier(stmt->fdwname);
-				// Need to temporarily make the privileged role a superuser because non SUs can't own FDWs.
+				// Need to temporarily make the current role a superuser because non SUs can't own FDWs.
 				char *sql_template = "alter role %s superuser;\n"
 					"alter foreign data wrapper %s owner to %s;\n"
 					"alter role %s nosuperuser;\n";
 				size_t sql_len = strlen(sql_template)
-					+ (3 * strlen(privileged_role_name_ident))
+					+ (3 * strlen(current_role_name_ident))
 					+ strlen(fdw_name_ident);
 				char *sql = (char *)palloc(sql_len);
 				int rc;
@@ -601,10 +598,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				snprintf(sql,
 						 sql_len,
 						 sql_template,
-						 privileged_role_name_ident,
+						 current_role_name_ident,
 						 fdw_name_ident,
-						 privileged_role_name_ident,
-						 privileged_role_name_ident);
+						 current_role_name_ident,
+						 current_role_name_ident);
 
 				rc = SPI_execute(sql, false, 0);
 				if (rc != SPI_OK_UTILITY) {
@@ -658,13 +655,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (((CommentStmt *)utility_stmt)->objtype != OBJECT_EXTENSION) {
 				break;
 			}
-			if (privileged_role == NULL) {
-				break;
-			}
-			if (!OidIsValid(get_role_oid(privileged_role, true))) {
-				break;
-			}
-			if (GetUserId() != get_role_oid(privileged_role, false)) {
+			if (!is_privileged_role()) {
 				break;
 			}
 
@@ -696,13 +687,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 			}
-			if (privileged_role == NULL) {
-				break;
-			}
-			if (!OidIsValid(get_role_oid(privileged_role, true))) {
-				break;
-			}
-			if (GetUserId() != get_role_oid(privileged_role, false)) {
+			if (!is_privileged_role()) {
 				break;
 			}
 
@@ -902,13 +887,15 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-has_privileged_role(void)
+is_privileged_role(void)
 {
-	Oid	role_oid;
+	Oid current_role_oid = GetUserId();
+	Oid	privileged_role_oid;
 
-	if (privileged_role == NULL)
+	if (privileged_role == NULL) {
 		return false;
+	}
+	privileged_role_oid = get_role_oid(privileged_role, true);
 
-	role_oid = get_role_oid(privileged_role, true);
-	return OidIsValid(role_oid) && (GetUserId() == role_oid);
+	return OidIsValid(privileged_role_oid) && is_member_of_role(current_role_oid, privileged_role_oid);
 }
