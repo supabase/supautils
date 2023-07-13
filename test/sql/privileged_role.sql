@@ -119,3 +119,11 @@ alter role authenticator set other.nested.bar to true;
 drop role authenticator;
 alter role authenticator rename to authorized;
 alter role authenticator nologin;
+\echo
+
+-- member of privileged_role can do privileged role stuff
+set role privileged_role_member;
+
+grant testme to authenticator;
+
+set role privileged_role;

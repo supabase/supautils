@@ -149,3 +149,10 @@ alter role authenticator rename to authorized;
 ERROR:  "authenticator" is a reserved role, only superusers can modify it
 alter role authenticator nologin;
 ERROR:  "authenticator" is a reserved role, only superusers can modify it
+\echo
+
+-- member of privileged_role can do privileged role stuff
+set role privileged_role_member;
+grant testme to authenticator;
+NOTICE:  role "authenticator" is already a member of role "testme"
+set role privileged_role;
