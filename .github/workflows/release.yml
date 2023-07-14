@@ -77,7 +77,6 @@ jobs:
           mkdir -p ${package_dir}/usr/share/postgresql/${{ matrix.postgres }}/extension
           cd ${package_dir}/usr/share/postgresql/${{ matrix.postgres }}/extension
           cp -s ../../../../../var/lib/postgresql/extension/${{ matrix.extension_name }}.control .
-          cp -s ../../../../../var/lib/postgresql/extension/${{ matrix.extension_name }}*.sql .
           cd ../../../../../..
 
           # Create install control file
