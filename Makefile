@@ -1,6 +1,5 @@
 PG_CFLAGS = -Wall -Werror
 
-EXTENSION = supautils
 DATA = $(wildcard sql/*--*.sql)
 
 MODULE_big = supautils

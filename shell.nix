@@ -10,10 +10,8 @@ let
       buildInputs = [ postgresql ];
       src = ./.;
       installPhase = ''
-        mkdir -p $out/bin
+        mkdir -p $out/lib
         install -D supautils.so -t $out/lib
-
-        install -D -t $out/share/postgresql/extension supautils.control
       '';
     };
   pgWithExt = { postgresql } :
