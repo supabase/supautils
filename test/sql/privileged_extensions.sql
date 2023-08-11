@@ -1,5 +1,6 @@
 -- non-superuser extensions role
 create role extensions_role login;
+grant all on database postgres to extensions_role;
 alter default privileges for role postgres in schema public grant all on tables to extensions_role;
 set role extensions_role;
 \echo
@@ -11,12 +12,23 @@ select '1=>2'::hstore;
 drop extension hstore;
 \echo
 
--- custom scripts are run
+-- per-extension custom scripts are run
 select * from t2;
 
 reset role;
 drop table t2;
 set role extensions_role;
+\echo
+
+-- global extension custom scripts are run
+create extension pg_tle;
+reset role;
+grant pgtle_admin to extensions_role;
+set role extensions_role;
+select pgtle.install_extension('foo', '1', '', 'select 1', '{}');
+create extension foo cascade;
+
+drop extension pg_tle cascade;
 \echo
 
 -- custom scripts are run even for superusers

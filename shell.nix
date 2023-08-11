@@ -18,7 +18,10 @@ let
     };
   pgWithExt = { postgresql } :
   let
-    pg = postgresql.withPackages (p: [ (supautils {inherit postgresql;}) ]);
+    pg = postgresql.withPackages (p: [
+      (supautils { inherit postgresql; })
+      (callPackage ./nix/pg_tle.nix { inherit postgresql; })
+    ]);
     ver = builtins.head (builtins.splitVersion postgresql.version);
     script = ''
       export PATH=${pg}/bin:"$PATH"
@@ -34,11 +37,11 @@ let
 
       PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 
-      options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\""
+      options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\""
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-      privileged_extensions="hstore, postgres_fdw"
+      privileged_extensions="hstore, postgres_fdw, pg_tle"
       privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
       privileged_role="privileged_role"
       privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
@@ -49,6 +52,15 @@ let
       pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options"
 
       mkdir -p "$tmpdir/privileged_extensions_custom_scripts/hstore"
+      echo "do \$\$
+            begin
+              if not exists (select from pg_extension where extname = 'pg_tle') then
+                return;
+              end if;
+              if exists (select from pgtle.available_extensions() where name = @extname@) then
+                raise notice 'extname: %, extschema: %, extversion: %, extcascade: %', @extname@, @extschema@, @extversion@, @extcascade@;
+              end if;
+            end \$\$;" > "$tmpdir/privileged_extensions_custom_scripts/before-create.sql"
       echo 'create table t1();' > "$tmpdir/privileged_extensions_custom_scripts/hstore/before-create.sql"
       echo 'drop table t1; create table t2 as values (1);' > "$tmpdir/privileged_extensions_custom_scripts/hstore/after-create.sql"
 
