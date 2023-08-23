@@ -47,7 +47,9 @@ let
       reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
       placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
 
-      pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options"
+      cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"20 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
+
+      pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option"
 
       mkdir -p "$tmpdir/privileged_extensions_custom_scripts/hstore"
       echo "do \$\$
@@ -70,7 +72,12 @@ let
     '';
   in
     writeShellScriptBin "supautils-with-pg-${ver}" script;
-  supportedPgVersions = [  postgresql_12 postgresql_13 postgresql_14 postgresql_15 ];
+    supportedPgVersions = [
+      postgresql_12
+      postgresql_13
+      postgresql_14
+      postgresql_15
+    ];
   extAll = map (x: pgWithExt { postgresql = x;}) supportedPgVersions;
 in
 mkShell {
