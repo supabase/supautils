@@ -19,7 +19,12 @@
 #include <utils/varlena.h>
 
 #include "privileged_extensions.h"
+
 #include "utils.h"
+
+#if PG13_GTE
+#include "constrained_extensions.h"
+#endif
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)									\
 	ereport(ERROR,															\
@@ -39,6 +44,8 @@
 			 errmsg("parameter \"%s\" must be a comma-separated list of "	\
 					"identifiers", name)));
 
+#define MAX_CONSTRAINED_EXTENSIONS 100
+
 /* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
 
@@ -53,6 +60,15 @@ static char *privileged_extensions_custom_scripts_path = NULL;
 static char *privileged_role                           = NULL;
 static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
+
+#if PG13_GTE
+static char *constrained_extensions_str                = NULL;
+static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
+static size_t total_cexts = 0;
+
+static void
+constrained_extensions_assign_hook(const char *newval, void *extra);
+#endif
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -92,9 +108,6 @@ static void check_parameter(char *val, char *name);
 static bool
 is_privileged_role(void);
 
-/*
- * IO: module load callback
- */
 void
 _PG_init(void)
 {
@@ -193,6 +206,18 @@ _PG_init(void)
 							   privileged_role_allowed_configs_check_hook,
 							   NULL,
 							   NULL);
+
+#if PG13_GTE
+	DefineCustomStringVariable("supautils.constrained_extensions",
+							   "Extensions that require a minimum amount of CPUs, memory and free disk to be installed",
+							   NULL,
+							   &constrained_extensions_str,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   NULL,
+							   constrained_extensions_assign_hook,
+							   NULL);
+#endif
 
 	if(placeholders){
 		List* comma_separated_list;
@@ -522,6 +547,13 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_CreateExtensionStmt:
 		{
+
+#if PG13_GTE
+			CreateExtensionStmt *stmt = (CreateExtensionStmt *)utility_stmt;
+
+			constrain_extension(stmt->extname, cexts, total_cexts);
+#endif
+
 			handle_create_extension(prev_hook,
 									PROCESS_UTILITY_ARGS,
 									privileged_extensions,
@@ -841,6 +873,26 @@ check_parameter(char *val, char *name)
 		list_free(comma_separated_list);
 	}
 }
+
+#if PG13_GTE
+void constrained_extensions_assign_hook(const char *newval, void *extra){
+	if (total_cexts > 0) {
+		for (size_t i = 0; i < total_cexts; i++){
+			pfree(cexts[i].name);
+		}
+		total_cexts = 0;
+	}
+	if (newval) {
+		json_constrained_extension_parse_state state = parse_constrained_extensions(newval, cexts);
+		total_cexts = state.total_cexts;
+		if(state.error_msg){
+			ereport(ERROR,															\
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),						\
+					 errmsg("supautils.constrained_extensions: %s", state.error_msg)));
+		}
+	}
+}
+#endif
 
 static void
 confirm_reserved_roles(const char *target, bool allow_configurable_roles)

@@ -1,0 +1,34 @@
+-- this feature is only enabled for pg >= 13, for pg12 this will be false
+SELECT current_setting('server_version_num')::int >= 130000 as gte_pg13;
+ gte_pg13 
+----------
+ t
+(1 row)
+
+-- constrained by cpu
+create extension adminpack;
+ERROR:  not enough CPUs for using this extension
+DETAIL:  required CPUs: 64
+HINT:  upgrade to an instance with higher resources
+\echo
+
+-- constrained by memory
+create extension cube;
+ERROR:  not enough memory for using this extension
+DETAIL:  required memory: 17 GB
+HINT:  upgrade to an instance with higher resources
+\echo
+
+-- constrained by disk
+create extension lo;
+ERROR:  not enough free disk space for using this extension
+DETAIL:  required free disk space: 20 GB
+HINT:  upgrade to an instance with higher resources
+\echo
+
+-- passes all resource constraints
+create extension amcheck;
+\echo
+
+-- no resource constraints
+create extension bloom;

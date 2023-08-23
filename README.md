@@ -121,6 +121,37 @@ supautils.privileged_extensions_custom_scripts_path = '/opt/postgresql/privilege
 supautils.privileged_extensions_superuser = 'postgres'
 ```
 
+## Constrained Extensions
+
+You can constrain the resources needed for an extension to be installed. This is done through:
+
+```
+supautils.constrained_extensions = '{"plrust": {"cpu": 16, "mem": "1 GB", "disk": "500 MB"}, "any_extension_name": { "mem": "1 GB"}}'
+```
+
+The `supautils.constrained_extensions` is a json object, any other json type will result in an error.
+
+Each top field of the json object corresponds to an extension name, the only value these top fields can take is a json object composed of 3 keys: `cpu`, `mem` and `disk`.
+
+- `cpu`: is the minimum number of cpus this extension needs. It's a json number.
+- `mem`: is the minimum amount of memory this extension needs. It's a json string that takes a human-readable format of bytes.
+- `disk`: is the minimum amount of free disk space this extension needs. It's a json string that takes a human-readable format of bytes.
+  + The free space of the disk is taken from the filesystem where PGDATA (data directory) is located.
+
+Note: this human-readable format is the same that [pg_size_pretty](https://pgpedia.info/p/pg_size_pretty.html) would give.
+
+`CREATE EXTENSION` will fail if any of the resource constraints are not met:
+
+```sql
+create extension plrust;
+
+ERROR:  not enough CPUs for using this extension
+DETAIL:  required CPUs: 16
+HINT:  upgrade to an instance with higher resources
+```
+
+This feature is only available from PostgreSQL 13 onwards.
+
 ## Development
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.
