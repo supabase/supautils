@@ -619,6 +619,84 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			return;
 		}
 
+		/**
+		 * CREATE PUBLICATION
+		 */
+		case T_CreatePublicationStmt:
+		{
+			const Oid current_user_id = GetUserId();
+
+			if (superuser()) {
+				break;
+			}
+			if (!is_privileged_role()) {
+				break;
+			}
+
+			switch_to_superuser(privileged_extensions_superuser);
+
+			run_process_utility_hook(prev_hook);
+
+			// Change publication owner to the current role (which is a privileged role)
+			{
+				CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
+
+				const char *current_role_name = GetUserNameFromId(current_user_id, false);
+				const char *current_role_name_ident = quote_identifier(current_role_name);
+				const char *publication_name_ident = quote_identifier(stmt->pubname);
+				const char *sql_template = "alter publication %s owner to %s;\n";
+				size_t sql_len = strlen(sql_template)
+					+ strlen(publication_name_ident)
+					+ strlen(current_role_name_ident);
+				char *sql = (char *)palloc(sql_len);
+				int rc;
+
+				snprintf(sql,
+						 sql_len,
+						 sql_template,
+						 publication_name_ident,
+						 current_role_name_ident);
+
+				PushActiveSnapshot(GetTransactionSnapshot());
+				SPI_connect();
+
+				rc = SPI_execute(sql, false, 0);
+				if (rc != SPI_OK_UTILITY) {
+					elog(ERROR, "SPI_execute failed with error code %d", rc);
+				}
+
+				pfree(sql);
+
+				SPI_finish();
+				PopActiveSnapshot();
+			}
+
+			switch_to_original_role();
+
+			return;
+		}
+
+		/**
+		 * ALTER PUBLICATION <name> ADD TABLES IN SCHEMA ...
+		 */
+		case T_AlterPublicationStmt:
+		{
+			if (superuser()) {
+				break;
+			}
+			if (!is_privileged_role()) {
+				break;
+			}
+
+			switch_to_superuser(privileged_extensions_superuser);
+
+			run_process_utility_hook(prev_hook);
+
+			switch_to_original_role();
+
+			return;
+		}
+
 		case T_DropStmt:
 		{
 			DropStmt *stmt = (DropStmt *)utility_stmt;

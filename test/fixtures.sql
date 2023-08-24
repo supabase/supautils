@@ -13,3 +13,4 @@ create role privileged_role login createrole;
 create role privileged_role_member login createrole in role privileged_role;
 create role testme noinherit;
 create role authenticator login noinherit;
+grant all on database postgres to privileged_role;
