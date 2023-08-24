@@ -127,3 +127,9 @@ set role privileged_role_member;
 grant testme to authenticator;
 
 set role privileged_role;
+\echo
+
+-- privileged_role can manage publications
+create publication p for all tables;
+drop publication p;
+-- not testing `create publication ... for tables in schema ...` because it's PG15+

@@ -37,7 +37,7 @@ let
 
       PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 
-      options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\""
+      options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\" -c wal_level=logical"
 
       reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
       reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
