@@ -213,7 +213,7 @@ _PG_init(void)
 							   NULL,
 							   &constrained_extensions_str,
 							   NULL,
-							   PGC_SIGHUP, 0,
+							   SUPAUTILS_GUC_CONTEXT_SIGHUP, 0,
 							   NULL,
 							   constrained_extensions_assign_hook,
 							   NULL);

@@ -1,4 +1,8 @@
-PG_CFLAGS = -Wall -Werror
+ifeq ($(TEST), 1)
+	PG_CFLAGS = -Wall -Werror -DTEST
+else
+	PG_CFLAGS = -Wall -Werror
+endif
 
 DATA = $(wildcard sql/*--*.sql)
 

@@ -11,11 +11,11 @@ let
     postgresql_15
   ];
   pgWithExt = { postgresql }: postgresql.withPackages (p: [
-    (callPackage ./nix/supautils.nix { inherit postgresql; })
+    (callPackage ./nix/supautils.nix { inherit postgresql; extraMakeFlags = "TEST=1"; })
     (callPackage ./nix/pg_tle.nix { inherit postgresql; })
   ]);
   pgScriptAll = map (x: callPackage ./nix/pgScript.nix { postgresql = pgWithExt { postgresql = x;}; }) supportedPgVersions;
 in
 mkShell {
-  buildInputs = [  pgScriptAll ];
+  buildInputs = [ pgScriptAll ];
 }

@@ -53,6 +53,13 @@
         standard_ProcessUtility(PROCESS_UTILITY_ARGS);                         \
     }
 
+// helper for testing a guc config
+#if TEST
+#define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_USERSET
+#else
+#define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_SIGHUP
+#endif
+
 extern void
 alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                               DefElem *bypassrls_option,
