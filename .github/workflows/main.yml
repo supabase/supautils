@@ -17,3 +17,5 @@ jobs:
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Run tests
       run: nix-shell --run "supautils-with-pg-${{ matrix.pg-version }} make installcheck"
+    - if: ${{ failure() }}
+      run: cat regression.diffs
