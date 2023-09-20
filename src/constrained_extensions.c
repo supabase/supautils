@@ -139,6 +139,11 @@ json_scalar(void *state, char *token, JsonTokenType tokentype)
 			parse->error_msg = "unexpected scalar, expected an object";
 			break;
 
+		case JCE_EXPECT_CONSTRAINTS_START:
+			parse->state = JCE_UNEXPECTED_SCALAR;
+			parse->error_msg = "unexpected scalar, expected an object";
+			break;
+
 		default:
 			break;
 	}

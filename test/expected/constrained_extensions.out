@@ -32,3 +32,30 @@ create extension amcheck;
 
 -- no resource constraints
 create extension bloom;
+\echo
+
+-- check json validation works
+set supautils.constrained_extensions to '';
+ERROR:  supautils.constrained_extensions: invalid json
+set supautils.constrained_extensions to '[]';
+ERROR:  supautils.constrained_extensions: unexpected array
+set supautils.constrained_extensions to '1';
+ERROR:  supautils.constrained_extensions: unexpected scalar, expected an object
+set supautils.constrained_extensions to '"foo"';
+ERROR:  supautils.constrained_extensions: unexpected scalar, expected an object
+set supautils.constrained_extensions to '{"plrust": []}';
+ERROR:  supautils.constrained_extensions: unexpected array
+set supautils.constrained_extensions to '{"plrust": {"cpu": true}}';
+ERROR:  supautils.constrained_extensions: unexpected cpu value, expected a number
+set supautils.constrained_extensions to '{"plrust": {"cpu": {}}}';
+ERROR:  supautils.constrained_extensions: unexpected object for cpu, mem or disk, expected a value
+set supautils.constrained_extensions to '{"plrust": {"anykey": "11GB"}}';
+ERROR:  supautils.constrained_extensions: unexpected field, only cpu, mem or disk are allowed
+set supautils.constrained_extensions to '{"plrust": {"disk": 123}}';
+ERROR:  supautils.constrained_extensions: unexpected disk value, expected a string with bytes in human-readable format (as returned by pg_size_pretty)
+set supautils.constrained_extensions to '{"plrust": {"mem": 456}}';
+ERROR:  supautils.constrained_extensions: unexpected mem value, expected a string with bytes in human-readable format (as returned by pg_size_pretty)
+set supautils.constrained_extensions to '{"plrust": {"mem": ""}}';
+ERROR:  invalid size: ""
+set supautils.constrained_extensions to '{"plrust": 123}';
+ERROR:  supautils.constrained_extensions: unexpected scalar, expected an object
