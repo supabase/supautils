@@ -1,7 +1,7 @@
 with import (builtins.fetchTarball {
-  name = "2022-10-25";
-  url = "https://github.com/NixOS/nixpkgs/archive/a11f8032aa9de58be11190b71320f98f9a3c395b.tar.gz";
-  sha256 = "101y90kqqfqc5vkigw5rbcqw01cg9nndknz4q4gb28zi4918r1hz";
+  name = "2023-09-16";
+  url = "https://github.com/NixOS/nixpkgs/archive/ae5b96f3ab6aabb60809ab78c2c99f8dd51ee678.tar.gz";
+  sha256 = "11fpdcj5xrmmngq0z8gsc3axambqzvyqkfk23jn3qkx9a5x56xxk";
 }) {};
 let
   supportedPgVersions = [
@@ -9,6 +9,7 @@ let
     postgresql_13
     postgresql_14
     postgresql_15
+    postgresql_16
   ];
   pgWithExt = { postgresql }: postgresql.withPackages (p: [
     (callPackage ./nix/supautils.nix { inherit postgresql; extraMakeFlags = "TEST=1"; })
