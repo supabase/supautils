@@ -1,6 +1,3 @@
--- this feature is only enabled for pg >= 13, for pg12 this will be false
-SELECT current_setting('server_version_num')::int >= 130000 as gte_pg13;
-
 -- constrained by cpu
 create extension adminpack;
 \echo
