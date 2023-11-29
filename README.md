@@ -8,11 +8,11 @@
 
 </p>
 
+Supautils is an extension that secures a PostgreSQL cluster on a cloud environment.
+
+It's tested to work on PostgreSQL 12, 13, 14 and 15.
+
 ## Installation
-
-Tested to work on PostgreSQL 12, 13, 14 and 15.
-
-## Setup
 
 Clone this repo and run
 
@@ -20,15 +20,24 @@ Clone this repo and run
 make && make install
 ```
 
-To make the extension available to the database add on `postgresql.conf`:
+To make it available on some PostgreSQL roles
 
 ```
+ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
+ALTER ROLE role2 SET session_preload_libraries TO 'supautils';
+```
+
+Or to make it available to the whole cluster
+
+```
+# add the following on postgresql.conf
+# use SHOW config_file; for finding the location
 shared_preload_libraries = 'supautils'
 ```
 
 ## Role Security
 
-The supautils extension provides tooling to prevent non-superusers from modifying/granting a set of roles.
+This functionality prevents non-superusers from modifying/granting a set of roles.
 
 Say your backend service depends on a `connector` role for connecting to the database. Also, you need to give database users the ability to create their own roles, i.e. they need the CREATEROLE privilege.
 
@@ -61,15 +70,10 @@ supautils.reserved_memberships = 'pg_read_server_files'
 
 ### Configuration
 
-Settings available in `postgresql.conf`:
+Settings available:
 
-#### Protect Roles
 ```
 supautils.reserved_roles = 'supabase_admin,supabase_auth_admin,supabase_storage_admin'
-```
-
-#### Protect Memberships
-```
 supautils.reserved_memberships = 'pg_read_server_files, pg_write_server_files, pg_execute_server_program'
 ```
 
@@ -113,7 +117,7 @@ This is useful for things like creating a dedicated role per extension and grant
 
 ### Configuration
 
-Settings available in `postgresql.conf`:
+Settings available:
 
 ```
 supautils.privileged_extensions = 'hstore,moddatetime'
@@ -156,8 +160,8 @@ This feature is only available from PostgreSQL 13 onwards.
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.
 
-
 ### Testing
+
 For testing the module locally, execute:
 
 ```bash
@@ -176,3 +180,7 @@ $ supautils-with-pg-14 make installcheck
 # you can also test manually with
 $ supautils-with-pg-12 psql -U rolecreator
 ```
+
+## Design
+
+Supautils doesn't require creating database objects. It's a shared library that modifies PostgreSQL behavior through "hooks", not through tables or functions.
