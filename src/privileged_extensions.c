@@ -173,6 +173,19 @@ void handle_create_extension(
         }
     }
 
+    // Handle pg_cron 1.4 -> 1.5 breaking change.
+    if (strcmp(stmt->extname, "pg_cron") == 0) {
+        ListCell *option_cell = NULL;
+
+        foreach (option_cell, stmt->options) {
+            DefElem *defel = (DefElem *)lfirst(option_cell);
+
+            if (strcmp(defel->defname, "schema") == 0) {
+                defel->arg = (Node *)makeString("pg_catalog");
+            }
+        }
+    }
+
     // Run `CREATE EXTENSION`.
     if (!superuser() && is_string_in_comma_delimited_string(
                             stmt->extname, privileged_extensions)) {

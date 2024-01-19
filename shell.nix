@@ -11,6 +11,7 @@ let
     postgresql_15
   ];
   pgWithExt = { postgresql }: postgresql.withPackages (p: [
+    p.pg_cron
     (callPackage ./nix/supautils.nix { inherit postgresql; extraMakeFlags = "TEST=1"; })
     (callPackage ./nix/pg_tle.nix { inherit postgresql; })
   ]);
