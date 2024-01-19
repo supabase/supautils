@@ -7,6 +7,9 @@
 static Oid prev_role_oid = 0;
 static int prev_role_sec_context = 0;
 
+// Prevent nested switch_to_superuser() calls from corrupting prev_role_*
+static bool is_switched_to_superuser = false;
+
 static bool strstarts(const char *, const char *);
 
 void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
@@ -14,6 +17,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
                                                    const char *superuser_name) {
     RoleSpec *role = makeNode(RoleSpec);
     AlterRoleStmt *bypassrls_stmt = makeNode(AlterRoleStmt);
+    bool already_switched_to_superuser = false;
 
     role->roletype = ROLESPEC_CSTRING;
     role->rolename = pstrdup(role_name);
@@ -22,7 +26,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     bypassrls_stmt->role = role;
     bypassrls_stmt->options = list_make1(bypassrls_option);
 
-    switch_to_superuser(superuser_name);
+    switch_to_superuser(superuser_name, &already_switched_to_superuser);
 
 #if PG15_GTE
     AlterRole(NULL, bypassrls_stmt);
@@ -30,7 +34,9 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     AlterRole(bypassrls_stmt);
 #endif
 
-    switch_to_original_role();
+    if (!already_switched_to_superuser) {
+        switch_to_original_role();
+    }
 
     pfree(role->rolename);
     pfree(role);
@@ -40,8 +46,15 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     return;
 }
 
-void switch_to_superuser(const char *privileged_extensions_superuser) {
+void switch_to_superuser(const char *privileged_extensions_superuser,
+                         bool *already_switched) {
     Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
+    *already_switched = is_switched_to_superuser;
+
+    if (*already_switched) {
+        return;
+    }
+    is_switched_to_superuser = true;
 
     if (privileged_extensions_superuser != NULL) {
         superuser_oid = get_role_oid(privileged_extensions_superuser, false);
@@ -55,6 +68,7 @@ void switch_to_superuser(const char *privileged_extensions_superuser) {
 
 void switch_to_original_role(void) {
     SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
+    is_switched_to_superuser = false;
 }
 
 bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {

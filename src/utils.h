@@ -69,7 +69,8 @@ alter_role_with_bypassrls_option_as_superuser(const char *role_name,
  * Switch to a superuser and save the original role. Caller is responsible for
  * calling switch_to_original_role() afterwards.
  */
-extern void switch_to_superuser(const char *privileged_extensions_superuser);
+extern void switch_to_superuser(const char *privileged_extensions_superuser,
+                                bool *already_switched);
 
 /**
  * Restore the saved original role. Caller is responsible for ensuring
