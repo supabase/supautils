@@ -1,7 +1,7 @@
 with import (builtins.fetchTarball {
-  name = "2022-10-25";
-  url = "https://github.com/NixOS/nixpkgs/archive/a11f8032aa9de58be11190b71320f98f9a3c395b.tar.gz";
-  sha256 = "101y90kqqfqc5vkigw5rbcqw01cg9nndknz4q4gb28zi4918r1hz";
+  name = "23.11";
+  url = "https://github.com/NixOS/nixpkgs/archive/refs/tags/23.11.tar.gz";
+  sha256 = "1ndiv385w1qyb3b18vw13991fzb9wg4cl21wglk89grsfsnra41k";
 }) {};
 let
   supportedPgVersions = [

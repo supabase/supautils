@@ -15,7 +15,7 @@ options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg
 
 reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
 reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-privileged_extensions="hstore, postgres_fdw, pg_tle"
+privileged_extensions="autoinc, citext, hstore, postgres_fdw, pg_tle"
 privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
 privileged_role="privileged_role"
 privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
@@ -27,7 +27,8 @@ cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64
 
 pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option"
 
-mkdir -p "$tmpdir/privileged_extensions_custom_scripts/hstore"
+# print notice when creating a TLE
+mkdir -p "$tmpdir/privileged_extensions_custom_scripts"
 echo "do \$\$
       begin
         if not exists (select from pg_extension where extname = 'pg_tle') then
@@ -37,6 +38,12 @@ echo "do \$\$
           raise notice 'extname: %, extschema: %, extversion: %, extcascade: %', @extname@, @extschema@, @extversion@, @extcascade@;
         end if;
       end \$\$;" > "$tmpdir/privileged_extensions_custom_scripts/before-create.sql"
+
+mkdir -p "$tmpdir/privileged_extensions_custom_scripts/autoinc"
+echo 'create extension citext;' > "$tmpdir/privileged_extensions_custom_scripts/autoinc/after-create.sql"
+
+# assert both before-create and after-create scripts are run
+mkdir -p "$tmpdir/privileged_extensions_custom_scripts/hstore"
 echo 'create table t1();' > "$tmpdir/privileged_extensions_custom_scripts/hstore/before-create.sql"
 echo 'drop table t1; create table t2 as values (1);' > "$tmpdir/privileged_extensions_custom_scripts/hstore/after-create.sql"
 

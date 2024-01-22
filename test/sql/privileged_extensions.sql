@@ -23,6 +23,8 @@ set role extensions_role;
 -- global extension custom scripts are run
 create extension pg_tle;
 reset role;
+-- must run this after `create extension pg_tle` since the role only exists
+-- after the ext is created
 grant pgtle_admin to extensions_role;
 set role extensions_role;
 select pgtle.install_extension('foo', '1', '', 'select 1', '{}');
@@ -42,4 +44,9 @@ set role extensions_role;
 \echo
 
 -- cannot create other extensions
-create extension moddatetime;
+create extension file_fdw;
+\echo
+
+-- original role is restored on nested switch_to_superuser()
+create extension autoinc;
+select current_role;

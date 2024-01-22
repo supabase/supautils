@@ -352,11 +352,14 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				}
 
 				{
-					switch_to_superuser(privileged_extensions_superuser);
+					bool already_switched_to_superuser = false;
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 					run_process_utility_hook(prev_hook);
 
-					switch_to_original_role();
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
+					}
 
 					return;
 				}
@@ -595,6 +598,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_CreateFdwStmt:
 		{
 			const Oid current_user_id = GetUserId();
+			bool already_switched_to_superuser = false;
 
 			if (superuser()) {
 				break;
@@ -603,7 +607,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			switch_to_superuser(privileged_extensions_superuser);
+			switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 			run_process_utility_hook(prev_hook);
 
@@ -646,7 +650,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				PopActiveSnapshot();
 			}
 
-			switch_to_original_role();
+			if (!already_switched_to_superuser) {
+				switch_to_original_role();
+			}
 
 			return;
 		}
@@ -657,6 +663,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_CreatePublicationStmt:
 		{
 			const Oid current_user_id = GetUserId();
+			bool already_switched_to_superuser = false;
 
 			if (superuser()) {
 				break;
@@ -665,7 +672,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			switch_to_superuser(privileged_extensions_superuser);
+			switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 			run_process_utility_hook(prev_hook);
 
@@ -703,7 +710,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				PopActiveSnapshot();
 			}
 
-			switch_to_original_role();
+			if (!already_switched_to_superuser) {
+				switch_to_original_role();
+			}
 
 			return;
 		}
@@ -713,6 +722,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		 */
 		case T_AlterPublicationStmt:
 		{
+			bool already_switched_to_superuser = false;
+
 			if (superuser()) {
 				break;
 			}
@@ -720,11 +731,13 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			switch_to_superuser(privileged_extensions_superuser);
+			switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 			run_process_utility_hook(prev_hook);
 
-			switch_to_original_role();
+			if (!already_switched_to_superuser) {
+				switch_to_original_role();
+			}
 
 			return;
 		}
@@ -770,11 +783,14 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 
 			{
-				switch_to_superuser(privileged_extensions_superuser);
+				bool already_switched_to_superuser = false;
+				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 				run_process_utility_hook(prev_hook);
 
-				switch_to_original_role();
+		     	if (!already_switched_to_superuser) {
+		     		switch_to_original_role();
+		     	}
 
 				return;
 			}
@@ -802,11 +818,14 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			}
 
 			{
-				switch_to_superuser(privileged_extensions_superuser);
+				bool already_switched_to_superuser = false;
+				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 				run_process_utility_hook(prev_hook);
 
-				switch_to_original_role();
+		     	if (!already_switched_to_superuser) {
+		     		switch_to_original_role();
+		     	}
 
 				return;
 			}

@@ -104,6 +104,7 @@ void handle_create_extension(
         char *extversion = NULL;
         bool extcascade = false;
         ListCell *option_cell = NULL;
+        bool already_switched_to_superuser = false;
 
         foreach (option_cell, stmt->options) {
             DefElem *defel = (DefElem *)lfirst(option_cell);
@@ -120,14 +121,17 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser);
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/before-create.sql",
                  privileged_extensions_custom_scripts_path);
         run_custom_script(filename, stmt->extname, extschema, extversion,
                           extcascade);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     }
 
     // Run per-extension before-create script.
@@ -139,6 +143,7 @@ void handle_create_extension(
         char *extversion = NULL;
         bool extcascade = false;
         ListCell *option_cell = NULL;
+        bool already_switched_to_superuser = false;
 
         foreach (option_cell, stmt->options) {
             DefElem *defel = (DefElem *)lfirst(option_cell);
@@ -155,24 +160,31 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser);
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
                  privileged_extensions_custom_scripts_path, stmt->extname);
         run_custom_script(filename, stmt->extname, extschema, extversion,
                           extcascade);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     }
 
     // Run `CREATE EXTENSION`.
     if (!superuser() && is_string_in_comma_delimited_string(
                             stmt->extname, privileged_extensions)) {
-        switch_to_superuser(privileged_extensions_superuser);
+        bool already_switched_to_superuser = false;
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     } else {
         run_process_utility_hook(process_utility_hook);
     }
@@ -186,6 +198,7 @@ void handle_create_extension(
         char *extversion = NULL;
         bool extcascade = false;
         ListCell *option_cell = NULL;
+        bool already_switched_to_superuser = false;
 
         foreach (option_cell, stmt->options) {
             DefElem *defel = (DefElem *)lfirst(option_cell);
@@ -202,14 +215,17 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser);
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
                  privileged_extensions_custom_scripts_path, stmt->extname);
         run_custom_script(filename, stmt->extname, extschema, extversion,
                           extcascade);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     }
 
     pfree(filename);
@@ -223,11 +239,15 @@ void handle_alter_extension(
 
     if (is_string_in_comma_delimited_string(stmt->extname,
                                             privileged_extensions)) {
-        switch_to_superuser(privileged_extensions_superuser);
+        bool already_switched_to_superuser = false;
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     } else {
         run_process_utility_hook(process_utility_hook);
     }
@@ -251,11 +271,15 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     }
 
     if (all_extensions_are_privileged) {
-        switch_to_superuser(privileged_extensions_superuser);
+        bool already_switched_to_superuser = false;
+        switch_to_superuser(privileged_extensions_superuser,
+                            &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);
 
-        switch_to_original_role();
+        if (!already_switched_to_superuser) {
+            switch_to_original_role();
+        }
     } else {
         run_process_utility_hook(process_utility_hook);
     }
