@@ -13,7 +13,9 @@
 #include <utils/builtins.h>
 #include <utils/memutils.h>
 
+#ifdef __linux__
 #include <sys/sysinfo.h>
+#endif
 #include <sys/statvfs.h>
 #include <errno.h>
 
@@ -192,13 +194,17 @@ void constrain_extension(
 	constrained_extension *cexts,
 	const size_t total_cexts
 ){
+#ifdef __linux__
 	struct sysinfo info = {};
+#endif
 	struct statvfs fsdata = {};
 
+#ifdef __linux__
 	if(sysinfo(&info) < 0){
 		int save_errno = errno;
 		ereport(ERROR, errmsg("sysinfo call failed: %s", strerror(save_errno)));
 	}
+#endif
 
 	if (statvfs(DataDir, &fsdata) < 0){
 		int save_errno = errno;
@@ -207,6 +213,7 @@ void constrain_extension(
 
 	for(size_t i = 0; i < total_cexts; i++){
 		if (strcmp(name, cexts[i].name) == 0) {
+#ifdef __linux__
 			if(cexts[i].cpu != 0 && cexts[i].cpu > get_nprocs())
 				ereport(ERROR,
 					errdetail("required CPUs: %zu", cexts[i].cpu),
@@ -221,6 +228,7 @@ void constrain_extension(
 					errmsg("not enough memory for using this extension")
 				);
 			}
+#endif
 			if(cexts[i].disk != 0 && cexts[i].disk > fsdata.f_bfree * fsdata.f_bsize){
 				char *pretty_size = text_to_cstring(DatumGetTextPP(DirectFunctionCall1(pg_size_pretty, Int64GetDatum(cexts[i].disk))));
 				ereport(ERROR,
