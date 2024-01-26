@@ -8,9 +8,8 @@ else
 endif
 
 MODULE_big = supautils
-OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/utils.o
+OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/utils.o
 
-PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
 SYSTEM = $(shell uname -s)
 
 ifneq ($(SYSTEM), Linux)

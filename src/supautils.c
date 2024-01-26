@@ -19,6 +19,7 @@
 #include <utils/varlena.h>
 
 #include "constrained_extensions.h"
+#include "extensions_parameter_overrides.h"
 #include "privileged_extensions.h"
 #include "utils.h"
 
@@ -40,7 +41,8 @@
 			 errmsg("parameter \"%s\" must be a comma-separated list of "	\
 					"identifiers", name)));
 
-#define MAX_CONSTRAINED_EXTENSIONS 100
+#define MAX_CONSTRAINED_EXTENSIONS         100
+#define MAX_EXTENSIONS_PARAMETER_OVERRIDES 100
 
 /* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
@@ -60,9 +62,14 @@ static ProcessUtility_hook_type prev_hook              = NULL;
 static char *constrained_extensions_str                = NULL;
 static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
 static size_t total_cexts = 0;
-
 static void
 constrained_extensions_assign_hook(const char *newval, void *extra);
+
+static char *extensions_parameter_overrides_str = NULL;
+static extension_parameter_overrides epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] = {0};
+static size_t total_epos = 0;
+static bool
+extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource source);
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -110,6 +117,16 @@ _PG_init(void)
 
 	/* Set our hook */
 	ProcessUtility_hook = supautils_hook;
+
+	DefineCustomStringVariable("supautils.extensions_parameter_overrides",
+							   "Overrides for CREATE EXTENSION parameters",
+							   NULL,
+							   &extensions_parameter_overrides_str,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   &extensions_parameter_overrides_check_hook,
+							   NULL,
+							   NULL);
 
 	DefineCustomStringVariable("supautils.reserved_roles",
 							   "Comma-separated list of roles that cannot be modified",
@@ -161,20 +178,20 @@ _PG_init(void)
 							   NULL,
 							   NULL);
 
-	DefineCustomStringVariable("supautils.privileged_extensions_superuser",
-							   "Superuser to install extensions in supautils.privileged_extensions as",
+	DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
+							   "Path to load privileged extensions' custom scripts from",
 							   NULL,
-							   &privileged_extensions_superuser,
+							   &privileged_extensions_custom_scripts_path,
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
 							   NULL,
 							   NULL);
 
-	DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
-							   "Path to load privileged extensions' custom scripts from",
+	DefineCustomStringVariable("supautils.privileged_extensions_superuser",
+							   "Superuser to install extensions in supautils.privileged_extensions as",
 							   NULL,
-							   &privileged_extensions_custom_scripts_path,
+							   &privileged_extensions_superuser,
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
@@ -551,7 +568,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 									PROCESS_UTILITY_ARGS,
 									privileged_extensions,
 									privileged_extensions_superuser,
-									privileged_extensions_custom_scripts_path);
+									privileged_extensions_custom_scripts_path,
+                                    epos, total_epos);
 			return;
         }
 
@@ -827,6 +845,32 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 	/* Chain to previously defined hooks */
 	run_process_utility_hook(prev_hook);
+}
+
+static bool
+extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource source)
+{
+	char *val = *newval;
+
+	if (total_epos > 0) {
+		for (size_t i = 0; i < total_epos; i++){
+			pfree(epos[i].name);
+			pfree(epos[i].schema);
+		}
+		total_epos = 0;
+	}
+
+	if (val) {
+		json_extension_parameter_overrides_parse_state state = parse_extensions_parameter_overrides(val, epos);
+		if (state.error_msg) {
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("supautils.extensions_parameter_overrides: %s", state.error_msg)));
+		}
+		total_epos = state.total_epos;
+	}
+
+	return true;
 }
 
 static bool

@@ -78,3 +78,13 @@ select current_role;
  extensions_role
 (1 row)
 
+\echo
+
+-- can force pg_cron to be installed in pg_catalog
+create extension pg_cron schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_cron';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
