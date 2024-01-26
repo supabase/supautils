@@ -7,6 +7,7 @@
 #include <commands/defrem.h>
 #include <executor/spi.h>
 #include <miscadmin.h>
+#include <nodes/makefuncs.h>
 #include <nodes/pg_list.h>
 #include <storage/fd.h>
 #include <utils/acl.h>
@@ -16,6 +17,7 @@
 #include <utils/snapmgr.h>
 #include <utils/varlena.h>
 
+#include "extensions_parameter_overrides.h"
 #include "privileged_extensions.h"
 #include "utils.h"
 
@@ -91,7 +93,8 @@ void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
     const char *privileged_extensions_superuser,
-    const char *privileged_extensions_custom_scripts_path) {
+    const char *privileged_extensions_custom_scripts_path,
+    const extension_parameter_overrides *epos, const size_t total_epos) {
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
     char *filename = (char *)palloc(MAXPGPATH);
 
@@ -170,6 +173,42 @@ void handle_create_extension(
 
         if (!already_switched_to_superuser) {
             switch_to_original_role();
+        }
+    }
+
+    // Apply overrides.
+    for (size_t i = 0; i < total_epos; i++) {
+        if (strcmp(epos[i].name, stmt->extname) == 0) {
+            const extension_parameter_overrides *epo = &epos[i];
+            DefElem *schema_option = NULL;
+            DefElem *schema_override_option = NULL;
+            ListCell *option_cell;
+
+            if (epo->schema != NULL) {
+                Node *schema_node = (Node *)makeString(pstrdup(epo->schema));
+                schema_override_option = makeDefElem("schema", schema_node, -1);
+            }
+
+            foreach (option_cell, stmt->options) {
+                DefElem *defel = (DefElem *)lfirst(option_cell);
+
+                if (strcmp(defel->defname, "schema") == 0) {
+                    if (schema_option != NULL) {
+                        ereport(ERROR,
+                                (errcode(ERRCODE_SYNTAX_ERROR),
+                                 errmsg("conflicting or redundant options")));
+                    }
+                    schema_option = defel;
+                }
+            }
+
+            if (schema_override_option != NULL) {
+                if (schema_option != NULL) {
+                    stmt->options =
+                        list_delete_ptr(stmt->options, schema_option);
+                }
+                stmt->options = lappend(stmt->options, schema_override_option);
+            }
         }
     }
 

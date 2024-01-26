@@ -50,3 +50,8 @@ create extension file_fdw;
 -- original role is restored on nested switch_to_superuser()
 create extension autoinc;
 select current_role;
+\echo
+
+-- can force pg_cron to be installed in pg_catalog
+create extension pg_cron schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_cron';
