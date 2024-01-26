@@ -4,7 +4,7 @@
 
 <a href="https://github.com/supabase/supautils/actions"><img src="https://github.com/supabase/supautils/actions/workflows/main.yml/badge.svg" alt="Tests" height="18"></a>
 <a href="https://github.com/olirice/alembic_utils/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/markdown-subtemplate.svg" alt="License" height="18"></a>
-<a href=""><img src="https://img.shields.io/badge/postgresql-12+-blue.svg" alt="PostgreSQL version" height="18"></a>
+<a href=""><img src="https://img.shields.io/badge/postgresql-13+-blue.svg" alt="PostgreSQL version" height="18"></a>
 
 </p>
 
@@ -12,7 +12,7 @@ Supautils is an extension that secures a PostgreSQL cluster on a cloud environme
 
 It doesn't require creating database objects. It's a shared library that modifies PostgreSQL behavior through "hooks", not through tables or functions.
 
-It's tested to work on PostgreSQL 12, 13, 14 and 15.
+It's tested to work on PostgreSQL 13, 14 and 15.
 
 ## Installation
 
@@ -170,9 +170,6 @@ For testing the module locally, execute:
 # might take a while in downloading all the dependencies
 $ nix-shell
 
-# test on pg 12
-$ supautils-with-pg-12 make installcheck
-
 # test on pg 13
 $ supautils-with-pg-13 make installcheck
 
@@ -180,5 +177,5 @@ $ supautils-with-pg-13 make installcheck
 $ supautils-with-pg-14 make installcheck
 
 # you can also test manually with
-$ supautils-with-pg-12 psql -U rolecreator
+$ supautils-with-pg-13 psql -U rolecreator
 ```

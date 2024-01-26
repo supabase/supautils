@@ -1,16 +1,11 @@
-#include "utils.h"
-
-#if PG13_GTE
-
 #include <postgres.h>
-#include <utils/json.h>
-#include <utils/jsonb.h>
-#include <utils/jsonfuncs.h>
 #include <common/jsonapi.h>
-#include <utils/memutils.h>
 #include <miscadmin.h>
 #include <tsearch/ts_locale.h>
 #include <utils/builtins.h>
+#include <utils/json.h>
+#include <utils/jsonb.h>
+#include <utils/jsonfuncs.h>
 #include <utils/memutils.h>
 
 #ifdef __linux__
@@ -240,5 +235,3 @@ void constrain_extension(
 		}
 	}
 }
-
-#endif

@@ -12,7 +12,6 @@
 #include <utils/acl.h>
 #include <utils/queryenvironment.h>
 
-#define PG13_GTE (PG_VERSION_NUM >= 130000)
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
 #define PG15_GTE (PG_VERSION_NUM >= 150000)
 
@@ -25,7 +24,7 @@
 #define PROCESS_UTILITY_ARGS                                                   \
     pstmt, queryString, readOnlyTree, context, params, queryEnv, dest, qc
 
-#elif PG13_GTE
+#else // PG13
 
 #define PROCESS_UTILITY_PARAMS                                                 \
     PlannedStmt *pstmt, const char *queryString,                               \
@@ -33,16 +32,6 @@
         QueryEnvironment *queryEnv, DestReceiver *dest, QueryCompletion *qc
 #define PROCESS_UTILITY_ARGS                                                   \
     pstmt, queryString, context, params, queryEnv, dest, qc
-
-#else
-
-#define PROCESS_UTILITY_PARAMS                                                 \
-    PlannedStmt *pstmt, const char *queryString,                               \
-        ProcessUtilityContext context, ParamListInfo params,                   \
-        QueryEnvironment *queryEnv, DestReceiver *dest, char *completionTag
-
-#define PROCESS_UTILITY_ARGS                                                   \
-    pstmt, queryString, context, params, queryEnv, dest, completionTag
 
 #endif
 

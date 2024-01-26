@@ -18,13 +18,9 @@
 #include <utils/snapmgr.h>
 #include <utils/varlena.h>
 
-#include "privileged_extensions.h"
-
-#include "utils.h"
-
-#if PG13_GTE
 #include "constrained_extensions.h"
-#endif
+#include "privileged_extensions.h"
+#include "utils.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)									\
 	ereport(ERROR,															\
@@ -61,14 +57,12 @@ static char *privileged_role                           = NULL;
 static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
-#if PG13_GTE
 static char *constrained_extensions_str                = NULL;
 static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
 static size_t total_cexts = 0;
 
 static void
 constrained_extensions_assign_hook(const char *newval, void *extra);
-#endif
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -207,7 +201,6 @@ _PG_init(void)
 							   NULL,
 							   NULL);
 
-#if PG13_GTE
 	DefineCustomStringVariable("supautils.constrained_extensions",
 							   "Extensions that require a minimum amount of CPUs, memory and free disk to be installed",
 							   NULL,
@@ -217,7 +210,6 @@ _PG_init(void)
 							   NULL,
 							   constrained_extensions_assign_hook,
 							   NULL);
-#endif
 
 	if(placeholders){
 		List* comma_separated_list;
@@ -551,11 +543,9 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_CreateExtensionStmt:
 		{
 
-#if PG13_GTE
 			CreateExtensionStmt *stmt = (CreateExtensionStmt *)utility_stmt;
 
 			constrain_extension(stmt->extname, cexts, total_cexts);
-#endif
 
 			handle_create_extension(prev_hook,
 									PROCESS_UTILITY_ARGS,
@@ -893,7 +883,6 @@ check_parameter(char *val, char *name)
 	}
 }
 
-#if PG13_GTE
 void constrained_extensions_assign_hook(const char *newval, void *extra){
 	if (total_cexts > 0) {
 		for (size_t i = 0; i < total_cexts; i++){
@@ -911,7 +900,6 @@ void constrained_extensions_assign_hook(const char *newval, void *extra){
 		}
 	}
 }
-#endif
 
 static void
 confirm_reserved_roles(const char *target, bool allow_configurable_roles)
