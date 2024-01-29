@@ -88,3 +88,23 @@ select extnamespace::regnamespace from pg_extension where extname = 'pg_cron';
  pg_catalog
 (1 row)
 
+drop extension pg_cron;
+\echo
+
+-- switch to privileged_extensions_superuser even if superuser
+reset role;
+create role another_superuser superuser;
+set role another_superuser;
+create extension pg_cron;
+select extowner::regrole from pg_extension where extname = 'pg_cron';
+ extowner 
+----------
+ postgres
+(1 row)
+
+reset role;
+drop extension pg_cron;
+drop role another_superuser;
+set role extensions_role;
+\echo
+

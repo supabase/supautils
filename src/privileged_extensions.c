@@ -213,8 +213,8 @@ void handle_create_extension(
     }
 
     // Run `CREATE EXTENSION`.
-    if (!superuser() && is_string_in_comma_delimited_string(
-                            stmt->extname, privileged_extensions)) {
+    if (is_string_in_comma_delimited_string(stmt->extname,
+                                            privileged_extensions)) {
         bool already_switched_to_superuser = false;
         switch_to_superuser(privileged_extensions_superuser,
                             &already_switched_to_superuser);
