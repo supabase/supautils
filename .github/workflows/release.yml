@@ -66,7 +66,6 @@ jobs:
           mkdir -p ${package_dir}/usr/lib/postgresql/lib
           mkdir -p ${package_dir}/var/lib/postgresql/extension
           cp *.so ${package_dir}/usr/lib/postgresql/lib
-          cp *.control ${package_dir}/var/lib/postgresql/extension
 
           # symlinks to Copy files into directory structure
           mkdir -p ${package_dir}/usr/lib/postgresql/${{ matrix.postgres }}/lib
@@ -76,7 +75,6 @@ jobs:
 
           mkdir -p ${package_dir}/usr/share/postgresql/${{ matrix.postgres }}/extension
           cd ${package_dir}/usr/share/postgresql/${{ matrix.postgres }}/extension
-          cp -s ../../../../../var/lib/postgresql/extension/${{ matrix.extension_name }}.control .
           cd ../../../../../..
 
           # Create install control file
