@@ -55,3 +55,19 @@ select current_role;
 -- can force pg_cron to be installed in pg_catalog
 create extension pg_cron schema public;
 select extnamespace::regnamespace from pg_extension where extname = 'pg_cron';
+
+drop extension pg_cron;
+\echo
+
+-- switch to privileged_extensions_superuser even if superuser
+reset role;
+create role another_superuser superuser;
+set role another_superuser;
+create extension pg_cron;
+select extowner::regrole from pg_extension where extname = 'pg_cron';
+
+reset role;
+drop extension pg_cron;
+drop role another_superuser;
+set role extensions_role;
+\echo
