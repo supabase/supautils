@@ -10,15 +10,17 @@
 #include <utils/memutils.h>
 
 #include "extensions_parameter_overrides.h"
+#include "utils.h"
 
-static void json_array_start(void *state) {
+static JSON_ACTION_RETURN_TYPE json_array_start(void *state) {
     json_extension_parameter_overrides_parse_state *parse = state;
 
     parse->state = JEPO_UNEXPECTED_ARRAY;
     parse->error_msg = "unexpected array";
+    JSON_ACTION_RETURN;
 }
 
-static void json_object_start(void *state) {
+static JSON_ACTION_RETURN_TYPE json_object_start(void *state) {
     json_extension_parameter_overrides_parse_state *parse = state;
 
     switch (parse->state) {
@@ -32,9 +34,10 @@ static void json_object_start(void *state) {
     default:
         break;
     }
+    JSON_ACTION_RETURN;
 }
 
-static void json_object_end(void *state) {
+static JSON_ACTION_RETURN_TYPE json_object_end(void *state) {
     json_extension_parameter_overrides_parse_state *parse = state;
 
     switch (parse->state) {
@@ -45,9 +48,10 @@ static void json_object_end(void *state) {
     default:
         break;
     }
+    JSON_ACTION_RETURN;
 }
 
-static void json_object_field_start(void *state, char *fname, bool isnull) {
+static JSON_ACTION_RETURN_TYPE json_object_field_start(void *state, char *fname, bool isnull) {
     json_extension_parameter_overrides_parse_state *parse = state;
     extension_parameter_overrides *x = &parse->epos[parse->total_epos];
 
@@ -69,9 +73,10 @@ static void json_object_field_start(void *state, char *fname, bool isnull) {
     default:
         break;
     }
+    JSON_ACTION_RETURN;
 }
 
-static void json_scalar(void *state, char *token, JsonTokenType tokentype) {
+static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token, JsonTokenType tokentype) {
     json_extension_parameter_overrides_parse_state *parse = state;
     extension_parameter_overrides *x = &parse->epos[parse->total_epos];
 
@@ -99,6 +104,7 @@ static void json_scalar(void *state, char *token, JsonTokenType tokentype) {
     default:
         break;
     }
+    JSON_ACTION_RETURN;
 }
 
 json_extension_parameter_overrides_parse_state
