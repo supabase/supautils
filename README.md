@@ -156,7 +156,28 @@ DETAIL:  required CPUs: 16
 HINT:  upgrade to an instance with higher resources
 ```
 
-This feature is only available from PostgreSQL 13 onwards.
+## Extensions Parameter Overrides
+
+You can override `CREATE EXTENSION` parameters like so:
+
+```
+supautils.extensions_parameter_overrides = '{ "pg_cron": { "schema": "pg_catalog" } }'
+```
+
+Currently, only the `schema` parameter is supported.
+
+These overrides will apply on `CREATE EXTENSION`, e.g.:
+
+```sql
+postgres=> create extension pg_cron schema public;
+CREATE EXTENSION
+postgres=> \dx pg_cron
+                 List of installed extensions
+  Name   | Version |   Schema   |         Description
+---------+---------+------------+------------------------------
+ pg_cron | 1.5     | pg_catalog | Job scheduler for PostgreSQL
+(1 row)
+```
 
 ## Development
 
