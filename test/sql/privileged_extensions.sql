@@ -52,22 +52,22 @@ create extension autoinc;
 select current_role;
 \echo
 
--- can force pg_cron to be installed in pg_catalog
-create extension pg_cron schema public;
-select extnamespace::regnamespace from pg_extension where extname = 'pg_cron';
+-- can force sslinfo to be installed in pg_catalog
+create extension sslinfo schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
 
-drop extension pg_cron;
+drop extension sslinfo;
 \echo
 
 -- switch to privileged_extensions_superuser even if superuser
 reset role;
 create role another_superuser superuser;
 set role another_superuser;
-create extension pg_cron;
-select extowner::regrole from pg_extension where extname = 'pg_cron';
+create extension sslinfo;
+select extowner::regrole from pg_extension where extname = 'sslinfo';
 
 reset role;
-drop extension pg_cron;
+drop extension sslinfo;
 drop role another_superuser;
 set role extensions_role;
 \echo
