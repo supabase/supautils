@@ -11,11 +11,11 @@ trap 'pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
 
 PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 
-options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_cron, pg_tle, supautils\" -c wal_level=logical -c cron.database_name=postgres"
+options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\" -c wal_level=logical -c cron.database_name=postgres"
 
 reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
 reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-privileged_extensions="autoinc, citext, hstore, pg_cron, pg_tle, postgres_fdw"
+privileged_extensions="autoinc, citext, hstore, sslinfo, pg_tle, postgres_fdw"
 privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
 privileged_role="privileged_role"
 privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
@@ -25,7 +25,7 @@ placeholder_stuff_options='-c supautils.placeholders="response.headers, another.
 
 cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"20 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
 
-epos_option='-c supautils.extensions_parameter_overrides="{\"pg_cron\":{\"schema\":\"pg_catalog\"}}"'
+epos_option='-c supautils.extensions_parameter_overrides="{\"sslinfo\":{\"schema\":\"pg_catalog\"}}"'
 
 pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option" -o "$epos_option"
 
