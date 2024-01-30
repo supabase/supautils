@@ -8,6 +8,7 @@ let
     postgresql_13
     postgresql_14
     postgresql_15
+    postgresql_16
   ];
   pgWithExt = { postgresql }: postgresql.withPackages (p: [
     (callPackage ./nix/supautils.nix { inherit postgresql; extraMakeFlags = "TEST=1"; })

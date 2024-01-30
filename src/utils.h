@@ -14,6 +14,19 @@
 
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
 #define PG15_GTE (PG_VERSION_NUM >= 150000)
+#define PG16_GTE (PG_VERSION_NUM >= 160000)
+
+#if PG16_GTE
+
+#define JSON_ACTION_RETURN_TYPE JsonParseErrorType
+#define JSON_ACTION_RETURN return JSON_SUCCESS
+
+#else
+
+#define JSON_ACTION_RETURN_TYPE void
+#define JSON_ACTION_RETURN return
+
+#endif
 
 #if PG14_GTE
 
