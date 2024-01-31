@@ -1,3 +1,5 @@
+set -euo pipefail
+
 export PATH=@POSTGRESQL_PATH@/bin:"$PATH"
 
 tmpdir="$(mktemp -d)"
