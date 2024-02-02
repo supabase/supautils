@@ -282,8 +282,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 		case T_AlterRoleStmt:
 			{
 				AlterRoleStmt *stmt = (AlterRoleStmt *)utility_stmt;
-				DefElem *bypassrls_option = NULL;
 				ListCell *option_cell = NULL;
+				bool already_switched_to_superuser = false;
+				bool stmt_has_bypassrls = false;
+				bool bypassrls_is_allowed = true;
 
 				if (!IsTransactionState()) {
 					break;
@@ -295,6 +297,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				confirm_reserved_roles(get_rolespec_name(stmt->role), false);
 
 				if (!is_privileged_role()){
+					bypassrls_is_allowed = false;
 					break;
 				}
 
@@ -302,29 +305,23 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				foreach(option_cell, stmt->options)
 				{
 					DefElem *defel = (DefElem *) lfirst(option_cell);
+					stmt_has_bypassrls = strcmp(defel->defname, "bypassrls") == 0;
+				}
 
-					if (strcmp(defel->defname, "bypassrls") == 0) {
-						if (bypassrls_option != NULL) {
-							ereport(ERROR,
-									(errcode(ERRCODE_SYNTAX_ERROR),
-									 errmsg("conflicting or redundant options")));
-						}
-						bypassrls_option = defel;
+				/* Allow doing BYPASSRLS */
+				if(bypassrls_is_allowed && stmt_has_bypassrls){
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+					run_process_utility_hook(prev_hook);
+
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
 					}
+
+					return;
 				}
-
-				// Defer setting bypassrls attribute if using `privileged_role`.
-				if (bypassrls_option != NULL) {
-					stmt->options = list_delete_ptr(stmt->options, bypassrls_option);
-				}
-
-				run_process_utility_hook(prev_hook);
-
-				if (bypassrls_option != NULL) {
-					alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option, privileged_extensions_superuser);
-				}
-
-				return;
+				else
+					break;
 			}
 
 		/*
@@ -414,15 +411,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
 
-						// Defer setting bypassrls attribute if using `privileged_role`.
-						//
-						// Duplicate/conflicting attributes will be caught by
-						// the standard process utility hook, so we can assume
-						// there's at most one bypassrls DefElem.
-						if (bypassrls_is_allowed && strcmp(defel->defname, "bypassrls") == 0) {
-							stmt_has_bypassrls = intVal(defel->arg) != 0;
-							intVal(defel->arg) = 0;
-						}
+						// Check if statement has BYPASSRLS
+						stmt_has_bypassrls = strcmp(defel->defname, "bypassrls") == 0;
 					}
 
 					/* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
@@ -452,15 +442,15 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					// deferred in the original CREATE ROLE - the actual setting
 					// is done here.
 					if (bypassrls_is_allowed && stmt_has_bypassrls) {
-						Node *true_node = (Node *)makeInteger(true);
-						DefElem *bypassrls_option = makeDefElem("bypassrls", true_node, -1);
+						bool already_switched_to_superuser = false;
+
+						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
 						run_process_utility_hook(prev_hook);
 
-						alter_role_with_bypassrls_option_as_superuser(stmt->role, bypassrls_option, privileged_extensions_superuser);
-
-						pfree(true_node);
-						pfree(bypassrls_option);
+						if (!already_switched_to_superuser) {
+							switch_to_original_role();
+						}
 
 						return;
 					}

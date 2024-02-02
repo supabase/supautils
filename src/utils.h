@@ -62,11 +62,6 @@
 #define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_SIGHUP
 #endif
 
-extern void
-alter_role_with_bypassrls_option_as_superuser(const char *role_name,
-                                              DefElem *bypassrls_option,
-                                              const char *superuser_name);
-
 /**
  * Switch to a superuser and save the original role. Caller is responsible for
  * calling switch_to_original_role() afterwards.
