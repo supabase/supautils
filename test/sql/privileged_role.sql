@@ -50,6 +50,16 @@ select rolbypassrls from pg_roles where rolname = 'r';
 drop role r;
 \echo
 
+-- can manage replication role attribute
+create role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+alter role r noreplication;
+select rolreplication from pg_roles where rolname = 'r';
+alter role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+drop role r;
+\echo
+
 -- can manage foreign data wrappers
 create extension postgres_fdw;
 create foreign data wrapper new_fdw
@@ -61,7 +71,6 @@ drop extension postgres_fdw cascade;
 
 -- non-superuser non-privileged role cannot manage bypassrls role attribute
 set role rolecreator;
-\echo
 
 -- the error message changed in PG14
 do $$
@@ -79,6 +88,25 @@ drop role r;
 set role privileged_role;
 \echo
 
+-- non-superuser non-privileged role cannot manage replication role attribute
+set role rolecreator;
+
+-- the error message changed in PG14
+do $$
+begin
+  create role r replication;
+  exception when insufficient_privilege then null;
+end;
+$$ language plpgsql;
+
+create role r;
+alter role r noreplication;
+alter role r replication;
+drop role r;
+
+set role privileged_role;
+\echo
+
 -- superuser can manage bypassrls role attribute
 set role postgres;
 
@@ -88,6 +116,20 @@ alter role r nobypassrls;
 select rolbypassrls from pg_roles where rolname = 'r';
 alter role r bypassrls;
 select rolbypassrls from pg_roles where rolname = 'r';
+drop role r;
+
+set role privileged_role;
+\echo
+
+-- superuser can manage replication role attribute
+set role postgres;
+
+create role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+alter role r noreplication;
+select rolreplication from pg_roles where rolname = 'r';
+alter role r replication;
+select rolreplication from pg_roles where rolname = 'r';
 drop role r;
 
 set role privileged_role;

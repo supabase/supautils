@@ -12,9 +12,8 @@ static bool is_switched_to_superuser = false;
 
 static bool strstarts(const char *, const char *);
 
-void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
-                                                   DefElem *bypassrls_option,
-                                                   const char *superuser_name) {
+void alter_role_with_options_as_superuser(const char *role_name, List *options,
+                                          const char *superuser_name) {
     RoleSpec *role = makeNode(RoleSpec);
     AlterRoleStmt *bypassrls_stmt = makeNode(AlterRoleStmt);
     bool already_switched_to_superuser = false;
@@ -24,7 +23,7 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
     role->location = -1;
 
     bypassrls_stmt->role = role;
-    bypassrls_stmt->options = list_make1(bypassrls_option);
+    bypassrls_stmt->options = options;
 
     switch_to_superuser(superuser_name, &already_switched_to_superuser);
 
@@ -40,7 +39,6 @@ void alter_role_with_bypassrls_option_as_superuser(const char *role_name,
 
     pfree(role->rolename);
     pfree(role);
-    list_free(bypassrls_stmt->options);
     pfree(bypassrls_stmt);
 
     return;

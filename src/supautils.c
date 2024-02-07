@@ -283,6 +283,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			{
 				AlterRoleStmt *stmt = (AlterRoleStmt *)utility_stmt;
 				DefElem *bypassrls_option = NULL;
+				DefElem *replication_option = NULL;
+				List *deferred_options = NIL;
 				ListCell *option_cell = NULL;
 
 				if (!IsTransactionState()) {
@@ -298,7 +300,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 
-				/* Check to see if there are any descriptions related to bypassrls. */
+				/* Check to see if there are any descriptions related to
+				 * bypassrls or replication. */
 				foreach(option_cell, stmt->options)
 				{
 					DefElem *defel = (DefElem *) lfirst(option_cell);
@@ -311,17 +314,32 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						}
 						bypassrls_option = defel;
 					}
+
+					if (strcmp(defel->defname, "isreplication") == 0) {
+						if (replication_option != NULL) {
+							ereport(ERROR,
+									(errcode(ERRCODE_SYNTAX_ERROR),
+									 errmsg("conflicting or redundant options")));
+						}
+						replication_option = defel;
+					}
 				}
 
-				// Defer setting bypassrls attribute if using `privileged_role`.
+				// Defer setting bypassrls or replication attributes if using
+				// `privileged_role`.
 				if (bypassrls_option != NULL) {
 					stmt->options = list_delete_ptr(stmt->options, bypassrls_option);
+					deferred_options = lappend(deferred_options, bypassrls_option);
+				}
+				if (replication_option != NULL) {
+					stmt->options = list_delete_ptr(stmt->options, replication_option);
+					deferred_options = lappend(deferred_options, replication_option);
 				}
 
 				run_process_utility_hook(prev_hook);
 
-				if (bypassrls_option != NULL) {
-					alter_role_with_bypassrls_option_as_superuser(stmt->role->rolename, bypassrls_option, privileged_extensions_superuser);
+				if (deferred_options != NIL) {
+					alter_role_with_options_as_superuser(stmt->role->rolename, deferred_options, privileged_extensions_superuser);
 				}
 
 				return;
@@ -387,8 +405,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					const char *created_role = stmt->role;
 					List *addroleto = NIL;	/* roles to make this a member of */
 					bool hasrolemembers = false;	/* has roles to be members of this role */
+					List *deferred_options = NIL;
 					bool stmt_has_bypassrls = false;
-					bool bypassrls_is_allowed = true;
+					bool stmt_has_replication = false;
+					bool role_is_privileged = is_privileged_role();
 					ListCell *option_cell;
 
 					/* if role already exists, bypass the hook to let it fail with the usual error */
@@ -397,11 +417,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 					/* CREATE ROLE <reserved_role> */
 					confirm_reserved_roles(created_role, false);
-
-					// Allow bypassrls attribute if using `privileged_role`.
-					if (!is_privileged_role()){
-						bypassrls_is_allowed = false;
-					}
 
 					/* Check to see if there are any descriptions related to membership and bypassrls. */
 					foreach(option_cell, stmt->options)
@@ -414,13 +429,18 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
 
-						// Defer setting bypassrls attribute if using `privileged_role`.
+						// Defer setting bypassrls & replication attributes if
+						// using `privileged_role`.
 						//
 						// Duplicate/conflicting attributes will be caught by
 						// the standard process utility hook, so we can assume
 						// there's at most one bypassrls DefElem.
-						if (bypassrls_is_allowed && strcmp(defel->defname, "bypassrls") == 0) {
+						if (role_is_privileged && strcmp(defel->defname, "bypassrls") == 0) {
 							stmt_has_bypassrls = intVal(defel->arg) != 0;
+							intVal(defel->arg) = 0;
+						}
+						if (role_is_privileged && strcmp(defel->defname, "isreplication") == 0) {
+							stmt_has_replication = intVal(defel->arg) != 0;
 							intVal(defel->arg) = 0;
 						}
 					}
@@ -445,22 +465,32 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (hasrolemembers)
 						confirm_reserved_memberships(created_role);
 
-					// CREATE ROLE <any_role> BYPASSRLS
+					// CREATE ROLE <any_role> < BYPASSRLS | REPLICATION >
 					//
 					// Allow `privileged_role` (in addition to superusers) to
-					// set bypassrls attribute. The setting of the attribute is
-					// deferred in the original CREATE ROLE - the actual setting
-					// is done here.
-					if (bypassrls_is_allowed && stmt_has_bypassrls) {
+					// set bypassrls and replication attributes. The setting of
+					// the attributes is deferred in the original CREATE ROLE -
+					// the actual setting is done here.
+					if (role_is_privileged) {
 						Node *true_node = (Node *)makeInteger(true);
 						DefElem *bypassrls_option = makeDefElem("bypassrls", true_node, -1);
+						DefElem *replication_option = makeDefElem("isreplication", true_node, -1);
+
+						if (stmt_has_bypassrls) {
+							deferred_options = lappend(deferred_options, bypassrls_option);
+						}
+						if (stmt_has_replication) {
+							deferred_options = lappend(deferred_options, replication_option);
+						}
 
 						run_process_utility_hook(prev_hook);
 
-						alter_role_with_bypassrls_option_as_superuser(stmt->role, bypassrls_option, privileged_extensions_superuser);
+						alter_role_with_options_as_superuser(stmt->role, deferred_options, privileged_extensions_superuser);
 
 						pfree(true_node);
 						pfree(bypassrls_option);
+						pfree(replication_option);
+						list_free(deferred_options);
 
 						return;
 					}

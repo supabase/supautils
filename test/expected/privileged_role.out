@@ -64,6 +64,33 @@ select rolbypassrls from pg_roles where rolname = 'r';
 drop role r;
 \echo
 
+-- can manage replication role attribute
+create role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+alter role r noreplication;
+ERROR:  must be superuser to alter replication users
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+alter role r replication;
+ERROR:  must be superuser to alter replication users
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+drop role r;
+\echo
+
 -- can manage foreign data wrappers
 create extension postgres_fdw;
 create foreign data wrapper new_fdw
@@ -75,8 +102,6 @@ NOTICE:  drop cascades to foreign-data wrapper new_fdw
 
 -- non-superuser non-privileged role cannot manage bypassrls role attribute
 set role rolecreator;
-\echo
-
 -- the error message changed in PG14
 do $$
 begin
@@ -89,6 +114,24 @@ alter role r nobypassrls;
 ERROR:  must be superuser to change bypassrls attribute
 alter role r bypassrls;
 ERROR:  must be superuser to change bypassrls attribute
+drop role r;
+set role privileged_role;
+\echo
+
+-- non-superuser non-privileged role cannot manage replication role attribute
+set role rolecreator;
+-- the error message changed in PG14
+do $$
+begin
+  create role r replication;
+  exception when insufficient_privilege then null;
+end;
+$$ language plpgsql;
+create role r;
+alter role r noreplication;
+ERROR:  must be superuser to alter replication users
+alter role r replication;
+ERROR:  must be superuser to alter replication users
 drop role r;
 set role privileged_role;
 \echo
@@ -113,6 +156,33 @@ alter role r bypassrls;
 select rolbypassrls from pg_roles where rolname = 'r';
  rolbypassrls 
 --------------
+ t
+(1 row)
+
+drop role r;
+set role privileged_role;
+\echo
+
+-- superuser can manage replication role attribute
+set role postgres;
+create role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+alter role r noreplication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ f
+(1 row)
+
+alter role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
  t
 (1 row)
 
