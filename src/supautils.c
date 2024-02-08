@@ -107,7 +107,10 @@ privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSourc
 static void check_parameter(char *val, char *name);
 
 static bool
-is_privileged_role(void);
+is_current_role_privileged(void);
+
+static bool
+is_role_privileged(const char *role);
 
 void
 _PG_init(void)
@@ -285,7 +288,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				ListCell *option_cell = NULL;
 				bool already_switched_to_superuser = false;
 				bool stmt_has_bypassrls = false;
-				bool bypassrls_is_allowed = true;
 
 				if (!IsTransactionState()) {
 					break;
@@ -296,32 +298,40 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 				confirm_reserved_roles(get_rolespec_name(stmt->role), false);
 
-				if (!is_privileged_role()){
-					bypassrls_is_allowed = false;
+				if (!is_current_role_privileged()){
 					break;
 				}
 
-				/* Check to see if there are any descriptions related to bypassrls. */
+				if (is_role_privileged(stmt->role->rolename)) {
+					ereport(ERROR,
+							(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+							 errmsg("permission denied to alter role"),
+							 errdetail("Only superusers can alter privileged roles.")));
+				}
+
+				// Setting the superuser attribute is not allowed.
 				foreach(option_cell, stmt->options)
 				{
 					DefElem *defel = (DefElem *) lfirst(option_cell);
-					stmt_has_bypassrls = strcmp(defel->defname, "bypassrls") == 0;
-				}
-
-				/* Allow doing BYPASSRLS */
-				if(bypassrls_is_allowed && stmt_has_bypassrls){
-					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
-
-					run_process_utility_hook(prev_hook);
-
-					if (!already_switched_to_superuser) {
-						switch_to_original_role();
+					if (strcmp(defel->defname, "superuser") == 0) {
+						ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								 errmsg("permission denied to alter role"),
+								 errdetail("Only roles with the %s attribute may alter roles with the %s attribute.",
+										   "SUPERUSER", "SUPERUSER")));
 					}
-
-					return;
 				}
-				else
-					break;
+
+				// Allow setting bypassrls & replication.
+				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+				run_process_utility_hook(prev_hook);
+
+				if (!already_switched_to_superuser) {
+					switch_to_original_role();
+				}
+
+				return;
 			}
 
 		/*
@@ -339,7 +349,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 
-				role_is_privileged = is_privileged_role();
+				role_is_privileged = is_current_role_privileged();
 
 				confirm_reserved_roles(get_rolespec_name(stmt->role), role_is_privileged);
 
@@ -384,8 +394,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					const char *created_role = stmt->role;
 					List *addroleto = NIL;	/* roles to make this a member of */
 					bool hasrolemembers = false;	/* has roles to be members of this role */
-					bool stmt_has_bypassrls = false;
-					bool bypassrls_is_allowed = true;
 					ListCell *option_cell;
 
 					/* if role already exists, bypass the hook to let it fail with the usual error */
@@ -395,12 +403,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					/* CREATE ROLE <reserved_role> */
 					confirm_reserved_roles(created_role, false);
 
-					// Allow bypassrls attribute if using `privileged_role`.
-					if (!is_privileged_role()){
-						bypassrls_is_allowed = false;
+					if (!is_current_role_privileged()){
+						break;
 					}
 
-					/* Check to see if there are any descriptions related to membership and bypassrls. */
+					/* Check to see if there are any descriptions related to membership. */
 					foreach(option_cell, stmt->options)
 					{
 						DefElem *defel = (DefElem *) lfirst(option_cell);
@@ -411,8 +418,14 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 							strcmp(defel->defname, "adminmembers") == 0)
 							hasrolemembers = true;
 
-						// Check if statement has BYPASSRLS
-						stmt_has_bypassrls = strcmp(defel->defname, "bypassrls") == 0;
+						// Setting the superuser attribute is not allowed.
+						if (strcmp(defel->defname, "superuser") == 0) {
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									 errmsg("permission denied to alter role"),
+									 errdetail("Only roles with the %s attribute may alter roles with the %s attribute.",
+											   "SUPERUSER", "SUPERUSER")));
+						}
 					}
 
 					/* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
@@ -435,25 +448,19 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (hasrolemembers)
 						confirm_reserved_memberships(created_role);
 
-					// CREATE ROLE <any_role> BYPASSRLS
-					//
+					bool already_switched_to_superuser = false;
+
 					// Allow `privileged_role` (in addition to superusers) to
-					// set bypassrls attribute. The setting of the attribute is
-					// deferred in the original CREATE ROLE - the actual setting
-					// is done here.
-					if (bypassrls_is_allowed && stmt_has_bypassrls) {
-						bool already_switched_to_superuser = false;
+					// set bypassrls & replication attributes.
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
-						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+					run_process_utility_hook(prev_hook);
 
-						run_process_utility_hook(prev_hook);
-
-						if (!already_switched_to_superuser) {
-							switch_to_original_role();
-						}
-
-						return;
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
 					}
+
+					return;
 				}
 				break;
 			}
@@ -509,7 +516,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						}
 					}
 
-					role_is_privileged = is_privileged_role();
+					role_is_privileged = is_current_role_privileged();
 
 					/*
 					 * GRANT <role> TO <reserved_roles>
@@ -601,7 +608,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (!is_privileged_role()) {
+			if (!is_current_role_privileged()) {
 				break;
 			}
 
@@ -666,7 +673,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (!is_privileged_role()) {
+			if (!is_current_role_privileged()) {
 				break;
 			}
 
@@ -725,7 +732,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (!is_privileged_role()) {
+			if (!is_current_role_privileged()) {
 				break;
 			}
 
@@ -776,7 +783,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (((CommentStmt *)utility_stmt)->objtype != OBJECT_EXTENSION) {
 				break;
 			}
-			if (!is_privileged_role()) {
+			if (!is_current_role_privileged()) {
 				break;
 			}
 
@@ -811,7 +818,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					break;
 				}
 			}
-			if (!is_privileged_role()) {
+			if (!is_current_role_privileged()) {
 				break;
 			}
 
@@ -1058,7 +1065,7 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-is_privileged_role(void)
+is_current_role_privileged(void)
 {
 	Oid current_role_oid = GetUserId();
 	Oid	privileged_role_oid;
@@ -1068,5 +1075,19 @@ is_privileged_role(void)
 	}
 	privileged_role_oid = get_role_oid(privileged_role, true);
 
-	return OidIsValid(privileged_role_oid) && is_member_of_role(current_role_oid, privileged_role_oid);
+	return OidIsValid(privileged_role_oid) && has_privs_of_role(current_role_oid, privileged_role_oid);
+}
+
+static bool
+is_role_privileged(const char *role)
+{
+	Oid role_oid = get_role_oid(role, true);
+	Oid privileged_role_oid;
+
+	if (privileged_role == NULL) {
+		return false;
+	}
+	privileged_role_oid = get_role_oid(privileged_role, true);
+
+	return OidIsValid(role_oid) && OidIsValid(privileged_role_oid) && has_privs_of_role(role_oid, privileged_role_oid);
 }
