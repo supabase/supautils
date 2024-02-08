@@ -287,7 +287,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				AlterRoleStmt *stmt = (AlterRoleStmt *)utility_stmt;
 				ListCell *option_cell = NULL;
 				bool already_switched_to_superuser = false;
-				bool stmt_has_bypassrls = false;
 
 				if (!IsTransactionState()) {
 					break;
@@ -403,10 +402,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					/* CREATE ROLE <reserved_role> */
 					confirm_reserved_roles(created_role, false);
 
-					if (!is_current_role_privileged()){
-						break;
-					}
-
 					/* Check to see if there are any descriptions related to membership. */
 					foreach(option_cell, stmt->options)
 					{
@@ -448,16 +443,20 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (hasrolemembers)
 						confirm_reserved_memberships(created_role);
 
-					bool already_switched_to_superuser = false;
+					if (is_current_role_privileged()) {
+						bool already_switched_to_superuser = false;
 
-					// Allow `privileged_role` (in addition to superusers) to
-					// set bypassrls & replication attributes.
-					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+						// Allow `privileged_role` (in addition to superusers) to
+						// set bypassrls & replication attributes.
+						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
 
-					run_process_utility_hook(prev_hook);
+						run_process_utility_hook(prev_hook);
 
-					if (!already_switched_to_superuser) {
-						switch_to_original_role();
+						if (!already_switched_to_superuser) {
+							switch_to_original_role();
+						}
+					} else {
+						run_process_utility_hook(prev_hook);
 					}
 
 					return;
