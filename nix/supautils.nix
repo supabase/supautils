@@ -7,6 +7,6 @@ stdenv.mkDerivation {
   makeFlags = [ extraMakeFlags ];
   installPhase = ''
     mkdir -p $out/lib
-    install -D supautils.so -t $out/lib
+    install -D *.{dylib,so} -t $out/lib
   '';
 }
