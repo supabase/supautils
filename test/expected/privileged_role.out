@@ -64,6 +64,31 @@ select rolbypassrls from pg_roles where rolname = 'r';
 drop role r;
 \echo
 
+-- can manage replication role attribute
+create role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+alter role r noreplication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ f
+(1 row)
+
+alter role r replication;
+select rolreplication from pg_roles where rolname = 'r';
+ rolreplication 
+----------------
+ t
+(1 row)
+
+drop role r;
+\echo
+
 -- can manage foreign data wrappers
 create extension postgres_fdw;
 create foreign data wrapper new_fdw
