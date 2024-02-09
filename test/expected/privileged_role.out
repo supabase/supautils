@@ -151,6 +151,20 @@ alter role authenticator nologin;
 ERROR:  "authenticator" is a reserved role, only superusers can modify it
 \echo
 
+-- privileged_role cannot manage [no]superuser attribute
+create role r superuser;
+ERROR:  permission denied to create role
+DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
+create role r;
+alter role r superuser;
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
+alter role postgres nosuperuser;
+ERROR:  permission denied to alter role
+DETAIL:  Only superusers can alter privileged roles.
+drop role r;
+\echo
+
 -- member of privileged_role can do privileged role stuff
 set role privileged_role_member;
 grant testme to authenticator;
