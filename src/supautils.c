@@ -417,8 +417,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 						if (strcmp(defel->defname, "superuser") == 0) {
 							ereport(ERROR,
 									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-									 errmsg("permission denied to alter role"),
-									 errdetail("Only roles with the %s attribute may alter roles with the %s attribute.",
+									 errmsg("permission denied to create role"),
+									 errdetail("Only roles with the %s attribute may create roles with the %s attribute.",
 											   "SUPERUSER", "SUPERUSER")));
 						}
 					}
