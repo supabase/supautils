@@ -270,7 +270,7 @@ void handle_create_extension(
     pfree(filename);
 }
 
-void handle_alter_extension(
+bool handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
     const char *privileged_extensions_superuser) {
@@ -281,18 +281,13 @@ void handle_alter_extension(
         bool already_switched_to_superuser = false;
         switch_to_superuser(privileged_extensions_superuser,
                             &already_switched_to_superuser);
-
-        run_process_utility_hook(process_utility_hook);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    } else {
-        run_process_utility_hook(process_utility_hook);
+        return true;
     }
+
+    return false;
 }
 
-void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
+bool handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
                            PROCESS_UTILITY_PARAMS,
                            const char *privileged_extensions,
                            const char *privileged_extensions_superuser) {
@@ -313,13 +308,7 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
         bool already_switched_to_superuser = false;
         switch_to_superuser(privileged_extensions_superuser,
                             &already_switched_to_superuser);
-
-        run_process_utility_hook(process_utility_hook);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    } else {
-        run_process_utility_hook(process_utility_hook);
+        return true;
     }
+    return false;
 }

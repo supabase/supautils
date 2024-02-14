@@ -276,6 +276,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 {
 	/* Get the utility statement from the planned statement */
 	Node   *utility_stmt = pstmt->utilityStmt;
+    bool switched_to_superuser = false;
 
 	switch (utility_stmt->type)
 	{
@@ -581,11 +582,11 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			handle_alter_extension(prev_hook,
-								   PROCESS_UTILITY_ARGS,
-								   privileged_extensions,
-								   privileged_extensions_superuser);
-			return;
+			switched_to_superuser = handle_alter_extension(prev_hook,
+									PROCESS_UTILITY_ARGS,
+									privileged_extensions,
+									privileged_extensions_superuser);
+			break;
 		}
 
 		/*
@@ -761,11 +762,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			 * DROP EXTENSION <extension>
 			 */
 			if (stmt->removeType == OBJECT_EXTENSION) {
-				handle_drop_extension(prev_hook,
+				switched_to_superuser = handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
 									  privileged_extensions,
 									  privileged_extensions_superuser);
-				return;
 			}
 
 			break;
@@ -841,6 +841,10 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 
 	/* Chain to previously defined hooks */
 	run_process_utility_hook(prev_hook);
+
+	if (switched_to_superuser) {
+		switch_to_original_role();
+	}
 }
 
 static bool
