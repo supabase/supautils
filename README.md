@@ -179,6 +179,22 @@ postgres=> \dx pg_cron
 (1 row)
 ```
 
+## Managing Policies Without Table Ownership
+
+In Postgres, only table owners can create RLS policies for a table. This can be
+limiting if you need to allow certain roles to manage policies without allowing
+them to perform other DDL (e.g. to prevent them from dropping the table).
+
+With supautils, this can be done like so:
+
+```
+supautils.privileged_role = 'my_privileged_role'
+supautils.privileged_role_allow_policies_on_tables = 'public.not_my_table, public.also_not_my_table'
+```
+
+This allows `my_privileged_role` to manage policies for `public.not_my_table`
+and `public.also_not_my_table` without being an owner of these tables.
+
 ## Development
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.
