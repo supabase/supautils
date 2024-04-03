@@ -22,6 +22,7 @@
 
 #include "constrained_extensions.h"
 #include "extensions_parameter_overrides.h"
+#include "policy_grants.h"
 #include "privileged_extensions.h"
 #include "utils.h"
 
@@ -45,6 +46,7 @@
 
 #define MAX_CONSTRAINED_EXTENSIONS         100
 #define MAX_EXTENSIONS_PARAMETER_OVERRIDES 100
+#define MAX_POLICY_GRANTS                  100
 
 /* required macro for extension libraries to work */
 PG_MODULE_MAGIC;
@@ -58,7 +60,6 @@ static char *privileged_extensions                     = NULL;
 static char *privileged_extensions_superuser           = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
 static char *privileged_role                           = NULL;
-static char *privileged_role_allow_policies_on_tables  = NULL;
 static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
@@ -73,6 +74,12 @@ static extension_parameter_overrides epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] = 
 static size_t total_epos = 0;
 static bool
 extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource source);
+
+static char *policy_grants_str = NULL;
+static policy_grants pgs[MAX_POLICY_GRANTS] = {0};
+static size_t total_pgs = 0;
+static bool
+policy_grants_check_hook(char **newval, void **extra, GucSource source);
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -103,9 +110,6 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source);
-
-static bool
-privileged_role_allow_policies_on_tables_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
 privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source);
@@ -217,16 +221,6 @@ _PG_init(void)
 							   NULL,
 							   NULL);
 
-	DefineCustomStringVariable("supautils.privileged_role_allow_policies_on_tables",
-							   "List of tables that the privileged_role is allowed to manage policies for",
-							   NULL,
-							   &privileged_role_allow_policies_on_tables,
-							   NULL,
-							   PGC_SIGHUP, 0,
-							   privileged_role_allow_policies_on_tables_check_hook,
-							   NULL,
-							   NULL);
-
 	DefineCustomStringVariable("supautils.privileged_role_allowed_configs",
 							   "Superuser-only configs that the privileged_role is allowed to configure",
 							   NULL,
@@ -245,6 +239,16 @@ _PG_init(void)
 							   SUPAUTILS_GUC_CONTEXT_SIGHUP, 0,
 							   NULL,
 							   constrained_extensions_assign_hook,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.policy_grants",
+							   "Allow non-owners to manage policies on tables",
+							   NULL,
+							   &policy_grants_str,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   &policy_grants_check_hook,
+							   NULL,
 							   NULL);
 
 	if(placeholders){
@@ -772,14 +776,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (!is_current_role_privileged()) {
-				break;
-			}
-			if (privileged_role_allow_policies_on_tables == NULL) {
-				break;
-			}
 
-			if (is_table_range_var_in_list_of_tables_string(stmt->table, privileged_role_allow_policies_on_tables)) {
+			if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
 				bool already_switched_to_superuser = false;
 
 				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
@@ -806,14 +804,8 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (!is_current_role_privileged()) {
-				break;
-			}
-			if (privileged_role_allow_policies_on_tables == NULL) {
-				break;
-			}
 
-			if (is_table_range_var_in_list_of_tables_string(stmt->table, privileged_role_allow_policies_on_tables)) {
+			if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
 				bool already_switched_to_superuser = false;
 
 				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
@@ -852,10 +844,6 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				return;
 			}
 
-			if (!is_current_role_privileged()) {
-				break;
-			}
-
 			/*
 			 * DROP POLICY
 			 */
@@ -868,7 +856,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
 				RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
 
-				if (is_table_range_var_in_list_of_tables_string(table_range_var, privileged_role_allow_policies_on_tables)) {
+				if (is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
 					bool already_switched_to_superuser = false;
 
 					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
@@ -985,6 +973,33 @@ extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource
 }
 
 static bool
+policy_grants_check_hook(char **newval, void **extra, GucSource source)
+{
+	char *val = *newval;
+
+	for (size_t i = 0; i < total_pgs; i++){
+		pfree(pgs[i].role_name);
+		for (size_t j = 0; j < pgs[i].total_tables; j++) {
+			pfree(pgs[i].table_names[j]);
+		}
+		pgs[i].total_tables = 0;
+	}
+	total_pgs = 0;
+
+	if (val) {
+		json_policy_grants_parse_state state = parse_policy_grants(val, pgs);
+		if (state.error_msg) {
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("supautils.policy_grants: %s", state.error_msg)));
+		}
+		total_pgs = state.total_pgs;
+	}
+
+	return true;
+}
+
+static bool
 reserved_roles_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.reserved_roles");
@@ -1012,38 +1027,6 @@ static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.privileged_extensions");
-
-	return true;
-}
-
-static bool
-privileged_role_allow_policies_on_tables_check_hook(char **newval, void **extra, GucSource source)
-{
-	List *table_list;
-	ListCell *table;
-	char *val = *newval;
-
-	if (val != NULL)
-	{
-		if (!SplitIdentifierString(pstrdup(val), ',', &table_list))
-			EREPORT_INVALID_PARAMETER("supautils.privileged_role_allow_policies_on_tables");
-
-		foreach(table, table_list) {
-			List *name_list;
-#if PG16_GTE
-			name_list = stringToQualifiedNameList((char *)lfirst(table), NULL);
-#else
-			name_list = stringToQualifiedNameList((char *)lfirst(table));
-#endif
-			if (name_list == NULL) {
-				EREPORT_INVALID_PARAMETER("supautils.privileged_role_allow_policies_on_tables");
-			}
-
-			list_free(name_list);
-		}
-
-		list_free(table_list);
-	}
 
 	return true;
 }

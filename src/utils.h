@@ -82,8 +82,4 @@ extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
 
 extern bool remove_ending_wildcard(char *);
 
-extern bool
-is_table_range_var_in_list_of_tables_string(const RangeVar *table_range_var,
-                                            const char *list_of_tables_str);
-
 #endif
