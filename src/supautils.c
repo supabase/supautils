@@ -1,6 +1,7 @@
 #include <postgres.h>
 
 #include <access/xact.h>
+#include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
 #include <executor/spi.h>
 #include <fmgr.h>
@@ -15,6 +16,7 @@
 #include <utils/guc.h>
 #include <utils/guc_tables.h>
 #include <utils/jsonb.h>
+#include <utils/regproc.h>
 #include <utils/snapmgr.h>
 #include <utils/varlena.h>
 
@@ -56,6 +58,7 @@ static char *privileged_extensions                     = NULL;
 static char *privileged_extensions_superuser           = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
 static char *privileged_role                           = NULL;
+static char *privileged_role_allow_policies_on_tables  = NULL;
 static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
@@ -100,6 +103,9 @@ restrict_placeholders_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source);
+
+static bool
+privileged_role_allow_policies_on_tables_check_hook(char **newval, void **extra, GucSource source);
 
 static bool
 privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source);
@@ -208,6 +214,16 @@ _PG_init(void)
 							   NULL,
 							   PGC_SIGHUP, 0,
 							   NULL,
+							   NULL,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.privileged_role_allow_policies_on_tables",
+							   "List of tables that the privileged_role is allowed to manage policies for",
+							   NULL,
+							   &privileged_role_allow_policies_on_tables,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   privileged_role_allow_policies_on_tables_check_hook,
 							   NULL,
 							   NULL);
 
@@ -746,6 +762,74 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			return;
 		}
 
+		/**
+		 * CREATE POLICY
+		 */
+		case T_CreatePolicyStmt:
+		{
+			CreatePolicyStmt *stmt = (CreatePolicyStmt *)utility_stmt;
+
+			if (superuser()) {
+				break;
+			}
+			if (!is_current_role_privileged()) {
+				break;
+			}
+			if (privileged_role_allow_policies_on_tables == NULL) {
+				break;
+			}
+
+			if (is_table_range_var_in_list_of_tables_string(stmt->table, privileged_role_allow_policies_on_tables)) {
+				bool already_switched_to_superuser = false;
+
+				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+				run_process_utility_hook(prev_hook);
+
+				if (!already_switched_to_superuser) {
+					switch_to_original_role();
+				}
+
+				return;
+			}
+
+			break;
+		}
+
+		/**
+		 * ALTER POLICY
+		 */
+		case T_AlterPolicyStmt:
+		{
+			AlterPolicyStmt *stmt = (AlterPolicyStmt *)utility_stmt;
+
+			if (superuser()) {
+				break;
+			}
+			if (!is_current_role_privileged()) {
+				break;
+			}
+			if (privileged_role_allow_policies_on_tables == NULL) {
+				break;
+			}
+
+			if (is_table_range_var_in_list_of_tables_string(stmt->table, privileged_role_allow_policies_on_tables)) {
+				bool already_switched_to_superuser = false;
+
+				switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+				run_process_utility_hook(prev_hook);
+
+				if (!already_switched_to_superuser) {
+					switch_to_original_role();
+				}
+
+				return;
+			}
+
+			break;
+		}
+
 		case T_DropStmt:
 		{
 			DropStmt *stmt = (DropStmt *)utility_stmt;
@@ -753,19 +837,50 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 			if (superuser()) {
 				break;
 			}
-			if (privileged_extensions == NULL) {
-				break;
-			}
 
 			/*
 			 * DROP EXTENSION <extension>
 			 */
 			if (stmt->removeType == OBJECT_EXTENSION) {
+				if (privileged_extensions == NULL) {
+					break;
+				}
 				handle_drop_extension(prev_hook,
 									  PROCESS_UTILITY_ARGS,
 									  privileged_extensions,
 									  privileged_extensions_superuser);
 				return;
+			}
+
+			if (!is_current_role_privileged()) {
+				break;
+			}
+
+			/*
+			 * DROP POLICY
+			 */
+			if (stmt->removeType == OBJECT_POLICY) {
+				// DROP POLICY always has one object.
+				ListCell *object_cell = list_head(stmt->objects);
+				List *object = castNode(List, lfirst(object_cell));
+				// Last element is the policy name, the rest is the table name.
+				// Take everything but the last.
+				List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
+				RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+
+				if (is_table_range_var_in_list_of_tables_string(table_range_var, privileged_role_allow_policies_on_tables)) {
+					bool already_switched_to_superuser = false;
+
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+					run_process_utility_hook(prev_hook);
+
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
+					}
+
+					return;
+				}
 			}
 
 			break;
@@ -897,6 +1012,36 @@ static bool
 privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
 {
 	check_parameter(*newval, "supautils.privileged_extensions");
+
+	return true;
+}
+
+static bool
+privileged_role_allow_policies_on_tables_check_hook(char **newval, void **extra, GucSource source)
+{
+	List *table_list;
+	ListCell *table;
+	char *val = *newval;
+
+	if (val != NULL)
+	{
+		if (!SplitIdentifierString(pstrdup(val), ',', &table_list))
+			EREPORT_INVALID_PARAMETER("supautils.privileged_role_allow_policies_on_tables");
+
+		foreach(table, table_list) {
+			List *name_list;
+#if PG16_GTE
+			name_list = stringToQualifiedNameList((char *)lfirst(table), NULL);
+#else
+			name_list = stringToQualifiedNameList((char *)lfirst(table));
+#endif
+			if (!name_list) {
+				EREPORT_INVALID_PARAMETER("supautils.privileged_role_allow_policies_on_tables");
+			}
+		}
+
+		list_free(table_list);
+	}
 
 	return true;
 }

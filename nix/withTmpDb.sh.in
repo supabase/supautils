@@ -21,8 +21,9 @@ privileged_extensions="autoinc, citext, hstore, sslinfo, pg_tle, postgres_fdw"
 privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
 privileged_role="privileged_role"
 privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
+privileged_role_allow_policies_on_tables="allow_policies.my_table, allow_policies.nonexistent_table"
 
-reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
+reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\" -c supautils.privileged_role_allow_policies_on_tables=\"$privileged_role_allow_policies_on_tables\""
 placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
 
 cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"20 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
