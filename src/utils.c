@@ -1,5 +1,7 @@
 #include <postgres.h>
 
+#include <catalog/namespace.h>
+#include <utils/regproc.h>
 #include <utils/varlena.h>
 
 #include "utils.h"
@@ -84,4 +86,42 @@ bool remove_ending_wildcard(char *elem) {
 
 bool strstarts(const char *str, const char *prefix) {
     return strncmp(str, prefix, strlen(prefix)) == 0;
+}
+
+bool is_table_range_var_in_list_of_tables_string(
+    const RangeVar *table_range_var, const char *list_of_tables_str) {
+    Oid target_table_id =
+        RangeVarGetRelid(table_range_var, AccessExclusiveLock, false);
+    List *allowed_policies_list = NULL;
+    ListCell *table_cell = NULL;
+
+    if (!SplitIdentifierString(pstrdup(list_of_tables_str), ',',
+                               &allowed_policies_list)) {
+        return false;
+    }
+
+    foreach (table_cell, allowed_policies_list) {
+        List *qual_name_list;
+        RangeVar *range_var;
+        Oid table_id;
+#if PG16_GTE
+        qual_name_list =
+            stringToQualifiedNameList((char *)lfirst(table_cell), NULL);
+#else
+        qual_name_list = stringToQualifiedNameList((char *)lfirst(table_cell));
+#endif
+        range_var = makeRangeVarFromNameList(qual_name_list);
+        table_id = RangeVarGetRelid(range_var, AccessExclusiveLock, true);
+        if (!OidIsValid(table_id)) {
+            continue;
+        }
+
+        if (table_id == target_table_id) {
+            list_free(allowed_policies_list);
+            return true;
+        }
+    }
+
+    list_free(allowed_policies_list);
+    return false;
 }

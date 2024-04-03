@@ -153,3 +153,35 @@ set role privileged_role;
 create publication p for all tables;
 drop publication p;
 -- not testing `create publication ... for tables in schema ...` because it's PG15+
+\echo
+
+-- privileged_role can manage policies on tables in allowlist
+set role postgres;
+create schema allow_policies;
+create table allow_policies.my_table ();
+grant usage on schema allow_policies to privileged_role;
+set role privileged_role;
+create policy p on allow_policies.my_table for select using (true);
+alter policy p on allow_policies.my_table using (false);
+drop policy p on allow_policies.my_table;
+
+set role postgres;
+drop schema allow_policies cascade;
+set role privileged_role;
+\echo
+
+-- privileged_role cannot manage policies on tables not in allowlist
+set role postgres;
+create schema deny_policies;
+create table deny_policies.my_table ();
+create policy p1 on deny_policies.my_table for select using (true);
+grant usage on schema deny_policies to privileged_role;
+set role privileged_role;
+create policy p2 on deny_policies.my_table for select using (true);
+alter policy p1 on deny_policies.my_table using (false);
+drop policy p1 on deny_policies.my_table;
+
+set role postgres;
+drop schema deny_policies cascade;
+set role privileged_role;
+\echo
