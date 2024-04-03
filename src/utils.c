@@ -110,6 +110,10 @@ bool is_table_range_var_in_list_of_tables_string(
 #else
         qual_name_list = stringToQualifiedNameList((char *)lfirst(table_cell));
 #endif
+        if (qual_name_list == NULL) {
+            list_free(qual_name_list);
+            continue;
+        }
         range_var = makeRangeVarFromNameList(qual_name_list);
         table_id = RangeVarGetRelid(range_var, AccessExclusiveLock, true);
         if (!OidIsValid(table_id)) {
