@@ -8,7 +8,7 @@ else
 endif
 
 MODULE_big = supautils
-OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/utils.o
+OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/policy_grants.o src/utils.o
 
 SYSTEM = $(shell uname -s)
 
