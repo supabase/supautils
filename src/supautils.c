@@ -1035,9 +1035,11 @@ privileged_role_allow_policies_on_tables_check_hook(char **newval, void **extra,
 #else
 			name_list = stringToQualifiedNameList((char *)lfirst(table));
 #endif
-			if (!name_list) {
+			if (name_list == NULL) {
 				EREPORT_INVALID_PARAMETER("supautils.privileged_role_allow_policies_on_tables");
 			}
+
+			list_free(name_list);
 		}
 
 		list_free(table_list);
