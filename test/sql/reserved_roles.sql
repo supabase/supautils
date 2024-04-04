@@ -3,7 +3,10 @@ set role rolecreator;
 \echo
 
 -- cannot rename an existing role to a reserved role
-alter role fake rename to reserved_but_not_yet_created;
+create role r;
+alter role r rename to reserved_but_not_yet_created;
+
+drop role r;
 \echo
 
 -- cannot rename a reserved role
@@ -41,9 +44,10 @@ create role reserved_but_not_yet_created;
 create role anon;
 
 -- ensure our hooks don't mess regular non-reserved roles functionality
-alter role fake rename to new_fake;
-alter role new_fake createrole createdb;
-drop role new_fake;
+create role r;
+alter role r rename to new_r;
+alter role new_r createrole createdb;
+drop role new_r;
 create role non_reserved;
 \echo
 
