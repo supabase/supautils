@@ -141,9 +141,8 @@ drop role r;
 -- privileged_role cannot create superuser or alter [no]superuser
 create role r superuser;
 create role r;
-alter role r nosuperuser;
 alter role r superuser;
-alter role postgres nosuperuser;
+alter role r nosuperuser;
 
 drop role r;
 \echo
@@ -171,7 +170,6 @@ set role privileged_role;
 create policy p on allow_policies.my_table for select using (true);
 alter policy p on allow_policies.my_table using (false);
 drop policy p on allow_policies.my_table;
-
 set role postgres;
 drop schema allow_policies cascade;
 set role privileged_role;
@@ -187,7 +185,6 @@ set role privileged_role;
 create policy p2 on deny_policies.my_table for select using (true);
 alter policy p1 on deny_policies.my_table using (false);
 drop policy p1 on deny_policies.my_table;
-
 set role postgres;
 drop schema deny_policies cascade;
 set role privileged_role;

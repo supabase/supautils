@@ -10,12 +10,18 @@ endif
 MODULE_big = supautils
 OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/policy_grants.o src/utils.o
 
+PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
+PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
 SYSTEM = $(shell uname -s)
 
+TESTS := $(wildcard test/sql/*.sql)
 ifneq ($(SYSTEM), Linux)
-TESTS = $(filter-out test/sql/ge13_%.sql, $(wildcard test/sql/*.sql))
+TESTS := $(filter-out test/sql/linux_%.sql, $(TESTS))
+endif
+ifneq ($(PG_GE16), 0)
+TESTS := $(filter-out test/sql/ge16_%.sql, $(TESTS))
 else
-TESTS = $(wildcard test/sql/*.sql)
+TESTS := $(filter-out test/sql/lt16_%.sql, $(TESTS))
 endif
 
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
