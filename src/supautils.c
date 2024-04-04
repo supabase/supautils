@@ -464,6 +464,19 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					if (hasrolemembers)
 						confirm_reserved_memberships(created_role);
 
+					// We don't want to switch to superuser on PG16+ because the
+					// creating role is implicitly granted ADMIN on the new
+					// role:
+					// https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-CREATEROLE-SELF-GRANT
+					//
+					// This ADMIN will be missing if we switch to superuser
+					// since the creating role becomes the superuser.
+					//
+					// We also no longer need superuser to grant BYPASSRLS &
+					// REPLICATION anyway.
+#if PG16_GTE
+					run_process_utility_hook(prev_hook);
+#else
 					if (is_current_role_privileged()) {
 						bool already_switched_to_superuser = false;
 
@@ -479,6 +492,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					} else {
 						run_process_utility_hook(prev_hook);
 					}
+#endif
 
 					return;
 				}

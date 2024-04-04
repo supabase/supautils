@@ -111,9 +111,11 @@ end;
 $$ language plpgsql;
 create role r;
 alter role r nobypassrls;
-ERROR:  must be superuser to change bypassrls attribute
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the BYPASSRLS attribute may change the BYPASSRLS attribute.
 alter role r bypassrls;
-ERROR:  must be superuser to change bypassrls attribute
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the BYPASSRLS attribute may change the BYPASSRLS attribute.
 drop role r;
 set role privileged_role;
 \echo
@@ -186,22 +188,19 @@ create role r superuser;
 ERROR:  permission denied to create role
 DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
 create role r;
-alter role r nosuperuser;
-ERROR:  permission denied to alter role
-DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
 alter role r superuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
-alter role postgres nosuperuser;
+alter role r nosuperuser;
 ERROR:  permission denied to alter role
-DETAIL:  Only superusers can alter privileged roles.
+DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
 drop role r;
 \echo
 
 -- member of privileged_role can do privileged role stuff
 set role privileged_role_member;
 grant testme to authenticator;
-NOTICE:  role "authenticator" is already a member of role "testme"
+NOTICE:  role "authenticator" has already been granted membership in role "testme" by role "privileged_role"
 set role privileged_role;
 \echo
 
