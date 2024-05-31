@@ -333,7 +333,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				foreach(option_cell, stmt->options)
 				{
 					DefElem *defel = (DefElem *) lfirst(option_cell);
-					if (strcmp(defel->defname, "superuser") == 0 && defGetBoolean(defel)) {
+					if (strcmp(defel->defname, "superuser") == 0) {
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 								 errmsg("permission denied to alter role"),
