@@ -187,6 +187,8 @@ ERROR:  permission denied to create role
 DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
 create role r;
 alter role r nosuperuser;
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
 alter role r superuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
