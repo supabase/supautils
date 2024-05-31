@@ -3,6 +3,7 @@
 #include <access/xact.h>
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
+#include <commands/defrem.h>
 #include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
@@ -332,7 +333,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				foreach(option_cell, stmt->options)
 				{
 					DefElem *defel = (DefElem *) lfirst(option_cell);
-					if (strcmp(defel->defname, "superuser") == 0) {
+					if (strcmp(defel->defname, "superuser") == 0 && defGetBoolean(defel)) {
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 								 errmsg("permission denied to alter role"),
@@ -434,7 +435,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 							hasrolemembers = true;
 
 						// Setting the superuser attribute is not allowed.
-						if (strcmp(defel->defname, "superuser") == 0) {
+						if (strcmp(defel->defname, "superuser") == 0 && defGetBoolean(defel)) {
 							ereport(ERROR,
 									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 									 errmsg("permission denied to create role"),
