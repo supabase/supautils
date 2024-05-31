@@ -132,9 +132,9 @@ alter role authenticator rename to authorized;
 alter role authenticator nologin;
 \echo
 
--- privileged_role cannot manage [no]superuser attribute
+-- privileged_role cannot manage superuser attribute
 create role r superuser;
-create role r;
+create role r nosuperuser;
 alter role r superuser;
 alter role postgres nosuperuser;
 
