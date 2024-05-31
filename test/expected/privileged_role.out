@@ -180,7 +180,7 @@ ERROR:  "authenticator" is a reserved role, only superusers can modify it
 create role r superuser;
 ERROR:  permission denied to create role
 DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
-create role r;
+create role r nosuperuser;
 alter role r superuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
