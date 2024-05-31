@@ -176,11 +176,17 @@ alter role authenticator nologin;
 ERROR:  "authenticator" is a reserved role, only superusers can modify it
 \echo
 
--- privileged_role cannot manage superuser attribute
+-- privileged_role can create nosuperuser
+create role r nosuperuser;
+drop role r;
+\echo
+
+-- privileged_role cannot create superuser or alter [no]superuser
 create role r superuser;
 ERROR:  permission denied to create role
 DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
-create role r nosuperuser;
+create role r;
+alter role r nosuperuser;
 alter role r superuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
