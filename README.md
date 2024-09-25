@@ -194,6 +194,15 @@ supautils.policy_grants = '{ "my_role": ["public.not_my_table", "public.also_not
 This allows `my_role` to manage policies for `public.not_my_table` and
 `public.also_not_my_table` without being an owner of these tables.
 
+## Dropping Triggers Without Table Ownership
+
+In addition to managing policies, you can also allow certain roles to drop
+triggers on a table without being the table owner:
+
+```
+supautils.drop_trigger_grants = '{ "my_role": ["public.not_my_table", "public.also_not_my_table"] }'
+```
+
 ## Development
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.

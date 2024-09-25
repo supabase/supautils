@@ -27,9 +27,10 @@ placeholder_stuff_options='-c supautils.placeholders="response.headers, another.
 
 cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"20 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
 epos_option='-c supautils.extensions_parameter_overrides="{\"sslinfo\":{\"schema\":\"pg_catalog\"}}"'
+drop_trigger_grants_option='-c supautils.drop_trigger_grants="{\"privileged_role\":[\"allow_drop_triggers.my_table\"]}"'
 policy_grants_option='-c supautils.policy_grants="{\"privileged_role\":[\"allow_policies.my_table\",\"allow_policies.nonexistent_table\"]}"'
 
-pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option" -o "$epos_option" -o "$policy_grants_option"
+pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option" -o "$epos_option" -o "$drop_trigger_grants_option" -o "$policy_grants_option"
 
 # print notice when creating a TLE
 mkdir -p "$tmpdir/privileged_extensions_custom_scripts"

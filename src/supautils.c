@@ -22,6 +22,7 @@
 #include <utils/varlena.h>
 
 #include "constrained_extensions.h"
+#include "drop_trigger_grants.h"
 #include "extensions_parameter_overrides.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
@@ -47,6 +48,7 @@
 
 #define MAX_CONSTRAINED_EXTENSIONS         100
 #define MAX_EXTENSIONS_PARAMETER_OVERRIDES 100
+#define MAX_DROP_TRIGGER_GRANTS            100
 #define MAX_POLICY_GRANTS                  100
 
 /* required macro for extension libraries to work */
@@ -81,6 +83,12 @@ static policy_grants pgs[MAX_POLICY_GRANTS] = {0};
 static size_t total_pgs = 0;
 static bool
 policy_grants_check_hook(char **newval, void **extra, GucSource source);
+
+static char *drop_trigger_grants_str = NULL;
+static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
+static size_t total_dtgs = 0;
+static bool
+drop_trigger_grants_check_hook(char **newval, void **extra, GucSource source);
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -240,6 +248,16 @@ _PG_init(void)
 							   SUPAUTILS_GUC_CONTEXT_SIGHUP, 0,
 							   NULL,
 							   constrained_extensions_assign_hook,
+							   NULL);
+
+	DefineCustomStringVariable("supautils.drop_trigger_grants",
+							   "Allow non-owners to drop triggers on tables",
+							   NULL,
+							   &drop_trigger_grants_str,
+							   NULL,
+							   PGC_SIGHUP, 0,
+							   &drop_trigger_grants_check_hook,
+							   NULL,
 							   NULL);
 
 	DefineCustomStringVariable("supautils.policy_grants",
@@ -845,45 +863,81 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
-			/*
-			 * DROP EXTENSION <extension>
-			 */
-			if (stmt->removeType == OBJECT_EXTENSION) {
-				if (privileged_extensions == NULL) {
-					break;
-				}
-				handle_drop_extension(prev_hook,
-									  PROCESS_UTILITY_ARGS,
-									  privileged_extensions,
-									  privileged_extensions_superuser);
-				return;
-			}
-
-			/*
-			 * DROP POLICY
-			 */
-			if (stmt->removeType == OBJECT_POLICY) {
-				// DROP POLICY always has one object.
-				ListCell *object_cell = list_head(stmt->objects);
-				List *object = castNode(List, lfirst(object_cell));
-				// Last element is the policy name, the rest is the table name.
-				// Take everything but the last.
-				List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
-				RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-
-				if (is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
-					bool already_switched_to_superuser = false;
-
-					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
-
-					run_process_utility_hook(prev_hook);
-
-					if (!already_switched_to_superuser) {
-						switch_to_original_role();
+			switch (stmt->removeType)
+			{
+				/*
+				 * DROP EXTENSION <extension>
+				 */
+				case OBJECT_EXTENSION:
+				{
+					if (privileged_extensions == NULL) {
+						break;
 					}
-
+					handle_drop_extension(prev_hook,
+										  PROCESS_UTILITY_ARGS,
+										  privileged_extensions,
+										  privileged_extensions_superuser);
 					return;
 				}
+
+				/*
+				 * DROP POLICY
+				 */
+				case OBJECT_POLICY:
+				{
+					// DROP POLICY always has one object.
+					ListCell *object_cell = list_head(stmt->objects);
+					List *object = castNode(List, lfirst(object_cell));
+					// Last element is the policy name, the rest is the table name.
+					// Take everything but the last.
+					List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
+					RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+
+					if (is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
+						bool already_switched_to_superuser = false;
+
+						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+						run_process_utility_hook(prev_hook);
+
+						if (!already_switched_to_superuser) {
+							switch_to_original_role();
+						}
+
+						return;
+					}
+				}
+
+				/*
+				 * DROP TRIGGER
+				 */
+				case OBJECT_TRIGGER:
+				{
+					// DROP TRIGGER always has one object.
+					ListCell *object_cell = list_head(stmt->objects);
+					List *object = castNode(List, lfirst(object_cell));
+					// Last element is the trigger name, the rest is the table name.
+					// Take everything but the last.
+					List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
+					RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+
+					if (is_current_role_granted_table_drop_trigger(table_range_var, dtgs, total_dtgs)) {
+						bool already_switched_to_superuser = false;
+
+						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+						run_process_utility_hook(prev_hook);
+
+						if (!already_switched_to_superuser) {
+							switch_to_original_role();
+						}
+
+						return;
+					}
+				}
+
+				default:
+					break;
 			}
 
 			break;
@@ -1009,6 +1063,33 @@ policy_grants_check_hook(char **newval, void **extra, GucSource source)
 					 errmsg("supautils.policy_grants: %s", state.error_msg)));
 		}
 		total_pgs = state.total_pgs;
+	}
+
+	return true;
+}
+
+static bool
+drop_trigger_grants_check_hook(char **newval, void **extra, GucSource source)
+{
+	char *val = *newval;
+
+	for (size_t i = 0; i < total_dtgs; i++){
+		pfree(dtgs[i].role_name);
+		for (size_t j = 0; j < dtgs[i].total_tables; j++) {
+			pfree(dtgs[i].table_names[j]);
+		}
+		dtgs[i].total_tables = 0;
+	}
+	total_dtgs = 0;
+
+	if (val) {
+		json_drop_trigger_grants_parse_state state = parse_drop_trigger_grants(val, dtgs);
+		if (state.error_msg) {
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("supautils.drop_trigger_grants: %s", state.error_msg)));
+		}
+		total_dtgs = state.total_dtgs;
 	}
 
 	return true;

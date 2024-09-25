@@ -8,7 +8,7 @@ else
 endif
 
 MODULE_big = supautils
-OBJS = src/supautils.o src/privileged_extensions.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/policy_grants.o src/utils.o
+OBJS = src/supautils.o src/privileged_extensions.o src/drop_trigger_grants.o src/constrained_extensions.o src/extensions_parameter_overrides.o src/policy_grants.o src/utils.o
 
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
