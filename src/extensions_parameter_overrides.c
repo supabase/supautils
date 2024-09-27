@@ -117,8 +117,7 @@ parse_extensions_parameter_overrides(const char *str,
     json_extension_parameter_overrides_parse_state state = {
         JEPO_EXPECT_TOPLEVEL_START, NULL, 0, epos};
 
-    lex =
-        makeJsonLexContextCstringLen(pstrdup(str), strlen(str), PG_UTF8, true);
+    lex = makeJsonLexContextCstringLen(NULL, pstrdup(str), strlen(str), PG_UTF8, true);
 
     sem.semstate = &state;
     sem.object_start = json_object_start;
@@ -135,6 +134,8 @@ parse_extensions_parameter_overrides(const char *str,
 
     if (json_error != JSON_SUCCESS)
         state.error_msg = "invalid json";
+
+    pfree(lex);
 
     return state;
 }
