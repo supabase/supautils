@@ -163,7 +163,7 @@ parse_constrained_extensions(
 
 	json_constrained_extension_parse_state state = {JCE_EXPECT_TOPLEVEL_START, NULL, 0, cexts};
 
-	lex = makeJsonLexContextCstringLen(pstrdup(str), strlen(str), PG_UTF8, true);
+	lex = makeJsonLexContextCstringLen(NULL, pstrdup(str), strlen(str), PG_UTF8, true);
 
 	sem.semstate = &state;
 	sem.object_start = json_object_start;
@@ -180,6 +180,8 @@ parse_constrained_extensions(
 
 	if (json_error != JSON_SUCCESS)
 		state.error_msg = "invalid json";
+
+	pfree(lex);
 
 	return state;
 }
