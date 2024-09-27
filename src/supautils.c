@@ -892,20 +892,21 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					// Take everything but the last.
 					List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
 					RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+					bool already_switched_to_superuser = false;
 
-					if (is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
-						bool already_switched_to_superuser = false;
-
-						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
-
-						run_process_utility_hook(prev_hook);
-
-						if (!already_switched_to_superuser) {
-							switch_to_original_role();
-						}
-
-						return;
+					if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
+						break;
 					}
+
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+					run_process_utility_hook(prev_hook);
+
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
+					}
+
+					return;
 				}
 
 				/*
@@ -920,20 +921,21 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 					// Take everything but the last.
 					List *table_name_list = list_truncate(list_copy(object), list_length(object) - 1);
 					RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+					bool already_switched_to_superuser = false;
 
-					if (is_current_role_granted_table_drop_trigger(table_range_var, dtgs, total_dtgs)) {
-						bool already_switched_to_superuser = false;
-
-						switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
-
-						run_process_utility_hook(prev_hook);
-
-						if (!already_switched_to_superuser) {
-							switch_to_original_role();
-						}
-
-						return;
+					if (!is_current_role_granted_table_drop_trigger(table_range_var, dtgs, total_dtgs)) {
+						break;
 					}
+
+					switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+
+					run_process_utility_hook(prev_hook);
+
+					if (!already_switched_to_superuser) {
+						switch_to_original_role();
+					}
+
+					return;
 				}
 
 				default:
