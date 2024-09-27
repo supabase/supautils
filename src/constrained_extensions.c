@@ -152,40 +152,38 @@ json_scalar(void *state, char *token, JsonTokenType tokentype)
 	JSON_ACTION_RETURN;
 }
 
-static bool
-parse_parameter_overrides(const char *str)
-{
-    JsonParseErrorType json_error;
-    JsonSemAction sem;
-    parse_parameter_overrides_state state = {0};
+json_constrained_extension_parse_state
+parse_constrained_extensions(
+	const char *str,
+	constrained_extension *cexts
+){
+	JsonLexContext *lex;
+	JsonParseErrorType json_error;
+	JsonSemAction sem;
 
-    /* set up semantic actions */
-    memset(&sem, 0, sizeof(sem));
-    sem.semstate = &state;
-    sem.object_start = overrides_object_start;
-    sem.object_end = overrides_object_end;
-    sem.array_start = overrides_array_start;
-    sem.array_end = overrides_array_end;
-    sem.object_field_start = overrides_object_field_start;
-    sem.object_field_end = overrides_object_field_end;
-    sem.array_element_start = overrides_array_element_start;
-    sem.array_element_end = overrides_array_element_end;
-    sem.scalar = overrides_scalar;
+	json_constrained_extension_parse_state state = {JCE_EXPECT_TOPLEVEL_START, NULL, 0, cexts};
 
-    JsonLexContext *lex = makeJsonLexContextCstringLen(NULL, pstrdup(str), strlen(str), PG_UTF8, true);
-    json_error = pg_parse_json(lex, &sem);
+	lex = makeJsonLexContextCstringLen(NULL, pstrdup(str), strlen(str), PG_UTF8, true);
 
-    pfree(lex);
+	sem.semstate = &state;
+	sem.object_start = json_object_start;
+	sem.object_end = json_object_end;
+	sem.array_start = json_array_start;
+	sem.array_end = NULL;
+	sem.object_field_start = json_object_field_start;
+	sem.object_field_end = NULL;
+	sem.array_element_start = NULL;
+	sem.array_element_end = NULL;
+	sem.scalar = json_scalar;
 
-    if (json_error != JSON_SUCCESS)
-    {
-        ereport(ERROR,
-                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                 errmsg("invalid json for parameter overrides")));
-        return false;
-    }
+	json_error = pg_parse_json(lex, &sem);
 
-    return true;
+	if (json_error != JSON_SUCCESS)
+		state.error_msg = "invalid json";
+
+	pfree(lex);
+
+	return state;
 }
 
 #define ERROR_HINT "upgrade to an instance with higher resources"
