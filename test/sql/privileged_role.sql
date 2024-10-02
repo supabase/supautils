@@ -159,3 +159,33 @@ set role postgres;
 drop schema deny_policies cascade;
 set role privileged_role;
 \echo
+
+-- privileged_role can drop triggers on tables in allowlist
+set role postgres;
+create schema allow_drop_triggers;
+create table allow_drop_triggers.my_table ();
+create function allow_drop_triggers.f() returns trigger as 'begin return null; end' language plpgsql;
+create trigger tr after insert on allow_drop_triggers.my_table execute function allow_drop_triggers.f();
+grant usage on schema allow_drop_triggers to privileged_role;
+set role privileged_role;
+drop trigger tr on allow_drop_triggers.my_table;
+
+set role postgres;
+drop schema allow_drop_triggers cascade;
+set role privileged_role;
+\echo
+
+-- privileged_role cannot drop triggers on tables not in allowlist
+set role postgres;
+create schema deny_drop_triggers;
+create table deny_drop_triggers.my_table ();
+create function deny_drop_triggers.f() returns trigger as 'begin return null; end' language plpgsql;
+create trigger tr after insert on deny_drop_triggers.my_table execute function deny_drop_triggers.f();
+grant usage on schema deny_drop_triggers to privileged_role;
+set role privileged_role;
+drop trigger tr on deny_drop_triggers.my_table;
+
+set role postgres;
+drop schema deny_drop_triggers cascade;
+set role privileged_role;
+\echo
