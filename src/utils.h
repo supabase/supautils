@@ -15,6 +15,19 @@
 #define PG14_GTE (PG_VERSION_NUM >= 140000)
 #define PG15_GTE (PG_VERSION_NUM >= 150000)
 #define PG16_GTE (PG_VERSION_NUM >= 160000)
+#define PG17_GTE (PG_VERSION_NUM >= 170000)
+
+#if PG17_GTE
+
+#define NEW_JSON_LEX_CONTEXT_CSTRING_LEN(a, b, c, d) \
+  makeJsonLexContextCstringLen(NULL, a, b, c, d)
+
+#else
+
+#define NEW_JSON_LEX_CONTEXT_CSTRING_LEN(a, b, c, d) \
+  makeJsonLexContextCstringLen(a, b, c, d)
+
+#endif
 
 #if PG16_GTE
 

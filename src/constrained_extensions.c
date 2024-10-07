@@ -163,7 +163,7 @@ parse_constrained_extensions(
 
 	json_constrained_extension_parse_state state = {JCE_EXPECT_TOPLEVEL_START, NULL, 0, cexts};
 
-	lex = makeJsonLexContextCstringLen(pstrdup(str), strlen(str), PG_UTF8, true);
+	lex = NEW_JSON_LEX_CONTEXT_CSTRING_LEN(pstrdup(str), strlen(str), PG_UTF8, true);
 
 	sem.semstate = &state;
 	sem.object_start = json_object_start;
