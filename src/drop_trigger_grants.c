@@ -137,7 +137,7 @@ parse_drop_trigger_grants(const char *str, drop_trigger_grants *dtgs) {
                                                   NULL, 0, dtgs};
 
     lex =
-        makeJsonLexContextCstringLen(pstrdup(str), strlen(str), PG_UTF8, true);
+        NEW_JSON_LEX_CONTEXT_CSTRING_LEN(pstrdup(str), strlen(str), PG_UTF8, true);
 
     sem.semstate = &state;
     sem.object_start = json_object_start;

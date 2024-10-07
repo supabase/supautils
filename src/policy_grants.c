@@ -137,7 +137,7 @@ json_policy_grants_parse_state parse_policy_grants(const char *str,
                                             pgs};
 
     lex =
-        makeJsonLexContextCstringLen(pstrdup(str), strlen(str), PG_UTF8, true);
+        NEW_JSON_LEX_CONTEXT_CSTRING_LEN(pstrdup(str), strlen(str), PG_UTF8, true);
 
     sem.semstate = &state;
     sem.object_start = json_object_start;

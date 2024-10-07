@@ -12,7 +12,7 @@ Supautils is an extension that secures a PostgreSQL cluster on a cloud environme
 
 It doesn't require creating database objects. It's a shared library that modifies PostgreSQL behavior through "hooks", not through tables or functions.
 
-It's tested to work on PostgreSQL 13, 14, 15, and 16.
+It's tested to work on PostgreSQL 13, 14, 15, 16 and 17.
 
 ## Installation
 
