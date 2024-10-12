@@ -623,7 +623,7 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
         }
 
 		/*
-		 * ALTER EXTENSION <extension> [ UPDATE | SET SCHEMA ]
+		 * ALTER EXTENSION <extension> [ ADD | DROP | UPDATE ]
 		 */
 		case T_AlterExtensionStmt:
 		{
@@ -634,10 +634,38 @@ supautils_hook(PROCESS_UTILITY_PARAMS)
 				break;
 			}
 
+			AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
+
 			handle_alter_extension(prev_hook,
 								   PROCESS_UTILITY_ARGS,
+								   stmt->extname,
 								   privileged_extensions,
 								   privileged_extensions_superuser);
+			return;
+		}
+
+		/*
+		 * ALTER EXTENSION <extension> SET SCHEMA
+		 */
+		case T_AlterObjectSchemaStmt:
+		{
+			if (superuser()) {
+				break;
+			}
+			if (privileged_extensions == NULL) {
+				break;
+			}
+
+			AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
+
+			if (stmt->objectType == OBJECT_EXTENSION){
+				handle_alter_extension(prev_hook,
+									   PROCESS_UTILITY_ARGS,
+									   strVal(stmt->object),
+									   privileged_extensions,
+									   privileged_extensions_superuser);
+			}
+
 			return;
 		}
 

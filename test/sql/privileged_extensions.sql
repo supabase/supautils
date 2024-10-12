@@ -67,3 +67,25 @@ drop extension sslinfo;
 drop role another_superuser;
 set role extensions_role;
 \echo
+
+-- can change extensions schema
+create extension pageinspect;
+
+select count(*) = 3 as extensions_in_public_schema
+from information_schema.routines
+where routine_name in ('page_header', 'heap_page_items', 'bt_metap')
+and routine_schema = 'public';
+
+-- go back to postgres role for creating a new schema and switch to extensions_role again
+reset role;
+create schema xtens;
+set role extensions_role;
+\echo
+
+-- now alter extension schema
+alter extension pageinspect set schema xtens;
+
+select count(*) = 3 as extensions_in_xtens_schema
+from information_schema.routines
+where routine_name in ('page_header', 'heap_page_items', 'bt_metap')
+and routine_schema = 'xtens';
