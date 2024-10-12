@@ -1,10 +1,9 @@
 GREP ?= grep
 PG_CONFIG = pg_config
 
+PG_CFLAGS = -std=c99 -Wall -Werror -Wno-declaration-after-statement
 ifeq ($(TEST), 1)
-	PG_CFLAGS = -Wall -Werror -DTEST
-else
-	PG_CFLAGS = -Wall -Werror
+	PG_CFLAGS += -DTEST
 endif
 
 MODULE_big = supautils
