@@ -272,11 +272,11 @@ void handle_create_extension(
 
 void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
+    PROCESS_UTILITY_PARAMS,
+    const char *extname, const char *privileged_extensions,
     const char *privileged_extensions_superuser) {
-    AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
-    if (is_string_in_comma_delimited_string(stmt->extname,
+    if (is_string_in_comma_delimited_string(extname,
                                             privileged_extensions)) {
         bool already_switched_to_superuser = false;
         switch_to_superuser(privileged_extensions_superuser,
