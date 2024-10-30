@@ -107,3 +107,15 @@ jobs:
           asset_path: ./${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.deb
           asset_name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.deb
           asset_content_type: application/vnd.debian.binary-package
+
+      - name: Configure aws credentials for uploading release artifacts
+        if: ${{ matrix.box.arch == 'arm64' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.PROD_AWS_ROLE }}
+          aws-region: us-east-1
+
+      - name: Upload release artifacts to S3
+        if: ${{ matrix.box.arch == 'arm64' }}
+        run: |
+          aws s3api put-object --bucket ${{ secrets.PROD_ARTIFACTS_BUCKET }} --key extensions/${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.deb --body ./${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.deb
