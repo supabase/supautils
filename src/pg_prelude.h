@@ -24,6 +24,7 @@
 #include <utils/json.h>
 #include <utils/jsonb.h>
 #include <utils/jsonfuncs.h>
+#include <utils/lsyscache.h>
 #include <utils/memutils.h>
 #include <utils/regproc.h>
 #include <utils/snapmgr.h>
