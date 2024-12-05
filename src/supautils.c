@@ -42,7 +42,10 @@ static char *supautils_superuser                       = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
 static char *privileged_role                           = NULL; // the privileged_role is a proxy role for the `supautils.superuser` role
 static char *privileged_role_allowed_configs           = NULL;
+
 static ProcessUtility_hook_type prev_hook              = NULL;
+static fmgr_hook_type next_fmgr_hook                   = NULL;
+static needs_fmgr_hook_type next_needs_fmgr_hook       = NULL;
 
 static char *constrained_extensions_str                = NULL;
 static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
@@ -76,6 +79,68 @@ is_current_role_privileged(void);
 
 static bool
 is_role_privileged(const char *role);
+
+// the hook will only be attached to functions that `RETURN event_trigger`
+static bool supautils_needs_fmgr_hook(Oid functionId) {
+
+  // this
+  if (next_needs_fmgr_hook && (*next_needs_fmgr_hook) (functionId))
+    return true;
+
+  if (get_func_rettype(functionId) == SUPAUTILS_EVENT_TRIGGER_OID)
+    return true;
+  else
+    return false;
+}
+
+PG_FUNCTION_INFO_V1(noop);
+Datum noop(__attribute__ ((unused)) PG_FUNCTION_ARGS) { PG_RETURN_VOID();}
+
+static void
+force_noop(FmgrInfo *finfo)
+{
+    finfo->fn_addr   = (PGFunction) noop;
+    finfo->fn_oid    = InvalidOid;           /* not a known function OID anymore */
+    finfo->fn_nargs  = 0;                    /* no arguments for noop */
+    finfo->fn_strict = false;
+    finfo->fn_retset = false;
+    finfo->fn_stats  = 0;                    /* no stats collection */
+    finfo->fn_extra  = NULL;                 /* clear out old context data */
+    finfo->fn_mcxt   = CurrentMemoryContext;
+    finfo->fn_expr   = NULL;                 /* no parse tree */
+}
+
+// This function will fire twice: once before execution of the database function (event=FHET_START)
+// and once after execution has finished or failed (event=FHET_END/FHET_ABORT).
+static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum *private) {
+    switch (event) {
+    // we only need to change behavior before the function gets executed
+    case FHET_START: {
+        const char *current_role_name = GetUserNameFromId(GetUserId(), false);
+        if (superuser() || is_reserved_role(current_role_name, false)) {
+            elog(WARNING, "Skipping event trigger");
+            // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
+            // so instead we change the event trigger function to a noop function
+            force_noop(flinfo);
+        }
+
+        if (next_fmgr_hook)
+            (*next_fmgr_hook) (event, flinfo, private);
+        break;
+    }
+
+    // do nothing when the function already executed
+    case FHET_END:
+    case FHET_ABORT:
+        if (next_fmgr_hook)
+            (*next_fmgr_hook) (event, flinfo, private);
+        break;
+
+    default:
+        elog(ERROR, "unexpected event type: %d", (int) event);
+        break;
+    }
+}
 
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   /* Get the utility statement from the planned statement */
@@ -797,6 +862,32 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       }
   }
 
+  case T_CreateEventTrigStmt: {
+      if (!IsTransactionState()) {
+          break;
+      }
+      if (superuser()) {
+          break;
+      }
+
+      if (!is_current_role_privileged()) {
+          break;
+      }
+
+      {
+          bool already_switched_to_superuser = false;
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+          run_process_utility_hook(prev_hook);
+
+          if (!already_switched_to_superuser) {
+              switch_to_original_role();
+          }
+
+          return;
+      }
+  }
+
   default:
       break;
   }
@@ -1106,11 +1197,17 @@ is_role_privileged(const char *role)
 }
 
 void _PG_init(void) {
-  /* Store the previous hook */
-  prev_hook = ProcessUtility_hook;
 
-  /* Set our hook */
+  // process utility hook
+  prev_hook      = ProcessUtility_hook;
   ProcessUtility_hook = supautils_hook;
+
+  // fmgr hook
+  next_needs_fmgr_hook = needs_fmgr_hook;
+  needs_fmgr_hook = supautils_needs_fmgr_hook;
+
+  next_fmgr_hook = fmgr_hook;
+  fmgr_hook = supautils_fmgr_hook;
 
   DefineCustomStringVariable("supautils.extensions_parameter_overrides",
                              "Overrides for CREATE EXTENSION parameters",

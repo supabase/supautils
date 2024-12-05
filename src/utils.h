@@ -50,6 +50,8 @@
 #define PROCESS_UTILITY_ARGS                                                   \
     pstmt, queryString, readOnlyTree, context, params, queryEnv, dest, qc
 
+#define SUPAUTILS_EVENT_TRIGGER_OID EVENT_TRIGGEROID
+
 #else // PG13
 
 #define PROCESS_UTILITY_PARAMS                                                 \
@@ -58,6 +60,8 @@
         QueryEnvironment *queryEnv, DestReceiver *dest, QueryCompletion *qc
 #define PROCESS_UTILITY_ARGS                                                   \
     pstmt, queryString, context, params, queryEnv, dest, qc
+
+#define SUPAUTILS_EVENT_TRIGGER_OID EVTTRIGGEROID
 
 #endif
 
