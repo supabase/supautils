@@ -55,7 +55,7 @@ select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
 drop extension sslinfo;
 \echo
 
--- switch to privileged_extensions_superuser even if superuser
+-- switch to supautils.superuser even if superuser
 reset role;
 create role another_superuser superuser;
 set role another_superuser;

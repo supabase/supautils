@@ -92,7 +92,7 @@ static void run_custom_script(const char *filename, const char *extname,
 void handle_create_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
-    const char *privileged_extensions_superuser,
+    const char *superuser,
     const char *privileged_extensions_custom_scripts_path,
     const extension_parameter_overrides *epos, const size_t total_epos) {
     CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
@@ -124,7 +124,7 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/before-create.sql",
@@ -163,7 +163,7 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
@@ -216,7 +216,7 @@ void handle_create_extension(
     if (is_string_in_comma_delimited_string(stmt->extname,
                                             privileged_extensions)) {
         bool already_switched_to_superuser = false;
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);
@@ -254,7 +254,7 @@ void handle_create_extension(
             }
         }
 
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
@@ -274,12 +274,12 @@ void handle_alter_extension(
     void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
     PROCESS_UTILITY_PARAMS,
     const char *extname, const char *privileged_extensions,
-    const char *privileged_extensions_superuser) {
+    const char *superuser) {
 
     if (is_string_in_comma_delimited_string(extname,
                                             privileged_extensions)) {
         bool already_switched_to_superuser = false;
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);
@@ -295,7 +295,7 @@ void handle_alter_extension(
 void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
                            PROCESS_UTILITY_PARAMS,
                            const char *privileged_extensions,
-                           const char *privileged_extensions_superuser) {
+                           const char *superuser) {
     DropStmt *stmt = (DropStmt *)pstmt->utilityStmt;
     bool all_extensions_are_privileged = true;
     ListCell *lc;
@@ -311,7 +311,7 @@ void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
 
     if (all_extensions_are_privileged) {
         bool already_switched_to_superuser = false;
-        switch_to_superuser(privileged_extensions_superuser,
+        switch_to_superuser(superuser,
                             &already_switched_to_superuser);
 
         run_process_utility_hook(process_utility_hook);

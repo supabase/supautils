@@ -79,7 +79,7 @@
  * Switch to a superuser and save the original role. Caller is responsible for
  * calling switch_to_original_role() afterwards.
  */
-extern void switch_to_superuser(const char *privileged_extensions_superuser,
+extern void switch_to_superuser(const char *superuser,
                                 bool *already_switched);
 
 /**

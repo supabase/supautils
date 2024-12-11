@@ -14,7 +14,7 @@ static bool is_switched_to_superuser = false;
 
 static bool strstarts(const char *, const char *);
 
-void switch_to_superuser(const char *privileged_extensions_superuser,
+void switch_to_superuser(const char *supauser,
                          bool *already_switched) {
     Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
     *already_switched = is_switched_to_superuser;
@@ -24,8 +24,8 @@ void switch_to_superuser(const char *privileged_extensions_superuser,
     }
     is_switched_to_superuser = true;
 
-    if (privileged_extensions_superuser != NULL) {
-        superuser_oid = get_role_oid(privileged_extensions_superuser, false);
+    if (supauser != NULL) {
+        superuser_oid = get_role_oid(supauser, false);
     }
 
     GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);

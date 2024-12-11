@@ -87,12 +87,12 @@ supautils allows you to let non-superusers manage extensions that would normally
 
 To handle this, you can put the extension in `supautils.privileged_extensions`:
 
-```
+```psql
 supautils.privileged_extensions = 'hstore'
-supautils.privileged_extensions_superuser = 'postgres'
+supautils.superuser = 'postgres'; -- used to be called supautils.privileged_extensions_superuser, this is still provided for backwards compatibility
 ```
 
-Once you do, the extension creation will be delegated to the configured `supautils.privileged_extensions_superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster). That means the `hstore` extension would be created as if by the superuser.
+Once you do, the extension creation will be delegated to the configured `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster). That means the `hstore` extension would be created as if by the superuser.
 
 Note that extension creation would behave normally (i.e. no delegation) if the current role is already a superuser.
 
