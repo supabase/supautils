@@ -60,9 +60,9 @@ static char *placeholders                              = NULL;
 static char *placeholders_disallowed_values            = NULL;
 static char *empty_placeholder                         = NULL;
 static char *privileged_extensions                     = NULL;
-static char *privileged_extensions_superuser           = NULL;
+static char *supautils_superuser                       = NULL;
 static char *privileged_extensions_custom_scripts_path = NULL;
-static char *privileged_role                           = NULL;
+static char *privileged_role                           = NULL; // the privileged_role is a proxy role for the `supautils.superuser` role
 static char *privileged_role_allowed_configs           = NULL;
 static ProcessUtility_hook_type prev_hook              = NULL;
 
@@ -146,7 +146,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       }
 
       // Allow setting bypassrls & replication.
-      switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
       run_process_utility_hook(prev_hook);
 
@@ -191,7 +191,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       {
           bool already_switched_to_superuser = false;
-          switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
@@ -283,7 +283,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
               // Allow `privileged_role` (in addition to superusers) to
               // set bypassrls & replication attributes.
-              switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+              switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
               run_process_utility_hook(prev_hook);
 
@@ -394,7 +394,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       handle_create_extension(prev_hook,
                               PROCESS_UTILITY_ARGS,
                               privileged_extensions,
-                              privileged_extensions_superuser,
+                              supautils_superuser,
                               privileged_extensions_custom_scripts_path,
                               epos, total_epos);
       return;
@@ -417,7 +417,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                              PROCESS_UTILITY_ARGS,
                              stmt->extname,
                              privileged_extensions,
-                             privileged_extensions_superuser);
+                             supautils_superuser);
       return;
   }
 
@@ -439,7 +439,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                                  PROCESS_UTILITY_ARGS,
                                  strVal(stmt->object),
                                  privileged_extensions,
-                                 privileged_extensions_superuser);
+                                 supautils_superuser);
       }
 
       return;
@@ -467,7 +467,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           break;
       }
 
-      switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
       run_process_utility_hook(prev_hook);
 
@@ -531,7 +531,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           break;
       }
 
-      switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
       run_process_utility_hook(prev_hook);
 
@@ -589,7 +589,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           break;
       }
 
-      switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
       run_process_utility_hook(prev_hook);
 
@@ -613,7 +613,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
           bool already_switched_to_superuser = false;
 
-          switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
@@ -640,7 +640,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
           bool already_switched_to_superuser = false;
 
-          switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
@@ -674,7 +674,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
               handle_drop_extension(prev_hook,
                                     PROCESS_UTILITY_ARGS,
                                     privileged_extensions,
-                                    privileged_extensions_superuser);
+                                    supautils_superuser);
               return;
           }
 
@@ -696,7 +696,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                   break;
               }
 
-              switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+              switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
               run_process_utility_hook(prev_hook);
 
@@ -725,7 +725,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                   break;
               }
 
-              switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+              switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
               run_process_utility_hook(prev_hook);
 
@@ -759,7 +759,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       {
           bool already_switched_to_superuser = false;
-          switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
@@ -793,7 +793,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       {
           bool already_switched_to_superuser = false;
-          switch_to_superuser(privileged_extensions_superuser, &already_switched_to_superuser);
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
@@ -1169,7 +1169,7 @@ void _PG_init(void) {
                                NULL);
 
   DefineCustomStringVariable("supautils.privileged_extensions",
-                             "Comma-separated list of extensions which get installed using supautils.privileged_extensions_superuser",
+                             "Comma-separated list of extensions which get installed using supautils.superuser",
                              NULL,
                              &privileged_extensions,
                              NULL,
@@ -1188,10 +1188,21 @@ void _PG_init(void) {
                              NULL,
                              NULL);
 
-  DefineCustomStringVariable("supautils.privileged_extensions_superuser",
+  DefineCustomStringVariable("supautils.superuser",
                              "Superuser to install extensions in supautils.privileged_extensions as",
                              NULL,
-                             &privileged_extensions_superuser,
+                             &supautils_superuser,
+                             NULL,
+                             PGC_SIGHUP, 0,
+                             NULL,
+                             NULL,
+                             NULL);
+
+  // TODO emit a warning when this deprecated GUC is used
+  DefineCustomStringVariable("supautils.privileged_extensions_superuser",
+                             "Superuser to install extensions in supautils.privileged_extensions as. Deprecated: use supautils.superuser instead.",
+                             NULL,
+                             &supautils_superuser,
                              NULL,
                              PGC_SIGHUP, 0,
                              NULL,
@@ -1199,7 +1210,7 @@ void _PG_init(void) {
                              NULL);
 
   DefineCustomStringVariable("supautils.privileged_role",
-                             "Non-superuser role to be granted with additional privileges",
+                             "Non-superuser role to be granted with some superuser privileges",
                              NULL,
                              &privileged_role,
                              NULL,
