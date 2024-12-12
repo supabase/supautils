@@ -132,3 +132,13 @@ and routine_schema = 'xtens';
  t
 (1 row)
 
+-- users can change tables schemas normally
+reset role;
+set role nonsuper;
+create table public.qux();
+create schema baz;
+alter table public.qux set schema baz;
+select * from baz.qux;
+--
+(0 rows)
+

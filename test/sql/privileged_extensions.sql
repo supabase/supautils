@@ -89,3 +89,12 @@ select count(*) = 3 as extensions_in_xtens_schema
 from information_schema.routines
 where routine_name in ('page_header', 'heap_page_items', 'bt_metap')
 and routine_schema = 'xtens';
+
+-- users can change tables schemas normally
+reset role;
+set role nonsuper;
+
+create table public.qux();
+create schema baz;
+alter table public.qux set schema baz;
+select * from baz.qux;
