@@ -425,24 +425,26 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * ALTER EXTENSION <extension> SET SCHEMA
    */
   case T_AlterObjectSchemaStmt: {
-      if (superuser()) {
-          break;
-      }
-      if (privileged_extensions == NULL) {
-          break;
-      }
-
       AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
 
       if (stmt->objectType == OBJECT_EXTENSION){
+          if (superuser()) {
+              break;
+          }
+          if (privileged_extensions == NULL) {
+              break;
+          }
+
           handle_alter_extension(prev_hook,
                                  PROCESS_UTILITY_ARGS,
                                  strVal(stmt->object),
                                  privileged_extensions,
                                  supautils_superuser);
+
+         return;
       }
 
-      return;
+      break;
   }
 
   /*
