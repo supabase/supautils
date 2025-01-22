@@ -85,8 +85,8 @@ static size_t total_dtgs = 0;
 void _PG_init(void);
 void _PG_fini(void);
 
-static void
-confirm_reserved_roles(const char *target, bool allow_configurable_roles);
+static bool
+is_reserved_role(const char *target, bool allow_configurable_roles);
 
 static void
 confirm_reserved_memberships(const char *target);
@@ -119,7 +119,10 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           break;
       }
 
-      confirm_reserved_roles(get_rolespec_name(stmt->role), false);
+      char *role_name = get_rolespec_name(stmt->role);
+
+      if(is_reserved_role(role_name, false))
+        EREPORT_RESERVED_ROLE(role_name);
 
       if (!is_current_role_privileged()){
           break;
@@ -173,7 +176,10 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       role_is_privileged = is_current_role_privileged();
 
-      confirm_reserved_roles(get_rolespec_name(stmt->role), role_is_privileged);
+      char *role_name = get_rolespec_name(stmt->role);
+
+      if(is_reserved_role(role_name, role_is_privileged))
+        EREPORT_RESERVED_ROLE(role_name);
 
       if (!role_is_privileged){
           break;
@@ -222,7 +228,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
               break;
 
           /* CREATE ROLE <reserved_role> */
-          confirm_reserved_roles(created_role, false);
+          if(is_reserved_role(created_role, false))
+            EREPORT_RESERVED_ROLE(created_role);
 
           /* Check to see if there are any descriptions related to membership. */
           foreach(option_cell, stmt->options)
@@ -322,7 +329,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
               if (role->roletype != ROLESPEC_CSTRING)
                   break;
 
-              confirm_reserved_roles(role->rolename, false);
+              if(is_reserved_role(role->rolename, false))
+                EREPORT_RESERVED_ROLE(role->rolename);
           }
       }
       break;
@@ -359,7 +367,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           {
               AccessPriv *priv = (AccessPriv *) lfirst(grantee_role_cell);
               // privileged_role can do GRANT <role> to <reserved_role>
-              confirm_reserved_roles(priv->priv_name, role_is_privileged);
+              if(is_reserved_role(priv->priv_name, role_is_privileged))
+                EREPORT_RESERVED_ROLE(priv->priv_name);
           }
       }
       break;
@@ -377,8 +386,11 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           if (stmt->renameType != OBJECT_ROLE)
               break;
 
-          confirm_reserved_roles(stmt->subname, false);
-          confirm_reserved_roles(stmt->newname, false);
+          if(is_reserved_role(stmt->subname, false))
+            EREPORT_RESERVED_ROLE(stmt->subname);
+
+          if(is_reserved_role(stmt->newname, false))
+            EREPORT_RESERVED_ROLE(stmt->newname);
       }
       break;
   }
@@ -967,8 +979,8 @@ static void constrained_extensions_assign_hook(const char *newval, void *extra){
     }
 }
 
-static void
-confirm_reserved_roles(const char *target, bool allow_configurable_roles)
+static bool
+is_reserved_role(const char *target, bool allow_configurable_roles)
 {
     List *reserved_roles_list;
     ListCell *role;
@@ -989,12 +1001,14 @@ confirm_reserved_roles(const char *target, bool allow_configurable_roles)
                     continue;
                 } else {
                     list_free(reserved_roles_list);
-                    EREPORT_RESERVED_ROLE(reserved_role);
+                    return true;
                 }
             }
         }
         list_free(reserved_roles_list);
     }
+
+    return false;
 }
 
 static void
