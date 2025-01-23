@@ -15,7 +15,7 @@ HINT:  upgrade to an instance with higher resources
 -- constrained by disk
 create extension lo;
 ERROR:  not enough free disk space for using this extension
-DETAIL:  required free disk space: 20 GB
+DETAIL:  required free disk space: 100 GB
 HINT:  upgrade to an instance with higher resources
 \echo
 
