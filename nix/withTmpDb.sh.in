@@ -25,7 +25,7 @@ privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested
 reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
 placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
 
-cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"20 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
+cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"100 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
 epos_option='-c supautils.extensions_parameter_overrides="{\"sslinfo\":{\"schema\":\"pg_catalog\"}}"'
 drop_trigger_grants_option='-c supautils.drop_trigger_grants="{\"privileged_role\":[\"allow_drop_triggers.my_table\"]}"'
 policy_grants_option='-c supautils.policy_grants="{\"privileged_role\":[\"allow_policies.my_table\",\"allow_policies.nonexistent_table\"]}"'
