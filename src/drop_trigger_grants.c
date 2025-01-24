@@ -1,16 +1,4 @@
-#include <postgres.h>
-
-#include <common/jsonapi.h>
-#include <miscadmin.h>
-#include <tsearch/ts_locale.h>
-#include <utils/builtins.h>
-#include <utils/json.h>
-#include <utils/jsonb.h>
-#include <utils/jsonfuncs.h>
-#include <utils/memutils.h>
-#include <utils/regproc.h>
-#include <utils/varlena.h>
-
+#include "pg_prelude.h"
 #include "drop_trigger_grants.h"
 #include "utils.h"
 
@@ -77,8 +65,7 @@ static JSON_ACTION_RETURN_TYPE json_object_start(void *state) {
     JSON_ACTION_RETURN;
 }
 
-static JSON_ACTION_RETURN_TYPE json_object_field_start(void *state, char *fname,
-                                                       bool isnull) {
+static JSON_ACTION_RETURN_TYPE json_object_field_start(void *state, char *fname, __attribute__ ((unused)) bool isnull) {
     json_drop_trigger_grants_parse_state *parse = state;
     drop_trigger_grants *x = &parse->dtgs[parse->total_dtgs];
 

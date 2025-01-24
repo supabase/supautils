@@ -1,8 +1,6 @@
 #ifndef EXTENSIONS_PARAMETER_OVERRIDES_H
 #define EXTENSIONS_PARAMETER_OVERRIDES_H
 
-#include <postgres.h>
-
 typedef struct {
     char *name;
     char *schema;
