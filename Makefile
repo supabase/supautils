@@ -1,7 +1,7 @@
 GREP ?= grep
 PG_CONFIG = pg_config
 
-PG_CFLAGS = -std=c99 -Wall -Werror -Wno-declaration-after-statement
+PG_CFLAGS = -std=c99 -Wextra -Wall -Werror -Wno-declaration-after-statement
 ifeq ($(TEST), 1)
 	PG_CFLAGS += -DTEST
 endif

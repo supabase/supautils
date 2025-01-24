@@ -10,7 +10,7 @@
 typedef struct {
     char *role_name;
     char *table_names[MAX_POLICY_GRANT_TABLES];
-    int total_tables;
+    size_t total_tables;
 } policy_grants;
 
 typedef enum {

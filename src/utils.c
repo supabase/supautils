@@ -1,9 +1,4 @@
-#include <postgres.h>
-
-#include <catalog/namespace.h>
-#include <utils/regproc.h>
-#include <utils/varlena.h>
-
+#include "pg_prelude.h"
 #include "utils.h"
 
 static Oid prev_role_oid = 0;

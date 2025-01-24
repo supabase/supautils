@@ -1,12 +1,4 @@
-#include <postgres.h>
-#include <common/jsonapi.h>
-#include <miscadmin.h>
-#include <tsearch/ts_locale.h>
-#include <utils/builtins.h>
-#include <utils/json.h>
-#include <utils/jsonb.h>
-#include <utils/jsonfuncs.h>
-#include <utils/memutils.h>
+#include "pg_prelude.h"
 
 #ifdef __linux__
 #include <sys/sysinfo.h>
@@ -65,7 +57,7 @@ json_object_end(void *state)
 }
 
 static JSON_ACTION_RETURN_TYPE
-json_object_field_start(void *state, char *fname, bool isnull)
+json_object_field_start(void *state, char *fname, __attribute__ ((unused)) bool isnull)
 {
     json_constrained_extension_parse_state *parse = state;
     constrained_extension *x = &parse->cexts[parse->total_cexts];
@@ -213,7 +205,7 @@ void constrain_extension(
 #ifdef __linux__
             if(cexts[i].cpu != 0 && cexts[i].cpu > get_nprocs())
                 ereport(ERROR,
-                    errdetail("required CPUs: %zu", cexts[i].cpu),
+                    errdetail("required CPUs: %d", cexts[i].cpu),
                     errhint(ERROR_HINT),
                     errmsg("not enough CPUs for using this extension")
                 );
@@ -226,7 +218,7 @@ void constrain_extension(
                 );
             }
 #endif
-            if(cexts[i].disk != 0 && cexts[i].disk > fsdata.f_bfree * fsdata.f_bsize){
+            if(cexts[i].disk != 0 && cexts[i].disk > (size_t) (fsdata.f_bfree * fsdata.f_bsize)){
                 char *pretty_size = text_to_cstring(DatumGetTextPP(DirectFunctionCall1(pg_size_pretty, Int64GetDatum(cexts[i].disk))));
                 ereport(ERROR,
                     errdetail("required free disk space: %s", pretty_size),

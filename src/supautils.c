@@ -1,26 +1,4 @@
-#include <postgres.h>
-
-#include <access/xact.h>
-#include <catalog/namespace.h>
-#include <catalog/pg_authid.h>
-#include <commands/defrem.h>
-#include <executor/spi.h>
-#include <fmgr.h>
-#include <miscadmin.h>
-#include <nodes/makefuncs.h>
-#include <nodes/pg_list.h>
-#include <tcop/utility.h>
-#include <tsearch/ts_locale.h>
-#include <utils/acl.h>
-#include <utils/builtins.h>
-#include <utils/fmgrprotos.h>
-#include <utils/guc.h>
-#include <utils/guc_tables.h>
-#include <utils/jsonb.h>
-#include <utils/regproc.h>
-#include <utils/snapmgr.h>
-#include <utils/varlena.h>
-
+#include "pg_prelude.h"
 #include "constrained_extensions.h"
 #include "drop_trigger_grants.h"
 #include "extensions_parameter_overrides.h"
@@ -828,7 +806,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 }
 
 static bool
-extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource source)
+extensions_parameter_overrides_check_hook( char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     char *val = *newval;
 
@@ -854,7 +832,7 @@ extensions_parameter_overrides_check_hook(char **newval, void **extra, GucSource
 }
 
 static bool
-policy_grants_check_hook(char **newval, void **extra, GucSource source)
+policy_grants_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     char *val = *newval;
 
@@ -881,7 +859,7 @@ policy_grants_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-drop_trigger_grants_check_hook(char **newval, void **extra, GucSource source)
+drop_trigger_grants_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     char *val = *newval;
 
@@ -908,7 +886,7 @@ drop_trigger_grants_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-reserved_roles_check_hook(char **newval, void **extra, GucSource source)
+reserved_roles_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     check_parameter(*newval, "supautils.reserved_roles");
 
@@ -916,7 +894,7 @@ reserved_roles_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-reserved_memberships_check_hook(char **newval, void **extra, GucSource source)
+reserved_memberships_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     check_parameter(*newval, "supautils.reserved_memberships");
 
@@ -924,7 +902,7 @@ reserved_memberships_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource source)
+placeholders_disallowed_values_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     check_parameter(*newval, "supautils.placeholders_disallowed_values");
 
@@ -932,7 +910,7 @@ placeholders_disallowed_values_check_hook(char **newval, void **extra, GucSource
 }
 
 static bool
-privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
+privileged_extensions_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     check_parameter(*newval, "supautils.privileged_extensions");
 
@@ -940,7 +918,7 @@ privileged_extensions_check_hook(char **newval, void **extra, GucSource source)
 }
 
 static bool
-privileged_role_allowed_configs_check_hook(char **newval, void **extra, GucSource source)
+privileged_role_allowed_configs_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     check_parameter(*newval, "supautils.privileged_role_allowed_configs");
 
@@ -961,7 +939,7 @@ check_parameter(char *val, char *name)
     }
 }
 
-static void constrained_extensions_assign_hook(const char *newval, void *extra){
+static void constrained_extensions_assign_hook(const char *newval, __attribute__ ((unused)) void *extra){
     if (total_cexts > 0) {
         for (size_t i = 0; i < total_cexts; i++){
             pfree(cexts[i].name);
@@ -1036,7 +1014,7 @@ confirm_reserved_memberships(const char *target)
 }
 
 static bool
-placeholders_check_hook(char **newval, void **extra, GucSource source)
+placeholders_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source)
 {
     char* val = *newval;
 
@@ -1071,7 +1049,7 @@ placeholders_check_hook(char **newval, void **extra, GucSource source)
     return true;
 }
 
-static bool restrict_placeholders_check_hook(char **newval, void **extra, GucSource source) {
+static bool restrict_placeholders_check_hook(char **newval, __attribute__ ((unused)) void **extra, __attribute__ ((unused)) GucSource source) {
   bool not_empty = placeholders_disallowed_values && placeholders_disallowed_values[0] != '\0';
 
   if(*newval && not_empty) {

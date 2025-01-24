@@ -1,16 +1,12 @@
 #ifndef DROP_TRIGGER_GRANTS_H
 #define DROP_TRIGGER_GRANTS_H
 
-#include <postgres.h>
-
-#include <catalog/namespace.h>
-
 #define MAX_DROP_TRIGGER_GRANT_TABLES 100
 
 typedef struct {
     char *role_name;
     char *table_names[MAX_DROP_TRIGGER_GRANT_TABLES];
-    int total_tables;
+    size_t total_tables;
 } drop_trigger_grants;
 
 typedef enum {

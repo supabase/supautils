@@ -6,9 +6,9 @@
 typedef struct
 {
 	char *name;
-	size_t cpu;
-	int64 mem;
-	int64 disk;
+	int cpu;
+	uint64 mem;
+	uint64 disk;
 } constrained_extension;
 
 typedef enum

@@ -1,22 +1,4 @@
-#include <postgres.h>
-
-#include <catalog/namespace.h>
-#include <catalog/pg_authid.h>
-#include <catalog/pg_collation.h>
-#include <catalog/pg_type.h>
-#include <commands/defrem.h>
-#include <executor/spi.h>
-#include <miscadmin.h>
-#include <nodes/makefuncs.h>
-#include <nodes/pg_list.h>
-#include <storage/fd.h>
-#include <utils/acl.h>
-#include <utils/builtins.h>
-#include <utils/guc.h>
-#include <utils/lsyscache.h>
-#include <utils/snapmgr.h>
-#include <utils/varlena.h>
-
+#include "pg_prelude.h"
 #include "extensions_parameter_overrides.h"
 #include "privileged_extensions.h"
 #include "utils.h"
