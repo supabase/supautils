@@ -792,6 +792,29 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
               return;
           }
 
+          /*
+           * DROP EVENT TRIGGER
+           */
+          case OBJECT_EVENT_TRIGGER:
+          {
+              if (!is_current_role_privileged()) {
+                  break;
+              }
+
+              {
+                  bool already_switched_to_superuser = false;
+                  switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+                  run_process_utility_hook(prev_hook);
+
+                  if (!already_switched_to_superuser) {
+                      switch_to_original_role();
+                  }
+
+                  return;
+              }
+          }
+
           default:
               break;
       }
