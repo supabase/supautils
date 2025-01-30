@@ -56,11 +56,9 @@ set role supabase_storage_admin;
 
 -- A reserved_role shouldn't execute the event trigger function
 create table storage_stuff();
-WARNING:  Skipping event trigger
 \echo
 
 drop table storage_stuff;
-WARNING:  Skipping event trigger
 \echo
 
 -- A superuser role shouldn't execute the event trigger function
@@ -68,7 +66,6 @@ set role postgres;
 \echo
 
 create table super_stuff();
-WARNING:  Skipping event trigger
 \echo
 
 -- privesc shouldn't happen due to superuser tripping over a user-defined event trigger
@@ -77,15 +74,22 @@ execute procedure become_super();
 \echo
 
 create table super_duper_stuff();
-WARNING:  Skipping event trigger
-WARNING:  Skipping event trigger
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
  only_one_super 
 ----------------
  t
 (1 row)
 
+-- limitation: create extension won't fire event triggers due to implementation details (we switch to superuser temporarily to create them and we don't fire evtrigs for superusers)
+set role rolecreator;
+\echo
+
+create extension postgres_fdw;
+drop extension postgres_fdw;
+\echo
+
 -- cleanup
+set role postgres;
 drop event trigger event_trigger_1;
 drop event trigger event_trigger_2;
 revoke all on schema public from privileged_role;

@@ -74,7 +74,16 @@ execute procedure become_super();
 create table super_duper_stuff();
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 
+-- limitation: create extension won't fire event triggers due to implementation details (we switch to superuser temporarily to create them and we don't fire evtrigs for superusers)
+set role rolecreator;
+\echo
+
+create extension postgres_fdw;
+drop extension postgres_fdw;
+\echo
+
 -- cleanup
+set role postgres;
 drop event trigger event_trigger_1;
 drop event trigger event_trigger_2;
 revoke all on schema public from privileged_role;
