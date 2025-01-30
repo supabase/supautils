@@ -118,7 +118,6 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
     case FHET_START: {
         const char *current_role_name = GetUserNameFromId(GetUserId(), false);
         if (superuser() || is_reserved_role(current_role_name, false)) {
-            elog(WARNING, "Skipping event trigger");
             // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
             // so instead we change the event trigger function to a noop function
             force_noop(flinfo);
