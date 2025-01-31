@@ -82,10 +82,32 @@ create extension postgres_fdw;
 drop extension postgres_fdw;
 \echo
 
--- cleanup
-set role postgres;
+-- a non-privileged role can't alter event triggers
+set role rolecreator;
+alter event trigger event_trigger_1 disable;
+\echo
+
+-- the privileged role can alter the event triggers
+set role privileged_role;
+alter event trigger event_trigger_1 disable;
+alter event trigger event_trigger_2 disable;
+\echo
+
+-- a non-privileged role can't drop the event triggers
+set role rolecreator;
 drop event trigger event_trigger_1;
 drop event trigger event_trigger_2;
+\echo
+
+-- the privileged role can drop the event triggers
+set role privileged_role;
+drop event trigger event_trigger_1;
+drop event trigger event_trigger_2;
+\echo
+
+
+-- cleanup
+set role postgres;
 revoke all on schema public from privileged_role;
 revoke all on schema public from rolecreator;
 revoke all on schema public from supabase_storage_admin;
