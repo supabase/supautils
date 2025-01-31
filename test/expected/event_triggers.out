@@ -12,7 +12,7 @@ create or replace function become_super()
 $$
 begin
     raise notice 'transforming % to superuser', current_user;
-    alter role current_user superuser;
+    alter role rolecreator superuser;
 end;
 $$;
 grant all on schema public to privileged_role;
@@ -79,6 +79,20 @@ select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 ----------------
  t
 (1 row)
+
+-- privesc won't happen because the event trigger function will fire with the privileges
+-- of the current role (this is pg default behavior)
+set role rolecreator;
+\echo
+
+create table dummy();
+NOTICE:  the event trigger is executed for rolecreator
+NOTICE:  transforming rolecreator to superuser
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the SUPERUSER attribute may change the SUPERUSER attribute.
+CONTEXT:  SQL statement "alter role rolecreator superuser"
+PL/pgSQL function become_super() line 4 at SQL statement
+\echo
 
 -- limitation: create extension won't fire event triggers due to implementation details (we switch to superuser temporarily to create them and we don't fire evtrigs for superusers)
 set role rolecreator;
