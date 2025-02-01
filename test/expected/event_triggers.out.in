@@ -88,8 +88,16 @@ set role rolecreator;
 create table dummy();
 NOTICE:  the event trigger is executed for rolecreator
 NOTICE:  transforming rolecreator to superuser
+<PG_GE_16>
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may change the SUPERUSER attribute.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter superuser roles or change superuser attribute
+</PG_GE_14>
+<PG_GE_13>
+ERROR:  must be superuser to alter superusers
+</PG_GE_13>
 CONTEXT:  SQL statement "alter role rolecreator superuser"
 PL/pgSQL function become_super() line 4 at SQL statement
 \echo

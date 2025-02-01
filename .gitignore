@@ -9,3 +9,4 @@ results/*.out
 .history
 result*
 tags
+test/expected/event_triggers.out
