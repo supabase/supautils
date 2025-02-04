@@ -13,7 +13,7 @@ create or replace function become_super()
 $$
 begin
     raise notice 'transforming % to superuser', current_user;
-    alter role current_user superuser;
+    alter role rolecreator superuser;
 end;
 $$;
 
@@ -73,6 +73,14 @@ execute procedure become_super();
 
 create table super_duper_stuff();
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
+
+-- privesc won't happen because the event trigger function will fire with the privileges
+-- of the current role (this is pg default behavior)
+set role rolecreator;
+\echo
+
+create table dummy();
+\echo
 
 -- limitation: create extension won't fire event triggers due to implementation details (we switch to superuser temporarily to create them and we don't fire evtrigs for superusers)
 set role rolecreator;
