@@ -7,7 +7,9 @@ static int prev_role_sec_context = 0;
 // Prevent nested switch_to_superuser() calls from corrupting prev_role_*
 static bool is_switched_to_superuser = false;
 
-static bool strstarts(const char *, const char *);
+static bool strstarts(const char *str, const char *prefix) {
+    return strncmp(str, prefix, strlen(prefix)) == 0;
+}
 
 void switch_to_superuser(const char *supauser,
                          bool *already_switched) {
@@ -79,6 +81,53 @@ bool remove_ending_wildcard(char *elem) {
     return wildcard_removed;
 }
 
-bool strstarts(const char *str, const char *prefix) {
-    return strncmp(str, prefix, strlen(prefix)) == 0;
+// Changes the OWNER of a database object.
+// Some objects (e.g. foreign data wrappers) can only be owned by superusers, so this switches to superuser accordingly and then goes backs to non-super.
+void alter_owner(const char *obj_name, const char *role_name, altered_obj_type obj_type){
+
+  // static allocations to avoid dynamic palloc
+  static const char sql_fdw_template[] =
+    "alter role \"%s\" superuser;\n"
+    "alter foreign data wrapper \"%s\" owner to \"%s\";\n"
+    "alter role \"%s\" nosuperuser;\n";
+
+  static const char sql_sub_template[] =
+    "alter publication \"%s\" owner to \"%s\";\n";
+
+  // max sql length for above templates
+  static const size_t max_sql_len
+        = sizeof (sql_fdw_template) // the fdw template is the largest one
+        + 4 * NAMEDATALEN; // the max size of the 4 identifiers on the fdw template
+
+  char sql[max_sql_len];
+
+  switch(obj_type){
+  case ALT_FDW:
+    snprintf(sql,
+             max_sql_len,
+             sql_fdw_template,
+             role_name,
+             obj_name,
+             role_name,
+             role_name);
+    break;
+  case ALT_PUB:
+    snprintf(sql,
+             max_sql_len,
+             sql_sub_template,
+             obj_name,
+             role_name);
+    break;
+  }
+
+  PushActiveSnapshot(GetTransactionSnapshot());
+  SPI_connect();
+
+  int rc = SPI_execute(sql, false, 0);
+  if (rc != SPI_OK_UTILITY) {
+      elog(ERROR, "SPI_execute failed with error code %d", rc);
+  }
+
+  SPI_finish();
+  PopActiveSnapshot();
 }

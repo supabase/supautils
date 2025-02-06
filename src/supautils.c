@@ -527,44 +527,11 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       run_process_utility_hook(prev_hook);
 
+      CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
+      const char *current_role_name = GetUserNameFromId(current_user_id, false);
+
       // Change FDW owner to the current role (which is a privileged role)
-      {
-          CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
-
-          const char *current_role_name = GetUserNameFromId(current_user_id, false);
-          const char *current_role_name_ident = quote_identifier(current_role_name);
-          const char *fdw_name_ident = quote_identifier(stmt->fdwname);
-          // Need to temporarily make the current role a superuser because non SUs can't own FDWs.
-          char *sql_template = "alter role %s superuser;\n"
-              "alter foreign data wrapper %s owner to %s;\n"
-              "alter role %s nosuperuser;\n";
-          size_t sql_len = strlen(sql_template)
-              + (3 * strlen(current_role_name_ident))
-              + strlen(fdw_name_ident);
-          char *sql = (char *)palloc(sql_len);
-          int rc;
-
-          PushActiveSnapshot(GetTransactionSnapshot());
-          SPI_connect();
-
-          snprintf(sql,
-                   sql_len,
-                   sql_template,
-                   current_role_name_ident,
-                   fdw_name_ident,
-                   current_role_name_ident,
-                   current_role_name_ident);
-
-          rc = SPI_execute(sql, false, 0);
-          if (rc != SPI_OK_UTILITY) {
-              elog(ERROR, "SPI_execute failed with error code %d", rc);
-          }
-
-          pfree(sql);
-
-          SPI_finish();
-          PopActiveSnapshot();
-      }
+      alter_owner(stmt->fdwname, current_role_name, ALT_FDW);
 
       if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -591,39 +558,11 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       run_process_utility_hook(prev_hook);
 
+      CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
+      const char *current_role_name = GetUserNameFromId(current_user_id, false);
+
       // Change publication owner to the current role (which is a privileged role)
-      {
-          CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
-
-          const char *current_role_name = GetUserNameFromId(current_user_id, false);
-          const char *current_role_name_ident = quote_identifier(current_role_name);
-          const char *publication_name_ident = quote_identifier(stmt->pubname);
-          const char *sql_template = "alter publication %s owner to %s;\n";
-          size_t sql_len = strlen(sql_template)
-              + strlen(publication_name_ident)
-              + strlen(current_role_name_ident);
-          char *sql = (char *)palloc(sql_len);
-          int rc;
-
-          snprintf(sql,
-                   sql_len,
-                   sql_template,
-                   publication_name_ident,
-                   current_role_name_ident);
-
-          PushActiveSnapshot(GetTransactionSnapshot());
-          SPI_connect();
-
-          rc = SPI_execute(sql, false, 0);
-          if (rc != SPI_OK_UTILITY) {
-              elog(ERROR, "SPI_execute failed with error code %d", rc);
-          }
-
-          pfree(sql);
-
-          SPI_finish();
-          PopActiveSnapshot();
-      }
+      alter_owner(stmt->pubname, current_role_name, ALT_PUB);
 
       if (!already_switched_to_superuser) {
           switch_to_original_role();
