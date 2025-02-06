@@ -99,4 +99,15 @@ extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
 
 extern bool remove_ending_wildcard(char *);
 
+typedef enum {
+  ALT_FDW
+, ALT_PUB
+} altered_obj_type;
+
+extern void alter_owner(
+    const char *obj_name,
+    const char *role_name,
+    altered_obj_type obj_type
+);
+
 #endif
