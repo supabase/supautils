@@ -102,6 +102,7 @@ extern bool remove_ending_wildcard(char *);
 typedef enum {
   ALT_FDW
 , ALT_PUB
+, ALT_EVTRIG
 } altered_obj_type;
 
 extern void alter_owner(
