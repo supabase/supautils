@@ -91,6 +91,11 @@ void alter_owner(const char *obj_name, const char *role_name, altered_obj_type o
     "alter foreign data wrapper \"%s\" owner to \"%s\";\n"
     "alter role \"%s\" nosuperuser;\n";
 
+  static const char sql_evtrig_template[] =
+    "alter role \"%s\" superuser;\n"
+    "alter event trigger \"%s\" owner to \"%s\";\n"
+    "alter role \"%s\" nosuperuser;\n";
+
   static const char sql_sub_template[] =
     "alter publication \"%s\" owner to \"%s\";\n";
 
@@ -116,6 +121,15 @@ void alter_owner(const char *obj_name, const char *role_name, altered_obj_type o
              max_sql_len,
              sql_sub_template,
              obj_name,
+             role_name);
+    break;
+  case ALT_EVTRIG:
+    snprintf(sql,
+             max_sql_len,
+             sql_evtrig_template,
+             role_name,
+             obj_name,
+             role_name,
              role_name);
     break;
   }

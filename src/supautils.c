@@ -82,8 +82,6 @@ is_role_privileged(const char *role);
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
-
-  // this
   if (next_needs_fmgr_hook && (*next_needs_fmgr_hook) (functionId))
     return true;
 
@@ -814,9 +812,17 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       {
           bool already_switched_to_superuser = false;
+          const Oid current_user_id = GetUserId();
+
           switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
+
+          CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
+          const char *current_role_name = GetUserNameFromId(current_user_id, false);
+
+          // Change event trigger owner to the current role (which is a privileged role)
+          alter_owner(stmt->trigname, current_role_name, ALT_EVTRIG);
 
           if (!already_switched_to_superuser) {
               switch_to_original_role();

@@ -38,6 +38,9 @@ create event trigger event_trigger_1 on ddl_command_end
 execute procedure show_current_user();
 \echo
 
+-- the event trigger is owned by the privileged_role
+select evtowner::regrole from pg_event_trigger where evtname = 'event_trigger_1';
+
 -- The privileged_role should execute the event trigger function
 create table privileged_stuff();
 \echo
@@ -71,6 +74,9 @@ create event trigger event_trigger_2 on ddl_command_end
 execute procedure become_super();
 \echo
 
+-- the event trigger is owned by the superuser
+select evtowner::regrole from pg_event_trigger where evtname = 'event_trigger_2';
+
 create table super_duper_stuff();
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 
@@ -90,10 +96,47 @@ create extension postgres_fdw;
 drop extension postgres_fdw;
 \echo
 
--- cleanup
+-- a non-privileged role can't alter event triggers
+set role rolecreator;
+alter event trigger event_trigger_1 disable;
+\echo
+
+-- the privileged role can alter its own event triggers
+set role privileged_role;
+alter event trigger event_trigger_1 disable;
+\echo
+
+-- but it cannot alter a superuser owned event trigger
+alter event trigger event_trigger_2 disable;
+\echo
+
+-- only the superuser can alter its own event triggers
 set role postgres;
+alter event trigger event_trigger_2 disable;
+\echo
+
+-- a non-privileged role can't drop the event triggers
+set role rolecreator;
 drop event trigger event_trigger_1;
 drop event trigger event_trigger_2;
+\echo
+
+-- the privileged role can drop its own event triggers
+set role privileged_role;
+drop event trigger event_trigger_1;
+\echo
+
+-- but it cannot drop a superuser owned event trigger
+drop event trigger event_trigger_2;
+\echo
+
+-- only the superuser can drop its own event triggers
+set role postgres;
+drop event trigger event_trigger_2;
+\echo
+
+
+-- cleanup
 revoke all on schema public from privileged_role;
 revoke all on schema public from rolecreator;
 revoke all on schema public from supabase_storage_admin;
