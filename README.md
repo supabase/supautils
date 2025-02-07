@@ -39,18 +39,45 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 
 ### Privileged Role
 
-PostgreSQL doesn't allow non-superusers to create certain database objects like publications or foreign data wrappers. supautils allows creating these by configuring a `supautils.privileged_role`.
+PostgreSQL doesn't allow non-superusers to create certain database objects like publications, foreign data wrappers or event triggers. supautils allows creating these by configuring a `supautils.privileged_role`.
 This role is a proxy role for a SUPERUSER, which is configured by `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster).
 
-When the privileged role executes `create publication`, supautils will detect the statement and:
+#### Non-Superuser Publications
+
+The privileged role can create publications. When it executes `create publication`, supautils will detect the statement and:
 
 - It will switch to the `supautils.superuser`, allowing the operation and creating the publication.
 - It will change the ownership of the publication to the privileged role.
 - Finally, it will switch back to the privileged role.
 
-An analogous mechanism is done for doing `create foreign data wrapper` without superuser.
+#### Non-Superuser Foreign Data Wrappers
 
-#### Privileged Settings
+The privileged role can also execute `create foreign data wrapper..`, the logic followed is analogous to publication creation.
+
+#### Non-Superuser Event Triggers
+
+The privileged role is also able to create event triggers, this while adding protection for privilege escalation.
+
+To protect against privilege escalation, the event triggers created by the privileged role:
+
+- Will be executed for any non-superuser role.
+- Will be skipped for any superuser role.
+- For PostgreSQL < 16: Will also be skipped for [Reserved Roles](#reserved-roles).
+
+Superuser event triggers work as usual, with the additional restriction that the event trigger function must be owned by a superuser.
+
+```sql
+create event trigger evtrig on ddl_command_end
+execute procedure func(); -- func must be owned by the superuser
+```
+
+The privileged role won't be able to ALTER or DROP a superuser event trigger.
+
+> [!IMPORTANT]
+> Limitation: privileged role event triggers won't fire when creating publications, foreign data wrappers or extensions.
+> This is due to implementation details, since supautils has to switch to `supautils.superuser` when creating the above database objects, and we have to skip privileged role event triggers here to avoid privilege escalation.
+
+#### Non-Superuser Settings
 
 Certain settings like `session_replication_role` can only be set by superusers. The privileged role can be allowed to change these settings by listing them in:
 
@@ -69,7 +96,6 @@ You can also choose to allow all the extension settings by using a wildcard:
 ```
 supautils.privileged_role_allowed_configs="ext.*"
 ```
-
 
 ### Privileged Extensions
 
@@ -237,8 +263,6 @@ By default, reserved roles cannot have their settings changed. However their set
 ```
 supautils.reserved_roles = 'connector*, storage_admin*'
 ```
-
-That is, the role must end with a `*` suffix.
 
 ## Development
 
