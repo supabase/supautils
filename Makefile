@@ -8,7 +8,11 @@ PG_CFLAGS = -std=c99 -Wextra -Wall -Werror \
 	-Wno-long-long
 
 ifeq ($(TEST), 1)
-	PG_CFLAGS += -DTEST
+PG_CFLAGS += -DTEST
+endif
+
+ifeq ($(COVERAGE), 1)
+PG_CFLAGS += --coverage
 endif
 
 MODULE_big = supautils
