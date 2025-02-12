@@ -1,11 +1,11 @@
-{ stdenv, fetchFromGitHub, postgresql, flex }:
+{ stdenv, fetchFromGitHub, pg, flex }:
 
 stdenv.mkDerivation rec {
   pname = "pg_tle";
   version = "1.0.4";
 
   nativeBuildInputs = [ flex ];
-  buildInputs = [ postgresql ];
+  buildInputs = [ pg ];
 
   src = fetchFromGitHub {
     owner  = "aws";

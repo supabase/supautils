@@ -1,7 +1,5 @@
 set -euo pipefail
 
-export PATH=@POSTGRESQL_PATH@/bin:"$PATH"
-
 tmpdir="$(mktemp -d)"
 
 export PGDATA="$tmpdir"
@@ -12,6 +10,11 @@ export PGDATABASE=postgres
 trap 'pg_ctl stop -m i && rm -rf "$tmpdir"' sigint sigterm exit
 
 PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
+
+# pg versions older than 16 don't support adding "-c" to initdb to add these options
+# so we just modify the resulting postgresql.conf to avoid an error
+echo "dynamic_library_path='\$libdir:$(pwd)'" >> $PGDATA/postgresql.conf
+echo "extension_control_path='\$system:$(pwd)'" >> $PGDATA/postgresql.conf
 
 options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\" -c wal_level=logical -c cron.database_name=postgres"
 

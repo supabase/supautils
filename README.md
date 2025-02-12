@@ -1,12 +1,6 @@
 # supautils
 
-<p>
-
-<a href="https://github.com/supabase/supautils/actions"><img src="https://github.com/supabase/supautils/actions/workflows/main.yml/badge.svg" alt="Tests" height="18"></a>
-<a href="https://github.com/olirice/alembic_utils/blob/master/LICENSE"><img src="https://img.shields.io/pypi/l/markdown-subtemplate.svg" alt="License" height="18"></a>
-<a href=""><img src="https://img.shields.io/badge/postgresql-13+-blue.svg" alt="PostgreSQL version" height="18"></a>
-
-</p>
+[![Coverage Status](https://coveralls.io/repos/github/supabase/supautils/badge.svg?branch=master)](https://coveralls.io/github/supabase/supautils?branch=master)
 
 Supautils is an extension that secures a PostgreSQL cluster on a cloud environment.
 
@@ -216,11 +210,11 @@ For testing the module locally, execute:
 $ nix-shell
 
 # test on pg 13
-$ supautils-with-pg-13 make installcheck
+$ nxpg-13 nxpg-build && nxpg-13 nxpg-tmp make installcheck
 
 # test on pg 14
-$ supautils-with-pg-14 make installcheck
+$ nxpg-14 nxpg-build && nxpg-14 nxpg-tmp make installcheck
 
 # you can also test manually with
-$ supautils-with-pg-13 psql -U rolecreator
+$ nxpg-14 nxpg-tmp psql -U rolecreator
 ```

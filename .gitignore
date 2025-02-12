@@ -10,3 +10,7 @@ results/*.out
 result*
 tags
 test/expected/event_triggers.out
+*.gcno
+*.gcda
+coverage.info
+coverage_html
