@@ -6,6 +6,15 @@
 // Prevent recursively running custom scripts
 static bool running_custom_script = false;
 
+// This produces a char surrounded by a triple single quote like '''x'''
+// This is so when it gets interpreted by SQL it converts to a single quote surround: 'x'
+// To see an example, do `select 'x';` vs `select '''x''';` on psql.
+static char *sql_literal(const char *str){
+    return str == NULL?
+        "'null'": // also handle the NULL cstr case
+        quote_literal_cstr(quote_literal_cstr(str));
+}
+
 static void run_custom_script(const char *filename, const char *extname,
                               const char *extschema, const char *extversion,
                               bool extcascade) {
@@ -13,58 +22,45 @@ static void run_custom_script(const char *filename, const char *extname,
         return;
     }
     running_custom_script = true;
+
+    static const char sql_replace_template[] = "\
+    do $_$\
+    begin\
+      execute replace(replace(replace(replace(\
+            pg_read_file(%s)\
+          , '@extname@', %s)\
+          , '@extschema@', %s)\
+          , '@extversion@', %s)\
+          , '@extcascade@', %s);\
+    exception\
+      when undefined_file then\
+        null;\
+    end; $_$";
+
+    static const size_t max_sql_len
+        = sizeof (sql_replace_template)
+        + MAXPGPATH // max size of a file path
+        + 3 * (NAMEDATALEN + 6) // 3 *(identifier + 6 single quotes of the SQL literal, see sql_literal)
+        + sizeof ("false") // max size of a bool string value
+        ;
+
+    char sql[max_sql_len];
+
+    snprintf(sql,
+            max_sql_len,
+            sql_replace_template,
+            quote_literal_cstr(filename),
+            sql_literal(extname),
+            sql_literal(extschema),
+            sql_literal(extversion),
+            extcascade?"'true'":"'false'");
+
     PushActiveSnapshot(GetTransactionSnapshot());
     SPI_connect();
-    {
-        char *sql_tmp01 = "do $$\n"
-                          "begin\n"
-                          "  execute\n"
-                          "    replace(\n"
-                          "      replace(\n"
-                          "        replace(\n"
-                          "          replace(\n"
-                          "            pg_read_file(\n";
-        char *sql_tmp02 = quote_literal_cstr(filename);
-        char *sql_tmp03 = "            ),\n"
-                          "            '@extname@', ";
-        char *sql_tmp04 = quote_literal_cstr(quote_literal_cstr(extname));
-        char *sql_tmp05 = "          ),\n"
-                          "          '@extschema@', ";
-        char *sql_tmp06 =
-            extschema == NULL
-                ? "'null'"
-                : quote_literal_cstr(quote_literal_cstr(extschema));
-        char *sql_tmp07 = "        ),\n"
-                          "        '@extversion@', ";
-        char *sql_tmp08 =
-            extversion == NULL
-                ? "'null'"
-                : quote_literal_cstr(quote_literal_cstr(extversion));
-        char *sql_tmp09 = "      ), "
-                          "    '@extcascade@', ";
-        char *sql_tmp10 = extcascade ? "'true'" : "'false'";
-        char *sql_tmp11 = "    );\n"
-                          "exception\n"
-                          "  when undefined_file then\n"
-                          "    -- skip\n"
-                          "end\n"
-                          "$$;";
-        size_t sql_len =
-            strlen(sql_tmp01) + strlen(sql_tmp02) + strlen(sql_tmp03) +
-            strlen(sql_tmp04) + strlen(sql_tmp05) + strlen(sql_tmp06) +
-            strlen(sql_tmp07) + strlen(sql_tmp08) + strlen(sql_tmp09) +
-            strlen(sql_tmp10) + strlen(sql_tmp11);
-        char *sql = (char *)palloc(sql_len);
-        int rc;
 
-        snprintf(sql, sql_len, "%s%s%s%s%s%s%s%s%s%s%s", sql_tmp01, sql_tmp02,
-                 sql_tmp03, sql_tmp04, sql_tmp05, sql_tmp06, sql_tmp07,
-                 sql_tmp08, sql_tmp09, sql_tmp10, sql_tmp11);
-
-        rc = SPI_execute(sql, false, 0);
-        if (rc != SPI_OK_UTILITY) {
-            elog(ERROR, "SPI_execute failed with error code %d", rc);
-        }
+    int rc = SPI_execute(sql, false, 0);
+    if (rc != SPI_OK_UTILITY) {
+        elog(ERROR, "SPI_execute failed with error code %d", rc);
     }
     SPI_finish();
     PopActiveSnapshot();
