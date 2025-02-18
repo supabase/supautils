@@ -26,24 +26,24 @@ jobs:
     - if: ${{ failure() }}
       run: cat regression.diffs
 
-  #test-on-macos:
-    #runs-on: macos-13
+  test-on-macos:
+    runs-on: macos-13
 
-    #strategy:
-      #matrix:
-        #pg-version: ['17']
+    strategy:
+      matrix:
+        pg-version: ['17']
 
-    #steps:
-    #- uses: actions/checkout@v4
-    #- uses: cachix/install-nix-action@v30
-      #with:
-        #nix_path: nixpkgs=channel:nixos-unstable
-    #- name: Run tests
-      #run: |
-        #nix-shell --run "nxpg-${{ matrix.pg-version }} nxpg-build"
-        #nix-shell --run "nxpg-${{ matrix.pg-version }} nxpg-tmp nxpg-test"
-    #- if: ${{ failure() }}
-      #run: cat regression.diffs
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v30
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Run tests
+      run: |
+        nix-shell --run "nxpg-${{ matrix.pg-version }} nxpg-build"
+        nix-shell --run "nxpg-${{ matrix.pg-version }} nxpg-tmp nxpg-test"
+    - if: ${{ failure() }}
+      run: cat regression.diffs
 
 
   coverage:
