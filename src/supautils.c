@@ -5,6 +5,7 @@
 #include "policy_grants.h"
 #include "privileged_extensions.h"
 #include "utils.h"
+#include "event_triggers.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)                                   \
     ereport(ERROR,                                                          \
@@ -91,23 +92,6 @@ static bool supautils_needs_fmgr_hook(Oid functionId) {
     return false;
 }
 
-PG_FUNCTION_INFO_V1(noop);
-Datum noop(__attribute__ ((unused)) PG_FUNCTION_ARGS) { PG_RETURN_VOID();}
-
-static void
-force_noop(FmgrInfo *finfo)
-{
-    finfo->fn_addr   = (PGFunction) noop;
-    finfo->fn_oid    = InvalidOid;           /* not a known function OID anymore */
-    finfo->fn_nargs  = 0;                    /* no arguments for noop */
-    finfo->fn_strict = false;
-    finfo->fn_retset = false;
-    finfo->fn_stats  = 0;                    /* no stats collection */
-    finfo->fn_extra  = NULL;                 /* clear out old context data */
-    finfo->fn_mcxt   = CurrentMemoryContext;
-    finfo->fn_expr   = NULL;                 /* no parse tree */
-}
-
 // This function will fire twice: once before execution of the database function (event=FHET_START)
 // and once after execution has finished or failed (event=FHET_END/FHET_ABORT).
 static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum *private) {
@@ -116,8 +100,10 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
     case FHET_START: {
         const char *current_role_name = GetUserNameFromId(GetUserId(), false);
         if (superuser() || is_reserved_role(current_role_name, false)) {
+            bool function_is_owned_by_super = superuser_arg(get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo }));
+            if (!function_is_owned_by_super)
             // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
-            // so instead we change the event trigger function to a noop function
+            // so instead we use the workaround of changing the event trigger function to a noop function
             force_noop(flinfo);
         }
 
@@ -802,9 +788,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       if (!IsTransactionState()) {
           break;
       }
-      if (superuser()) {
-          break;
-      }
 
       if (!is_current_role_privileged()) {
           break;
@@ -814,15 +797,34 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           bool already_switched_to_superuser = false;
           const Oid current_user_id = GetUserId();
 
+          CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
+          const char *current_role_name = GetUserNameFromId(current_user_id, false);
+
+          bool current_user_is_super = superuser_arg(current_user_id);
+          Oid  function_owner = get_function_owner((func_owner_search){FO_SEARCH_NAME, {stmt->funcname}});
+          bool function_is_owned_by_super = superuser_arg(function_owner);
+
+          if(!current_user_is_super && function_is_owned_by_super){
+            ereport(ERROR, (
+              errmsg("Non-superuser owned event trigger must execute a non-superuser owned function")
+            , errdetail("The current user \"%s\" is not a superuser and the function \"%s\" is owned by a superuser", current_role_name, NameListToString(stmt->funcname))
+            ));
+          }
+
+          if(current_user_is_super && !function_is_owned_by_super){
+            ereport(ERROR, (
+              errmsg("Superuser owned event trigger must execute a superuser owned function")
+            , errdetail("The current user \"%s\" is a superuser and the function \"%s\" is owned by a non-superuser", current_role_name, NameListToString(stmt->funcname))
+            ));
+          }
+
           switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
           run_process_utility_hook(prev_hook);
 
-          CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
-          const char *current_role_name = GetUserNameFromId(current_user_id, false);
-
-          // Change event trigger owner to the current role (which is a privileged role)
-          alter_owner(stmt->trigname, current_role_name, ALT_EVTRIG);
+          if (!current_user_is_super)
+            // Change event trigger owner to the current role (which is a privileged role)
+            alter_owner(stmt->trigname, current_role_name, ALT_EVTRIG);
 
           if (!already_switched_to_superuser) {
               switch_to_original_role();
