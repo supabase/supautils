@@ -8,12 +8,14 @@
 #include <common/jsonapi.h>
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
+#include <catalog/pg_proc.h>
 #include <commands/defrem.h>
 #include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <nodes/makefuncs.h>
 #include <nodes/pg_list.h>
+#include <parser/parse_func.h>
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>
 #include <utils/acl.h>
@@ -24,6 +26,7 @@
 #include <utils/json.h>
 #include <utils/jsonb.h>
 #include <utils/jsonfuncs.h>
+#include <utils/syscache.h>
 #include <utils/lsyscache.h>
 #include <utils/memutils.h>
 #include <utils/regproc.h>
