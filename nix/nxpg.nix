@@ -76,6 +76,22 @@ let
       in
       writeShellScriptBin "${prefix}-${ver}" script
     ) supportedPgs;
+
+  supautilsWith = map (pg:
+      let
+        ver = builtins.head (builtins.splitVersion pg.version);
+        script = ''
+          set -euo pipefail
+
+          export PATH=${pg}/bin:"$PATH"
+
+          ${buildCov}/bin/${prefix}-build-cov
+
+          ${tmpDb}/bin/${prefix}-tmp "$@"
+        '';
+      in
+      writeShellScriptBin "supautils-with-pg-${ver}" script
+    ) supportedPgs;
 in
 [
   build
@@ -85,4 +101,5 @@ in
   watch
   tmpDb
   allPgPaths
+  supautilsWith
 ]

@@ -210,11 +210,19 @@ For testing the module locally, execute:
 $ nix-shell
 
 # test on pg 13
-$ nxpg-13 nxpg-build && nxpg-13 nxpg-tmp make installcheck
+$ supautils-with-pg-13 make installcheck
 
 # test on pg 14
-$ nxpg-14 nxpg-build && nxpg-14 nxpg-tmp make installcheck
+$ supautils-with-pg-14 make installcheck
 
 # you can also test manually with
-$ nxpg-14 nxpg-tmp psql -U rolecreator
+$ supautils-with-pg-13 psql -U rolecreator
+```
+
+### Coverage
+
+For coverage, execute:
+
+```bash
+$ supautils-with-pg-17 nxpg-coverage
 ```
