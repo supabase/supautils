@@ -66,13 +66,10 @@ let
   allPgPaths = map (pg:
       let
         ver = builtins.head (builtins.splitVersion pg.version);
-        pgExt = pg.withPackages (_: [
-          (callPackage ./pg_tle.nix {inherit pg;})
-        ]);
         script = ''
           set -euo pipefail
 
-          export PATH=${pgExt}/bin:"$PATH"
+          export PATH=${pg}/bin:"$PATH"
 
           "$@"
         '';

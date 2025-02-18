@@ -16,11 +16,11 @@ PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 echo "dynamic_library_path='\$libdir:$(pwd)'" >> $PGDATA/postgresql.conf
 echo "extension_control_path='\$system:$(pwd)'" >> $PGDATA/postgresql.conf
 
-options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"pg_tle, supautils\" -c wal_level=logical -c cron.database_name=postgres"
+options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\" -c wal_level=logical -c cron.database_name=postgres"
 
 reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
 reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-privileged_extensions="autoinc, citext, hstore, sslinfo, pg_tle, postgres_fdw, pageinspect"
+privileged_extensions="autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, postgres_fdw, pageinspect"
 privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
 privileged_role="privileged_role"
 privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
@@ -39,10 +39,10 @@ pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_o
 mkdir -p "$tmpdir/privileged_extensions_custom_scripts"
 echo "do \$\$
       begin
-        if not exists (select from pg_extension where extname = 'pg_tle') then
+        if not (@extname@ = ANY(ARRAY['dict_xsyn', 'insert_username'])) then
           return;
         end if;
-        if exists (select from pgtle.available_extensions() where name = @extname@) then
+        if exists (select from pg_available_extensions where name = @extname@) then
           raise notice 'extname: %, extschema: %, extversion: %, extcascade: %', @extname@, @extschema@, @extversion@, @extcascade@;
         end if;
       end \$\$;" > "$tmpdir/privileged_extensions_custom_scripts/before-create.sql"

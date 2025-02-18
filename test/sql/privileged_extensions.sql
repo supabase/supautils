@@ -17,16 +17,8 @@ set role extensions_role;
 \echo
 
 -- global extension custom scripts are run
-create extension pg_tle;
-reset role;
--- must run this after `create extension pg_tle` since the role only exists
--- after the ext is created
-grant pgtle_admin to extensions_role;
-set role extensions_role;
-select pgtle.install_extension('foo', '1', '', 'select 1', '{}');
-create extension foo cascade;
-
-drop extension pg_tle cascade;
+create extension dict_xsyn;
+create extension insert_username version "1.0" schema public cascade;
 \echo
 
 -- custom scripts are run even for superusers
