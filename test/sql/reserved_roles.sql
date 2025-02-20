@@ -82,4 +82,5 @@ create role reserved_but_not_yet_created;
 alter role reserved_but_not_yet_created set search_path to 'test';
 alter role reserved_but_not_yet_created login bypassrls;
 alter role reserved_but_not_yet_created rename to renamed_reserved_role;
+drop owned by supabase_storage_admin cascade;
 drop role supabase_storage_admin;
