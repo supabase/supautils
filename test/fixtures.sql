@@ -34,3 +34,9 @@ grant all on schema public to nonsuper;
 grant all on schema public to nonsuper;
 grant all privileges on database postgres to nonsuper;
 \c contrib_regression
+
+-- starting from pg16 not every role can create objects on the public schema by default
+-- this makes the behavior backwards compat
+grant all on schema public to privileged_role;
+grant all on schema public to rolecreator;
+grant all on schema public to supabase_storage_admin;

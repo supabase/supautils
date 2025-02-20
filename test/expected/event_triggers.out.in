@@ -15,9 +15,6 @@ begin
     alter role rolecreator superuser;
 end;
 $$;
-grant all on schema public to privileged_role;
-grant all on schema public to rolecreator;
-grant all on schema public to supabase_storage_admin;
 \echo
 
 -- A role other than privileged_role shouldn't be able to create the event trigger
@@ -166,9 +163,3 @@ ERROR:  must be owner of event trigger event_trigger_2
 -- only the superuser can drop its own event triggers
 set role postgres;
 drop event trigger event_trigger_2;
-\echo
-
--- cleanup
-revoke all on schema public from privileged_role;
-revoke all on schema public from rolecreator;
-revoke all on schema public from supabase_storage_admin;
