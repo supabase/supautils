@@ -2,7 +2,9 @@
 
 [![Coverage Status](https://coveralls.io/repos/github/supabase/supautils/badge.svg?branch=master)](https://coveralls.io/github/supabase/supautils?branch=master)
 
-Supautils is an extension that secures a PostgreSQL cluster on a cloud environment. It's controlled through settings, it doesn't require database tables or functions.
+Supautils is an extension that secures PostgreSQL on a cloud environment, where SUPERUSER cannot be granted to users.
+
+It's completely controlled through settings, it doesn't require database objects (tables, functions or security labels). So it can be configured cluster-wide entirely in `postgresql.conf`.
 
 Tested to work on PostgreSQL 13, 14, 15, 16 and 17.
 
@@ -31,49 +33,43 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 - [Reserved Roles](#reserved-roles)
 - [Privileged extensions](#privileged-extensions)
 - [Constrained extensions](#constrained-extensions)
+- [Privileged role](#privileged-role)
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
 - [Table Ownership Bypass](#table-ownership-bypass)
 
 ### Reserved Roles
 
-This functionality prevents non-superusers from modifying/granting a set of roles.
+> [!IMPORTANT]
+> This feature is disabled starting from PostgreSQL 16, from this version onwards the underlying CREATEROLE problem is fixed.
 
-Say your backend service depends on a `connector` role for connecting to the database. Also, you need to give database users the ability to create their own roles, i.e. they need the CREATEROLE privilege.
+Non-superusers with the CREATEROLE privilege can ALTER, DROP or GRANT non-superuser roles without restrictions.
 
-A problem arises here, because any database user with CREATEROLE can DROP or ALTER the `connector` role, making your backend service fail.
-From [role attributes docs](https://www.postgresql.org/docs/current/role-attributes.html):
+From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.html):
 
 > A role with CREATEROLE privilege can **alter and drop other roles, too, as well as grant or revoke membership in them**.
 > However, to create, alter, drop, or change membership of a superuser role, superuser status is required;
 > CREATEROLE is insufficient for that.
 
-The above problem can be solved by configuring this extension to protect the `connector` role:
+The above problem can be solved by configuring this extension to protect a set of roles, using the `reserved_roles` setting.
 
 ```
-supautils.reserved_roles = 'connector'
+supautils.reserved_roles = 'connector, storage_admin'
 ```
 
-This extension also allows restricting memberships grants for a set of roles. Certain default postgres roles are dangerous
-to expose to every database user. From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
+Roles with the CREATEROLE privilege cannot ALTER or DROP the above reserved roles.
+
+This extension also allows restricting roles memberships. Certain default postgres roles are dangerous to expose to every database user.
+From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
 
 > The pg_read_server_files, pg_write_server_files and pg_execute_server_program roles are intended to allow administrators to have trusted,
 > but non-superuser, roles which are able to access files and run programs on the database server as the user the database runs as.
 > As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
 > and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
 
-For example, you can restrict doing `GRANT pg_read_server_files TO my_role` with:
+For example, you can restrict doing `GRANT pg_read_server_files TO my_role` by setting:
 
 ```
 supautils.reserved_memberships = 'pg_read_server_files'
-```
-
-#### Configuration
-
-Settings available:
-
-```
-supautils.reserved_roles = 'supabase_admin,supabase_auth_admin,supabase_storage_admin'
-supautils.reserved_memberships = 'pg_read_server_files, pg_write_server_files, pg_execute_server_program'
 ```
 
 ### Privileged Extensions
