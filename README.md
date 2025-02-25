@@ -195,6 +195,26 @@ When the privileged role executes `create publication`, supautils will detect th
 
 An analogous mechanism is done for doing `create foreign data wrapper` without superuser.
 
+#### Privileged Settings
+
+Certain settings like `session_replication_role` can only be set by superusers. The privileged role can be allowed to change these settings by listing them in:
+
+```
+privileged_role_allowed_configs="session_replication_role"
+```
+
+Some extensions also have their own superuser settings with a prefix, those can be configured by:
+
+```
+privileged_role_allowed_configs="ext.setting, other.nested"
+```
+
+You can also choose to allow all the extension settings by using a wildcard:
+
+```
+privileged_role_allowed_configs="ext.*"
+```
+
 ### Table Ownership Bypass
 
 #### Manage Policies
