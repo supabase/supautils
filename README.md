@@ -30,57 +30,46 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 
 ## Features
 
-- [Reserved Roles](#reserved-roles)
+- [Privileged Role](#privileged-role)
 - [Privileged extensions](#privileged-extensions)
 - [Constrained extensions](#constrained-extensions)
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
-- [Privileged Role](#privileged-role)
 - [Table Ownership Bypass](#table-ownership-bypass)
+- [Reserved Roles](#reserved-roles)
 
-### Reserved Roles
+### Privileged Role
 
-> [!IMPORTANT]
-> This feature is disabled starting from PostgreSQL 16, from this version onwards the underlying CREATEROLE problem is fixed.
+PostgreSQL doesn't allow non-superusers to create certain database objects like publications or foreign data wrappers. supautils allows creating these by configuring a `supautils.privileged_role`.
+This role is a proxy role for a SUPERUSER, which is configured by `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster).
 
-Non-superusers with the CREATEROLE privilege can ALTER, DROP or GRANT non-superuser roles without restrictions.
+When the privileged role executes `create publication`, supautils will detect the statement and:
 
-From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.html):
+- It will switch to the `supautils.superuser`, allowing the operation and creating the publication.
+- It will change the ownership of the publication to the privileged role.
+- Finally, it will switch back to the privileged role.
 
-> A role with CREATEROLE privilege can **alter and drop other roles, too, as well as grant or revoke membership in them**.
-> However, to create, alter, drop, or change membership of a superuser role, superuser status is required;
-> CREATEROLE is insufficient for that.
+An analogous mechanism is done for doing `create foreign data wrapper` without superuser.
 
-The above problem can be solved by configuring this extension to protect a set of roles, using the `reserved_roles` setting.
+#### Privileged Settings
 
-```
-supautils.reserved_roles = 'connector, storage_admin'
-```
-
-Roles with the CREATEROLE privilege cannot ALTER or DROP the above reserved roles.
-
-This extension also allows restricting roles memberships. Certain default postgres roles are dangerous to expose to every database user.
-From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
-
-> The pg_read_server_files, pg_write_server_files and pg_execute_server_program roles are intended to allow administrators to have trusted,
-> but non-superuser, roles which are able to access files and run programs on the database server as the user the database runs as.
-> As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
-> and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
-
-For example, you can restrict doing `GRANT pg_read_server_files TO my_role` by setting:
+Certain settings like `session_replication_role` can only be set by superusers. The privileged role can be allowed to change these settings by listing them in:
 
 ```
-supautils.reserved_memberships = 'pg_read_server_files'
+supautils.privileged_role_allowed_configs="session_replication_role"
 ```
 
-#### Reserved Roles Settings
-
-By default, reserved roles cannot have their settings changed. However their settings can be modified by the [Privileged Role](#privileged-role) if they're configured like so:
+Some extensions also have their own superuser settings with a prefix, those can be configured by:
 
 ```
-supautils.reserved_roles = 'connector*, storage_admin*'
+supautils.privileged_role_allowed_configs="ext.setting, other.nested"
 ```
 
-That is, the role must end with a `*` suffix.
+You can also choose to allow all the extension settings by using a wildcard:
+
+```
+supautils.privileged_role_allowed_configs="ext.*"
+```
+
 
 ### Privileged Extensions
 
@@ -92,10 +81,9 @@ To handle this, you can put the extension in `supautils.privileged_extensions`:
 
 ```psql
 supautils.privileged_extensions = 'hstore'
-supautils.superuser = 'postgres'; -- used to be called supautils.privileged_extensions_superuser, this is still provided for backwards compatibility
 ```
 
-Once you do, the extension creation will be delegated to the configured `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster). That means the `hstore` extension would be created as if by the superuser.
+Once you do, the extension creation will be delegated to the configured `supautils.superuser`. That means the `hstore` extension would be created as if by the superuser.
 
 Note that extension creation would behave normally (i.e. no delegation) if the current role is already a superuser.
 
@@ -182,39 +170,6 @@ postgres=> \dx pg_cron
 (1 row)
 ```
 
-### Privileged Role
-
-PostgreSQL doesn't allow non-superusers to create certain database objects like publications or foreign data wrappers. supautils allows creating these by configuring a `supautils.privileged_role`.
-This role is a proxy role for a SUPERUSER (configured by `supautils.superuser`).
-
-When the privileged role executes `create publication`, supautils will detect the statement and:
-
-- It will switch to the `supautils.superuser`, allowing the operation and creating the publication.
-- It will change the ownership of the publication to the privileged role.
-- Finally, it will switch back to the privileged role.
-
-An analogous mechanism is done for doing `create foreign data wrapper` without superuser.
-
-#### Privileged Settings
-
-Certain settings like `session_replication_role` can only be set by superusers. The privileged role can be allowed to change these settings by listing them in:
-
-```
-supautils.privileged_role_allowed_configs="session_replication_role"
-```
-
-Some extensions also have their own superuser settings with a prefix, those can be configured by:
-
-```
-supautils.privileged_role_allowed_configs="ext.setting, other.nested"
-```
-
-You can also choose to allow all the extension settings by using a wildcard:
-
-```
-supautils.privileged_role_allowed_configs="ext.*"
-```
-
 ### Table Ownership Bypass
 
 #### Manage Policies
@@ -239,6 +194,51 @@ You can also allow certain roles to drop triggers on a table without being the t
 ```
 supautils.drop_trigger_grants = '{ "my_role": ["public.not_my_table", "public.also_not_my_table"] }'
 ```
+
+### Reserved Roles
+
+> [!IMPORTANT]
+> This feature is disabled starting from PostgreSQL 16, from this version onwards the underlying CREATEROLE problem is fixed.
+
+Non-superusers with the CREATEROLE privilege can ALTER, DROP or GRANT non-superuser roles without restrictions.
+
+From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.html):
+
+> A role with CREATEROLE privilege can **alter and drop other roles, too, as well as grant or revoke membership in them**.
+> However, to create, alter, drop, or change membership of a superuser role, superuser status is required;
+> CREATEROLE is insufficient for that.
+
+The above problem can be solved by configuring this extension to protect a set of roles, using the `reserved_roles` setting.
+
+```
+supautils.reserved_roles = 'connector, storage_admin'
+```
+
+Roles with the CREATEROLE privilege cannot ALTER or DROP the above reserved roles.
+
+This extension also allows restricting roles memberships. Certain default postgres roles are dangerous to expose to every database user.
+From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
+
+> The pg_read_server_files, pg_write_server_files and pg_execute_server_program roles are intended to allow administrators to have trusted,
+> but non-superuser, roles which are able to access files and run programs on the database server as the user the database runs as.
+> As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
+> and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
+
+For example, you can restrict doing `GRANT pg_read_server_files TO my_role` by setting:
+
+```
+supautils.reserved_memberships = 'pg_read_server_files'
+```
+
+#### Reserved Roles Settings
+
+By default, reserved roles cannot have their settings changed. However their settings can be modified by the [Privileged Role](#privileged-role) if they're configured like so:
+
+```
+supautils.reserved_roles = 'connector*, storage_admin*'
+```
+
+That is, the role must end with a `*` suffix.
 
 ## Development
 
