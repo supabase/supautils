@@ -110,7 +110,7 @@ jobs:
 
       - name: Configure aws credentials for uploading release artifacts
         if: ${{ matrix.box.arch == 'arm64' }}
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE }}
           aws-region: us-east-1
