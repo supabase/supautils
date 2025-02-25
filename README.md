@@ -72,6 +72,16 @@ For example, you can restrict doing `GRANT pg_read_server_files TO my_role` by s
 supautils.reserved_memberships = 'pg_read_server_files'
 ```
 
+#### Reserved Roles Settings
+
+By default, reserved roles cannot have their settings changed. However their settings can be modified by the [Privileged Role](#privileged-role) if they're configured like so:
+
+```
+supautils.reserved_roles = 'connector*, storage_admin*'
+```
+
+That is, the role must end with a `*` suffix.
+
 ### Privileged Extensions
 
 This functionality is adapted from [pgextwlist](https://github.com/dimitri/pgextwlist).
