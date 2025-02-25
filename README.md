@@ -33,8 +33,8 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 - [Reserved Roles](#reserved-roles)
 - [Privileged extensions](#privileged-extensions)
 - [Constrained extensions](#constrained-extensions)
-- [Privileged role](#privileged-role)
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
+- [Privileged Role](#privileged-role)
 - [Table Ownership Bypass](#table-ownership-bypass)
 
 ### Reserved Roles
@@ -171,6 +171,19 @@ postgres=> \dx pg_cron
  pg_cron | 1.5     | pg_catalog | Job scheduler for PostgreSQL
 (1 row)
 ```
+
+### Privileged Role
+
+PostgreSQL doesn't allow non-superusers to create certain database objects like publications or foreign data wrappers. supautils allows creating these by configuring a `supautils.privileged_role`.
+This role is a proxy role for a SUPERUSER (configured by `supautils.superuser`).
+
+When the privileged role executes `create publication`, supautils will detect the statement and:
+
+- It will switch to the `supautils.superuser`, allowing the operation and creating the publication.
+- It will change the ownership of the publication to the privileged role.
+- Finally, it will switch back to the privileged role.
+
+An analogous mechanism is done for doing `create foreign data wrapper` without superuser.
 
 ### Table Ownership Bypass
 
