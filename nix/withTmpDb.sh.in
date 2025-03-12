@@ -15,25 +15,15 @@ PGTZ=UTC initdb --no-locale --encoding=UTF8 --nosync -U "$PGUSER"
 # so we just modify the resulting postgresql.conf to avoid an error
 echo "dynamic_library_path='\$libdir:$(pwd)'" >> $PGDATA/postgresql.conf
 echo "extension_control_path='\$system:$(pwd)'" >> $PGDATA/postgresql.conf
+echo "include 'init.conf'" >> $PGDATA/postgresql.conf
 
-options="-F -c listen_addresses=\"\" -k $PGDATA -c shared_preload_libraries=\"supautils\" -c wal_level=logical -c cron.database_name=postgres"
+cp ./test/init.conf $tmpdir/init.conf
 
-reserved_roles="supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*"
-reserved_memberships="pg_read_server_files, pg_write_server_files, pg_execute_server_program, role_with_reserved_membership"
-privileged_extensions="autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, postgres_fdw, pageinspect"
-privileged_extensions_custom_scripts_path="$tmpdir/privileged_extensions_custom_scripts"
-privileged_role="privileged_role"
-privileged_role_allowed_configs="session_replication_role, pgrst.*, other.nested.*"
+sed -i "s|@TMPDIR@|$tmpdir|g" $tmpdir/init.conf
 
-reserved_stuff_options="-c supautils.reserved_roles=\"$reserved_roles\" -c supautils.reserved_memberships=\"$reserved_memberships\" -c supautils.privileged_extensions=\"$privileged_extensions\" -c supautils.privileged_extensions_custom_scripts_path=\"$privileged_extensions_custom_scripts_path\" -c supautils.privileged_role=\"$privileged_role\" -c supautils.privileged_role_allowed_configs=\"$privileged_role_allowed_configs\""
-placeholder_stuff_options='-c supautils.placeholders="response.headers, another.placeholder" -c supautils.placeholders_disallowed_values="\"content-type\",\"x-special-header\",special-value"'
+options="-F -c listen_addresses=\"\" -k $PGDATA"
 
-cexts_option='-c supautils.constrained_extensions="{\"adminpack\": { \"cpu\": 64}, \"cube\": { \"mem\": \"17 GB\"}, \"lo\": { \"disk\": \"100 GB\"}, \"amcheck\": { \"cpu\": 2, \"mem\": \"100 MB\", \"disk\": \"100 MB\"}}"'
-epos_option='-c supautils.extensions_parameter_overrides="{\"sslinfo\":{\"schema\":\"pg_catalog\"}}"'
-drop_trigger_grants_option='-c supautils.drop_trigger_grants="{\"privileged_role\":[\"allow_drop_triggers.my_table\"]}"'
-policy_grants_option='-c supautils.policy_grants="{\"privileged_role\":[\"allow_policies.my_table\",\"allow_policies.nonexistent_table\"]}"'
-
-pg_ctl start -o "$options" -o "$reserved_stuff_options" -o "$placeholder_stuff_options" -o "$cexts_option" -o "$epos_option" -o "$drop_trigger_grants_option" -o "$policy_grants_option"
+pg_ctl start -o "$options"
 
 # print notice when creating a TLE
 mkdir -p "$tmpdir/privileged_extensions_custom_scripts"
