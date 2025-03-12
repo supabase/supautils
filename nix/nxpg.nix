@@ -1,105 +1,11 @@
-{ stdenv, lib, makeWrapper, fetchurl, writeShellScriptBin, findutils, entr, callPackage, lcov } :
+{ fetchFromGitHub } :
 let
-  prefix = "nxpg";
-  ourPg = callPackage ./postgresql {
-    inherit lib;
-    inherit stdenv;
-    inherit fetchurl;
-    inherit makeWrapper;
-    inherit callPackage;
+  nxpg = fetchFromGitHub {
+    owner  = "steve-chavez";
+    repo   = "nxpg";
+    rev    = "v1.1";
+    sha256 = "sha256-R0Z2vDjFtkrFgetL1L/N1iWN0Bh+TWBZ7VZLDARJ3pY=";
   };
-  supportedPgs = [
-    ourPg.postgresql_17
-    ourPg.postgresql_16
-    ourPg.postgresql_15
-    ourPg.postgresql_14
-    ourPg.postgresql_13
-  ];
-  build =
-    writeShellScriptBin "${prefix}-build" ''
-      set -euo pipefail
-
-      make clean
-      make TEST=1
-    '';
-  buildCov =
-    writeShellScriptBin "${prefix}-build-cov" ''
-      set -euo pipefail
-
-      make clean
-      make TEST=1 COVERAGE=1
-    '';
-  test =
-    writeShellScriptBin "${prefix}-test" ''
-      set -euo pipefail
-
-      make installcheck
-    '';
-  cov =
-    writeShellScriptBin "${prefix}-coverage" ''
-      set -euo pipefail
-
-      info_file="coverage.info"
-      out_dir="coverage_html"
-
-      make installcheck
-      ${lcov}/bin/lcov --capture --directory . --output-file "$info_file"
-
-      # remove postgres headers on the nix store, otherwise they show on the output
-      ${lcov}/bin/lcov --remove "$info_file" '/nix/*' --output-file "$info_file" || true
-
-      ${lcov}/bin/lcov --list coverage.info
-      ${lcov}/bin/genhtml "$info_file" --output-directory "$out_dir"
-
-      echo "${prefix}-coverage: To see the results, visit file://$(pwd)/$out_dir/index.html on your browser"
-    '';
-  watch =
-    writeShellScriptBin "${prefix}-watch" ''
-      set -euo pipefail
-
-      ${findutils}/bin/find . -type f \( -name '*.c' -o -name '*.h' \) | ${entr}/bin/entr -dr "$@"
-    '';
-
-  tmpDb =
-    writeShellScriptBin "${prefix}-tmp" (builtins.readFile ./withTmpDb.sh.in);
-
-  allPgPaths = map (pg:
-      let
-        ver = builtins.head (builtins.splitVersion pg.version);
-        script = ''
-          set -euo pipefail
-
-          export PATH=${pg}/bin:"$PATH"
-
-          "$@"
-        '';
-      in
-      writeShellScriptBin "${prefix}-${ver}" script
-    ) supportedPgs;
-
-  supautilsWith = map (pg:
-      let
-        ver = builtins.head (builtins.splitVersion pg.version);
-        script = ''
-          set -euo pipefail
-
-          export PATH=${pg}/bin:"$PATH"
-
-          ${buildCov}/bin/${prefix}-build-cov
-
-          ${tmpDb}/bin/${prefix}-tmp "$@"
-        '';
-      in
-      writeShellScriptBin "supautils-with-pg-${ver}" script
-    ) supportedPgs;
+  script = import nxpg;
 in
-[
-  build
-  buildCov
-  test
-  cov
-  watch
-  tmpDb
-  allPgPaths
-  supautilsWith
-]
+script

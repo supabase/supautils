@@ -15,31 +15,57 @@ jobs:
         pg-version: ['13', '14', '15', '16', '17']
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v13
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    - name: Run tests
-      run: nix-shell --run "supautils-with-pg-${{ matrix.pg-version }} make installcheck"
-    - if: ${{ failure() }}
-      run: cat regression.diffs
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Use Cachix Cache
+        uses: cachix/cachix-action@v10
+        with:
+          name: nxpg
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Build
+        run: nix-shell --run "nxpg -v ${{ matrix.pg-version }} build"
+
+      - name: Run tests
+        run: nix-shell --run "nxpg -v ${{ matrix.pg-version }} test"
+
+      - if: ${{ failure() }}
+        run: cat regression.diffs
 
   test-on-macos:
-    runs-on: macos-13
+    runs-on: macos-15
 
     strategy:
       matrix:
-        pg-version: ['17']
+        pg-version: ['15']
 
     steps:
-    - uses: actions/checkout@v4
-    - uses: cachix/install-nix-action@v30
-      with:
-        nix_path: nixpkgs=channel:nixos-unstable
-    - name: Run tests
-      run: nix-shell --run "supautils-with-pg-${{ matrix.pg-version }} make installcheck"
-    - if: ${{ failure() }}
-      run: cat regression.diffs
+      - uses: actions/checkout@v4
+
+      - name: install nix
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: use cachix cache
+        uses: cachix/cachix-action@v10
+        with:
+          name: nxpg
+          authtoken: ${{ secrets.cachix_auth_token }}
+
+      - name: build
+        run: nix-shell --run "nxpg -v ${{ matrix.pg-version }} build"
+
+      - name: run tests
+        run: nix-shell --run "nxpg -v ${{ matrix.pg-version }} test"
+
+      - if: ${{ failure() }}
+        run: cat regression.diffs
 
 
   coverage:
@@ -52,14 +78,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: cachix/install-nix-action@v18
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
 
-      - name: Run coverage
-        run: nix-shell --run "supautils-with-pg-${{ matrix.pg-version }} nxpg-coverage"
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+
+      - name: Use Cachix Cache
+        uses: cachix/cachix-action@v10
+        with:
+          name: nxpg
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Coverage
+        run: nix-shell --run "nxpg -v ${{ matrix.pg-version }} coverage"
 
       - name: Send coverage to Coveralls
         uses: coverallsapp/github-action@v2.3.6
