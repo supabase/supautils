@@ -2,7 +2,7 @@ GREP ?= grep
 PG_CONFIG = pg_config
 
 # the `-Wno`s quiet C90 warnings
-PG_CFLAGS = -std=c99 -Wextra -Wall -Werror \
+PG_CFLAGS = -std=c11 -Wextra -Wall -Werror \
 	-Wno-declaration-after-statement \
 	-Wno-vla \
 	-Wno-long-long
@@ -15,9 +15,14 @@ ifeq ($(COVERAGE), 1)
 PG_CFLAGS += --coverage
 endif
 
-MODULE_big = supautils
+EXTENSION = supautils
+MODULE_big = $(EXTENSION)
+
+SRC_DIR = src
+BUILD_DIR ?= build
+
 SRC = $(wildcard src/*.c)
-OBJS = $(patsubst src/%.c, src/%.o, $(SRC))
+OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
@@ -41,6 +46,21 @@ GENERATED_OUT = test/expected/event_triggers.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
+
+build: $(BUILD_DIR)/$(EXTENSION).so
+
+PG_CPPFLAGS := $(CPPFLAGS) -DTEST=1
+
+$(BUILD_DIR)/.gitignore:
+	mkdir -p $(BUILD_DIR)
+	echo "*" > $(BUILD_DIR)/.gitignore
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(BUILD_DIR)/.gitignore
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/$(EXTENSION).so: $(EXTENSION).so
+	mv $? $@
+
 include $(PGXS)
 
 .PHONY: $(GENERATED_OUT)
@@ -68,3 +88,6 @@ endif
 # extra dep for target in pgxs.mk
 installcheck: $(GENERATED_OUT)
 
+.PHONY: test
+test:
+	make installcheck
