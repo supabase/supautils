@@ -5,6 +5,6 @@ with import (builtins.fetchTarball {
 }) {};
 mkShell {
   buildInputs = [
-    (callPackage ./nix/nxpg.nix {inherit fetchFromGitHub;})
+    (callPackage ./nix/xpg.nix {inherit fetchFromGitHub;})
   ];
 }
