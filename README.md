@@ -291,5 +291,5 @@ $ supautils-with-pg-13 psql -U rolecreator
 For coverage, execute:
 
 ```bash
-$ supautils-with-pg-17 nxpg-coverage
+$ supautils-with-pg-17 xpg-coverage
 ```
