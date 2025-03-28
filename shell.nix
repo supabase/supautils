@@ -4,7 +4,14 @@ with import (builtins.fetchTarball {
   sha256 = "sha256:1lr1h35prqkd1mkmzriwlpvxcb34kmhc9dnr48gkm8hh089hifmx";
 }) {};
 mkShell {
-  buildInputs = [
-    (callPackage ./nix/xpg.nix {inherit fetchFromGitHub;})
-  ];
+  buildInputs =
+    let
+      xpg = callPackage ./nix/xpg.nix {};
+      pgsqlcheck15 = callPackage ./nix/plpgsql-check.nix {
+        postgresql = xpg.postgresql_15;
+      };
+    in
+    [
+      (xpg.xpgWithExtensions { exts15 = [ pgsqlcheck15 ]; })
+    ];
 }

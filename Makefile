@@ -25,6 +25,7 @@ SRC = $(wildcard src/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
+PG_EQ15 = $(shell test $(PG_VERSION) -eq 15; echo $$?)
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
 PG_GE14 = $(shell test $(PG_VERSION) -ge 14; echo $$?)
 SYSTEM = $(shell uname -s)
@@ -47,7 +48,19 @@ EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 
-build: $(BUILD_DIR)/$(EXTENSION).so
+build: $(BUILD_DIR)/$(EXTENSION).so test/init.conf
+
+.PHONY: test/init.conf
+test/init.conf: test/init.conf.in
+ifeq ($(PG_EQ15), 0)
+	sed \
+		-e '/<\/\?PG_EQ_15>/d' \
+		$? > $@
+else
+	sed \
+		-e '/<PG_EQ_15>/,/<\/PG_EQ_15>/d' \
+		$? > $@
+endif
 
 PG_CPPFLAGS := $(CPPFLAGS) -DTEST=1
 
