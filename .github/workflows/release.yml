@@ -66,7 +66,7 @@ jobs:
           # Copy files into directory structure
           mkdir -p ${package_dir}/usr/lib/postgresql/lib
           mkdir -p ${package_dir}/var/lib/postgresql/extension
-          cp *.so ${package_dir}/usr/lib/postgresql/lib
+          cp build/*.so ${package_dir}/usr/lib/postgresql/lib
 
           # symlinks to Copy files into directory structure
           mkdir -p ${package_dir}/usr/lib/postgresql/${{ matrix.postgres }}/lib
