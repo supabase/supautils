@@ -101,10 +101,11 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
         const char *current_role_name = GetUserNameFromId(GetUserId(), false);
         if (superuser() || is_reserved_role(current_role_name, false)) {
             bool function_is_owned_by_super = superuser_arg(get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo }));
-            if (!function_is_owned_by_super)
-            // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
-            // so instead we use the workaround of changing the event trigger function to a noop function
-            force_noop(flinfo);
+            if (!function_is_owned_by_super){
+                // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
+                // so instead we use the workaround of changing the event trigger function to a noop function
+                force_noop(flinfo);
+            }
         }
 
         if (next_fmgr_hook)
