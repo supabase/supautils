@@ -42,7 +42,7 @@ jobs:
 
     strategy:
       matrix:
-        pg-version: ['15']
+        pg-version: ['17']
 
     steps:
       - uses: actions/checkout@v4
@@ -95,4 +95,4 @@ jobs:
         uses: coverallsapp/github-action@v2.3.6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          files: ./coverage.info
+          files: ./build-${{ matrix.pg-version }}/coverage.info

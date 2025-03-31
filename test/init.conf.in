@@ -1,4 +1,7 @@
-shared_preload_libraries='supautils'
+<PG_EQ_15>
+shared_preload_libraries='plpgsql_check'
+</PG_EQ_15>
+session_preload_libraries = 'supautils'
 wal_level=logical
 
 supautils.reserved_roles='supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*'

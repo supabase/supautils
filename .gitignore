@@ -14,3 +14,4 @@ test/expected/event_triggers.out
 *.gcda
 coverage.info
 coverage_html
+test/init.conf
