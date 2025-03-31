@@ -1,15 +1,15 @@
 #include "pg_prelude.h"
 #include "event_triggers.h"
 
-PG_FUNCTION_INFO_V1(noop);
-Datum noop(__attribute__ ((unused)) PG_FUNCTION_ARGS) { PG_RETURN_VOID();}
+// this is the underlying function of `select version();`
+extern Datum pgsql_version(PG_FUNCTION_ARGS);
 
 void
 force_noop(FmgrInfo *finfo)
 {
-    finfo->fn_addr   = (PGFunction) noop;
-    finfo->fn_oid    = 38;                   /* put the int2in oid which is sure to exist, this avoids cache lookup errors. See https://github.com/supabase/supautils/pull/129*/
-    finfo->fn_nargs  = 0;                    /* no arguments for noop */
+    finfo->fn_addr   = (PGFunction) pgsql_version;
+    finfo->fn_oid    = 89;                   /* this is the oid of pgsql_version function, it's stable and keeps being the same on latest pg version */
+    finfo->fn_nargs  = 0;                    /* no arguments for version() */
     finfo->fn_strict = false;
     finfo->fn_retset = false;
     finfo->fn_stats  = 0;                    /* no stats collection */
