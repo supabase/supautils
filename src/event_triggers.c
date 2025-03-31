@@ -8,7 +8,7 @@ void
 force_noop(FmgrInfo *finfo)
 {
     finfo->fn_addr   = (PGFunction) noop;
-    finfo->fn_oid    = InvalidOid;           /* not a known function OID anymore */
+    finfo->fn_oid    = 38;                   /* put the int2in oid which is sure to exist, this avoids cache lookup errors. See https://github.com/supabase/supautils/pull/129*/
     finfo->fn_nargs  = 0;                    /* no arguments for noop */
     finfo->fn_strict = false;
     finfo->fn_retset = false;
