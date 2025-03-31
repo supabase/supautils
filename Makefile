@@ -1,3 +1,11 @@
+OS = $(shell uname -s)
+
+ifeq ($(OS), Linux)
+  DL_SUFFIX=so
+else
+  DL_SUFFIX=dylib
+endif
+
 GREP ?= grep
 PG_CONFIG = pg_config
 
@@ -48,7 +56,7 @@ EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 
-build: $(BUILD_DIR)/$(EXTENSION).so test/init.conf
+build: $(BUILD_DIR)/$(EXTENSION).$(DL_SUFFIX) test/init.conf
 
 .PHONY: test/init.conf
 test/init.conf: test/init.conf.in
@@ -71,7 +79,7 @@ $(BUILD_DIR)/.gitignore:
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(BUILD_DIR)/.gitignore
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/$(EXTENSION).so: $(EXTENSION).so
+$(BUILD_DIR)/$(EXTENSION).$(DL_SUFFIX): $(EXTENSION).$(DL_SUFFIX)
 	mv $? $@
 
 include $(PGXS)
