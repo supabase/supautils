@@ -277,13 +277,13 @@ For testing the module locally, execute:
 $ nix-shell
 
 # test on pg 13
-$ supautils-with-pg-13 make installcheck
+$ xpg -v 13 make installcheck
 
 # test on pg 14
-$ supautils-with-pg-14 make installcheck
+$ xpg -v 14 make installcheck
 
 # you can also test manually with
-$ supautils-with-pg-13 psql -U rolecreator
+$ xpg -v 13 psql -U rolecreator
 ```
 
 ### Coverage
@@ -291,5 +291,5 @@ $ supautils-with-pg-13 psql -U rolecreator
 For coverage, execute:
 
 ```bash
-$ supautils-with-pg-17 xpg-coverage
+$ xpg -v 17 coverage
 ```
