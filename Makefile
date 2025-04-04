@@ -1,11 +1,5 @@
 OS = $(shell uname -s)
 
-ifeq ($(OS), Linux)
-  DL_SUFFIX=so
-else
-  DL_SUFFIX=dylib
-endif
-
 GREP ?= grep
 PG_CONFIG = pg_config
 
@@ -33,6 +27,7 @@ SRC = $(wildcard src/*.c)
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
+# 0 is true
 PG_EQ15 = $(shell test $(PG_VERSION) -eq 15; echo $$?)
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
 PG_GE14 = $(shell test $(PG_VERSION) -ge 14; echo $$?)
@@ -55,6 +50,18 @@ GENERATED_OUT = test/expected/event_triggers.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
+
+ifeq ($(OS), Linux)
+  DL_SUFFIX=so
+else ifeq ($(OS), Darwin)
+  ifeq ($(PG_GE16), 0)
+    DL_SUFFIX=dylib
+  else
+    DL_SUFFIX=so
+  endif
+else
+  DL_SUFFIX=dylib
+endif
 
 build: $(BUILD_DIR)/$(EXTENSION).$(DL_SUFFIX) test/init.conf
 
