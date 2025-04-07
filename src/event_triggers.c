@@ -1,5 +1,6 @@
 #include "pg_prelude.h"
 #include "event_triggers.h"
+#include "utils.h"
 
 // this is the underlying function of `select version();`
 extern Datum pgsql_version(PG_FUNCTION_ARGS);
@@ -44,3 +45,6 @@ Oid get_function_owner(func_owner_search search){
   return func_owner;
 }
 
+bool is_event_trigger_function(Oid foid){
+  return get_func_rettype(foid) == SUPAUTILS_EVENT_TRIGGER_OID;
+}
