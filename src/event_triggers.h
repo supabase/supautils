@@ -18,4 +18,6 @@ extern Oid get_function_owner(func_owner_search search);
 
 extern void force_noop(FmgrInfo *finfo);
 
+extern bool is_event_trigger_function(Oid foid);
+
 #endif

@@ -1,0 +1,133 @@
+-- create the extension as usual
+create extension if not exists pgmq;
+set supautils.log_skipped_evtrigs = true;
+\echo
+
+-- downgrade the extension functions owners to non-superuser, to ensure the following function calls are not wrongly skipped by the event trigger mechanism
+do $$
+declare
+  extoid oid := (select oid from pg_extension where extname = 'pgmq');
+  r record;
+  cls pg_class%rowtype;
+begin
+for r in (select * from pg_depend where refobjid = extoid) loop
+    if r.classid = 'pg_proc'::regclass then
+      execute(format('alter function %s(%s) owner to privileged_role;', r.objid::regproc, pg_get_function_identity_arguments(r.objid)));
+    end if;
+end loop;
+end $$;
+\echo
+
+-- Test the standard flow
+select
+  pgmq.create('Foo');
+ create 
+--------
+ 
+(1 row)
+
+select
+  *
+from
+  pgmq.send(
+    queue_name:='Foo',
+    msg:='{"foo": "bar1"}'
+  );
+ send 
+------
+    1
+(1 row)
+
+-- Test queue is not case sensitive
+select
+  *
+from
+  pgmq.send(
+    queue_name:='foo', -- note: lowercase useage
+    msg:='{"foo": "bar2"}',
+    delay:=5
+  );
+ send 
+------
+    2
+(1 row)
+
+select
+  msg_id,
+  read_ct,
+  message
+from
+  pgmq.read(
+    queue_name:='Foo',
+    vt:=30,
+    qty:=2
+  );
+ msg_id | read_ct |     message     
+--------+---------+-----------------
+      1 |       1 | {"foo": "bar1"}
+(1 row)
+
+select
+  msg_id,
+  read_ct,
+  message
+from
+  pgmq.pop('Foo');
+ msg_id | read_ct | message 
+--------+---------+---------
+(0 rows)
+
+-- Archive message with msg_id=2.
+select
+  pgmq.archive(
+    queue_name:='Foo',
+    msg_id:=2
+  );
+ archive 
+---------
+ t
+(1 row)
+
+select
+  pgmq.create('my_queue');
+ create 
+--------
+ 
+(1 row)
+
+select
+  pgmq.send_batch(
+  queue_name:='my_queue',
+  msgs:=array['{"foo": "bar3"}','{"foo": "bar4"}','{"foo": "bar5"}']::jsonb[]
+);
+ send_batch 
+------------
+          1
+          2
+          3
+(3 rows)
+
+select
+  pgmq.archive(
+    queue_name:='my_queue',
+    msg_ids:=array[3, 4, 5]
+  );
+ archive 
+---------
+       3
+(1 row)
+
+select
+  pgmq.delete('my_queue', 6);
+ delete 
+--------
+ f
+(1 row)
+
+select
+  pgmq.drop_queue('my_queue');
+ drop_queue 
+------------
+ t
+(1 row)
+
