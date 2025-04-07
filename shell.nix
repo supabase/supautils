@@ -10,8 +10,13 @@ mkShell {
       pgsqlcheck15 = callPackage ./nix/plpgsql-check.nix {
         postgresql = xpg.postgresql_15;
       };
+      pgmq15 = callPackage ./nix/pgmq.nix {
+        postgresql = xpg.postgresql_15;
+      };
     in
     [
-      (xpg.xpgWithExtensions { exts15 = [ pgsqlcheck15 ]; })
+      (xpg.xpgWithExtensions {
+        exts15 = [ pgsqlcheck15 pgmq15 ];
+      })
     ];
 }
