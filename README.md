@@ -64,6 +64,8 @@ To protect against privilege escalation, the event triggers created by the privi
 - Will be skipped for any superuser role.
 - For PostgreSQL < 16: Will also be skipped for [Reserved Roles](#reserved-roles).
 
+The skipping behavior can be logged by setting the `supautils.log_skipped_evtrigs` config to true, this is false by default.
+
 Superuser event triggers work as usual, with the additional restriction that the event trigger function must be owned by a superuser.
 
 ```sql
