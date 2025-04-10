@@ -101,6 +101,15 @@ set role postgres;
 create table super_duper_stuff();
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 
+-- ensure logging skipped event triggers happens when enabled
+set supautils.log_skipped_evtrigs = true;
+\echo
+
+create table supa_stuff();
+
+reset supautils.log_skipped_evtrigs;
+\echo
+
 -- privesc won't happen because the event trigger function will fire with the privileges
 -- of the current role (this is pg default behavior)
 set role rolecreator;

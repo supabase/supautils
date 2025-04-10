@@ -64,6 +64,8 @@ static char *drop_trigger_grants_str = NULL;
 static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t total_dtgs = 0;
 
+bool log_skipped_evtrigs = false;
+
 void _PG_init(void);
 void _PG_fini(void);
 
@@ -102,6 +104,8 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
         if (superuser() || is_reserved_role(current_role_name, false)) {
             bool function_is_owned_by_super = superuser_arg(get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo }));
             if (!function_is_owned_by_super){
+                if (log_skipped_evtrigs)
+                  elog(NOTICE, "Skipping event trigger function \"%s\" for user \"%s\"", get_func_name(flinfo->fn_oid), current_role_name);
                 // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
                 // so instead we use the workaround of changing the event trigger function to a noop function
                 force_noop(flinfo);
@@ -1296,6 +1300,14 @@ void _PG_init(void) {
                              &policy_grants_check_hook,
                              NULL,
                              NULL);
+
+  DefineCustomBoolVariable("supautils.log_skipped_evtrigs",
+                           "Log skipped event triggers with a NOTICE level",
+                           NULL,
+                           &log_skipped_evtrigs,
+                           false,
+                           PGC_USERSET, 0,
+                           NULL, NULL, NULL);
 
   if(placeholders){
       List* comma_separated_list;
