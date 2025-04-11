@@ -62,7 +62,7 @@ To protect against privilege escalation, the event triggers created by the privi
 
 - Will be executed for any non-superuser role.
 - Will be skipped for any superuser role.
-- For PostgreSQL < 16: Will also be skipped for [Reserved Roles](#reserved-roles).
+- Will also be skipped for [Reserved Roles](#reserved-roles).
 
 The skipping behavior can be logged by setting the `supautils.log_skipped_evtrigs` config to true, this is false by default.
 
@@ -226,7 +226,7 @@ supautils.drop_trigger_grants = '{ "my_role": ["public.not_my_table", "public.al
 ### Reserved Roles
 
 > [!IMPORTANT]
-> This feature is disabled starting from PostgreSQL 16, from this version onwards the underlying CREATEROLE problem is fixed.
+> The CREATEROLE problem is solved starting from PostgreSQL 16.
 
 Non-superusers with the CREATEROLE privilege can ALTER, DROP or GRANT non-superuser roles without restrictions.
 
