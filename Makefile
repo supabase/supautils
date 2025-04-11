@@ -29,6 +29,7 @@ OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
 # 0 is true
 PG_EQ15 = $(shell test $(PG_VERSION) -eq 15; echo $$?)
+PG_NEQ15 = $(shell test $(PG_VERSION) -ne 15; echo $$?)
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
 PG_GE14 = $(shell test $(PG_VERSION) -ge 14; echo $$?)
 SYSTEM = $(shell uname -s)
@@ -41,6 +42,10 @@ ifneq ($(PG_GE16), 0)
 TESTS := $(filter-out test/sql/ge16_%.sql, $(TESTS))
 else
 TESTS := $(filter-out test/sql/lt16_%.sql, $(TESTS))
+endif
+
+ifeq ($(PG_NEQ15), 0)
+TESTS := $(filter-out test/sql/eq15_%.sql, $(TESTS))
 endif
 
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
