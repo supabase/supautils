@@ -101,11 +101,18 @@ set role postgres;
 create table super_duper_stuff();
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 
--- ensure logging skipped event triggers happens when enabled
+-- ensure logging skipped event triggers happens when enabled, for superusers and reserved roles
 set supautils.log_skipped_evtrigs = true;
 \echo
 
 create table supa_stuff();
+\echo
+
+set role supabase_storage_admin;
+\echo
+
+create table some_stuff();
+\echo
 
 reset supautils.log_skipped_evtrigs;
 \echo

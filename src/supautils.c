@@ -101,11 +101,21 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
     // we only need to change behavior before the function gets executed
     case FHET_START: {
         const char *current_role_name = GetUserNameFromId(GetUserId(), false);
-        if (superuser() || is_reserved_role(current_role_name, false)) {
-            bool function_is_owned_by_super = superuser_arg(get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo }));
+        const bool role_is_super = superuser();
+        const bool role_is_reserved = is_reserved_role(current_role_name, false);
+        if (role_is_super || role_is_reserved) {
+            Oid func_owner = get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo });
+            bool function_is_owned_by_super = superuser_arg(func_owner);
             if (!function_is_owned_by_super){
-                if (log_skipped_evtrigs)
-                  elog(NOTICE, "Skipping event trigger function \"%s\" for user \"%s\"", get_func_name(flinfo->fn_oid), current_role_name);
+                if (log_skipped_evtrigs){
+                  char *func_name = get_func_name(flinfo->fn_oid);
+                  ereport(
+                    NOTICE,
+                    errmsg("Skipping event trigger function \"%s\" for user \"%s\"", func_name, current_role_name),
+                    errdetail("\"%s\" %s and the function \"%s\" is not superuser-owned, it's owned by \"%s\"",
+                        current_role_name, role_is_super?"is a superuser":"is a reserved role", func_name, GetUserNameFromId(func_owner, false))
+                  );
+                }
                 // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
                 // so instead we use the workaround of changing the event trigger function to a noop function
                 force_noop(flinfo);

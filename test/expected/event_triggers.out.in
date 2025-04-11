@@ -116,13 +116,27 @@ select count(*) = 1 as only_one_super from pg_roles where rolsuper;
  t
 (1 row)
 
--- ensure logging skipped event triggers happens when enabled
+-- ensure logging skipped event triggers happens when enabled, for superusers and reserved roles
 set supautils.log_skipped_evtrigs = true;
 \echo
 
 create table supa_stuff();
 NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
+DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
 NOTICE:  Skipping event trigger function "become_super" for user "postgres"
+DETAIL:  "postgres" is a superuser and the function "become_super" is not superuser-owned, it's owned by "privileged_role"
+\echo
+
+set role supabase_storage_admin;
+\echo
+
+create table some_stuff();
+NOTICE:  Skipping event trigger function "show_current_user" for user "supabase_storage_admin"
+DETAIL:  "supabase_storage_admin" is a reserved role and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
+NOTICE:  Skipping event trigger function "become_super" for user "supabase_storage_admin"
+DETAIL:  "supabase_storage_admin" is a reserved role and the function "become_super" is not superuser-owned, it's owned by "privileged_role"
+\echo
+
 reset supautils.log_skipped_evtrigs;
 \echo
 
