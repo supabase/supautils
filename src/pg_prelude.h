@@ -14,6 +14,7 @@
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <nodes/makefuncs.h>
+#include <nodes/nodeFuncs.h>
 #include <nodes/pg_list.h>
 #include <parser/parse_func.h>
 #include <tcop/utility.h>

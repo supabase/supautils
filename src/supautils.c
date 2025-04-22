@@ -5,6 +5,7 @@
 #include "policy_grants.h"
 #include "privileged_extensions.h"
 #include "event_triggers.h"
+#include "immutable_check.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)                                   \
     ereport(ERROR,                                                          \
@@ -143,6 +144,18 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   Node   *utility_stmt = pstmt->utilityStmt;
 
   switch (utility_stmt->type){
+
+  /*
+   * CREATE TABLE
+   */
+  case T_CreateStmt: {
+      if(contains_non_immutable_check_constraints((CreateStmt *) utility_stmt))
+        ereport(ERROR,
+                (errcode(ERRCODE_SYNTAX_ERROR),
+                 errmsg("usage of non-immutable function in CHECK constraints are forbidden")));
+      break;
+  }
+
   /*
    * ALTER ROLE <role> NOLOGIN NOINHERIT..
    */
