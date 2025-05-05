@@ -2,9 +2,11 @@
 
 [![Coverage Status](https://coveralls.io/repos/github/supabase/supautils/badge.svg?branch=master)](https://coveralls.io/github/supabase/supautils?branch=master)
 
-Supautils is an extension that secures PostgreSQL on a cloud environment, where SUPERUSER cannot be granted to users.
+Supautils is an extension that unlocks advanced Postgres features without granting SUPERUSER access.
 
-It's completely controlled through settings, it doesn't require database objects (tables, functions or security labels). So it can be configured cluster-wide entirely in `postgresql.conf`.
+It's a loadable library that allows creating event triggers, publications, and other highly privileged database objects on cloud deployments where giving SUPERUSER rights to end users isn’t an option.
+
+It's managed entirely by configuration — no tables, functions, or security labels are added to your database. That makes upgrades effortless and lets you apply settings cluster-wide solely via `postgresql.conf`.
 
 Tested to work on PostgreSQL 13, 14, 15, 16 and 17.
 
@@ -36,6 +38,7 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
 - [Table Ownership Bypass](#table-ownership-bypass)
 - [Reserved Roles](#reserved-roles)
+- [Reserved Memberships](#reserved-memberships)
 
 ### Privileged Role
 
@@ -56,12 +59,12 @@ The privileged role can also execute `create foreign data wrapper..`, the logic 
 
 #### Non-Superuser Event Triggers
 
-The privileged role is also able to create event triggers, this while adding protection for privilege escalation.
+The privileged role is also able to create event triggers, while adding protection for privilege escalation.
 
 To protect against privilege escalation, the event triggers created by the privileged role:
 
-- Will be executed for any non-superuser role.
-- Will be skipped for any superuser role.
+- Will be executed for non-superusers.
+- Will be skipped for superusers.
 - Will also be skipped for [Reserved Roles](#reserved-roles).
 
 The skipping behavior can be logged by setting the `supautils.log_skipped_evtrigs` config to true, this is false by default.
@@ -101,7 +104,8 @@ supautils.privileged_role_allowed_configs="ext.*"
 
 ### Privileged Extensions
 
-This functionality is adapted from [pgextwlist](https://github.com/dimitri/pgextwlist).
+> [!NOTE]
+> This functionality is adapted from [pgextwlist](https://github.com/dimitri/pgextwlist).
 
 supautils allows you to let non-superusers manage extensions that would normally require being a superuser. e.g. the `hstore` extension creates a base type, which requires being a superuser to perform.
 
@@ -136,16 +140,6 @@ grant all on type hstore to non_superuser_role;
 
 This is useful for things like creating a dedicated role per extension and granting privileges as needed to that role.
 
-#### Configuration
-
-Settings available:
-
-```
-supautils.privileged_extensions = 'hstore,moddatetime'
-supautils.privileged_extensions_custom_scripts_path = '/opt/postgresql/privileged_extensions_custom_scripts'
-supautils.privileged_extensions_superuser = 'postgres'
-```
-
 ### Constrained Extensions
 
 You can constrain the resources needed for an extension to be installed. This is done through:
@@ -160,10 +154,9 @@ Each top field of the json object corresponds to an extension name, the only val
 
 - `cpu`: is the minimum number of cpus this extension needs. It's a json number.
 - `mem`: is the minimum amount of memory this extension needs. It's a json string that takes a human-readable format of bytes.
+  + The human-readable format is the same that [pg_size_pretty](https://pgpedia.info/p/pg_size_pretty.html) returns.
 - `disk`: is the minimum amount of free disk space this extension needs. It's a json string that takes a human-readable format of bytes.
   + The free space of the disk is taken from the filesystem where PGDATA (data directory) is located.
-
-Note: this human-readable format is the same that [pg_size_pretty](https://pgpedia.info/p/pg_size_pretty.html) would give.
 
 `CREATE EXTENSION` will fail if any of the resource constraints are not met:
 
@@ -202,9 +195,8 @@ postgres=> \dx pg_cron
 
 #### Manage Policies
 
-In Postgres, only table owners can create RLS policies for a table. This can be
-limiting if you need to allow certain roles to manage policies without allowing
-them to perform other DDL (e.g. to prevent them from dropping the table).
+In Postgres, only table owners can create RLS policies for a table. This can be limiting if you need to allow certain roles to manage policies without allowing them
+to perform other DDL (e.g. to prevent them from dropping the table).
 
 With supautils, this can be done like so:
 
@@ -212,8 +204,7 @@ With supautils, this can be done like so:
 supautils.policy_grants = '{ "my_role": ["public.not_my_table", "public.also_not_my_table"] }'
 ```
 
-This allows `my_role` to manage policies for `public.not_my_table` and
-`public.also_not_my_table` without being an owner of these tables.
+This allows `my_role` to manage policies for `public.not_my_table` and `public.also_not_my_table` without being an owner of these tables.
 
 #### Drop Triggers
 
@@ -228,7 +219,7 @@ supautils.drop_trigger_grants = '{ "my_role": ["public.not_my_table", "public.al
 > [!IMPORTANT]
 > The CREATEROLE problem is solved starting from PostgreSQL 16.
 
-Non-superusers with the CREATEROLE privilege can ALTER, DROP or GRANT non-superuser roles without restrictions.
+Roles with the CREATEROLE privilege can ALTER, DROP or GRANT other roles without restrictions.
 
 From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.html):
 
@@ -244,20 +235,6 @@ supautils.reserved_roles = 'connector, storage_admin'
 
 Roles with the CREATEROLE privilege cannot ALTER or DROP the above reserved roles.
 
-This extension also allows restricting roles memberships. Certain default postgres roles are dangerous to expose to every database user.
-From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
-
-> The pg_read_server_files, pg_write_server_files and pg_execute_server_program roles are intended to allow administrators to have trusted,
-> but non-superuser, roles which are able to access files and run programs on the database server as the user the database runs as.
-> As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
-> and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
-
-For example, you can restrict doing `GRANT pg_read_server_files TO my_role` by setting:
-
-```
-supautils.reserved_memberships = 'pg_read_server_files'
-```
-
 #### Reserved Roles Settings
 
 By default, reserved roles cannot have their settings changed. However their settings can be modified by the [Privileged Role](#privileged-role) if they're configured like so:
@@ -265,6 +242,23 @@ By default, reserved roles cannot have their settings changed. However their set
 ```
 supautils.reserved_roles = 'connector*, storage_admin*'
 ```
+
+### Reserved Memberships
+
+Certain default postgres roles are dangerous to expose to every database user. From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
+
+> The pg_read_server_files, pg_write_server_files and pg_execute_server_program roles are intended to allow administrators to have trusted,
+> but non-superuser, roles which are able to access files and run programs on the database server as the user the database runs as.
+> As these roles are able to access any file on the server file system, they bypass all database-level permission checks when accessing files directly
+> and **they could be used to gain superuser-level access**, therefore great care should be taken when granting these roles to users.
+
+Supautils allows you to restrict doing `GRANT pg_read_server_files TO my_role` by setting:
+
+```
+supautils.reserved_memberships = 'pg_read_server_files'
+```
+
+This is also useful to limit memberships to the [Reserved Roles](#reserved-roles).
 
 ## Development
 
