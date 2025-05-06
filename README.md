@@ -1,14 +1,13 @@
 # supautils
 
 [![Coverage Status](https://coveralls.io/repos/github/supabase/supautils/badge.svg?branch=master)](https://coveralls.io/github/supabase/supautils?branch=master)
+![PostgreSQL version](https://img.shields.io/badge/postgresql-13+-blue.svg)
 
 Supautils is an extension that unlocks advanced Postgres features without granting SUPERUSER access.
 
-It's a loadable library that allows creating event triggers, publications, and other highly privileged database objects on cloud deployments where giving SUPERUSER rights to end users isn’t an option.
+It's a loadable library that securely allows creating event triggers, publications, extensions to non-superusers. Built for cloud deployments where giving SUPERUSER rights to end users isn’t an option.
 
-It's managed entirely by configuration — no tables, functions, or security labels are added to your database. That makes upgrades effortless and lets you apply settings cluster-wide solely via `postgresql.conf`.
-
-Tested to work on PostgreSQL 13, 14, 15, 16 and 17.
+Completely managed by configuration — no tables, functions, or security labels are added to your database. This makes upgrades effortless and lets you apply settings cluster-wide solely via `postgresql.conf`.
 
 ## Installation
 
@@ -22,6 +21,7 @@ To make supautils available to the whole cluster, you can add the following to `
 
 ```
 shared_preload_libraries = 'supautils'
+supautils.privileged_role = 'your_privileged_role'
 ```
 
 Or to make it available only on some PostgreSQL roles use `session_preload_libraries`.
@@ -33,6 +33,10 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 ## Features
 
 - [Privileged Role](#privileged-role)
+- [Non-Superuser Publications](#non-superuser-publications)
+- [Non-Superuser Foreign Data Wrappers](#non-superuser-foreign-data-wrappers)
+- [Non-Superuser Settings](#non-superuser-settings)
+- [Non-Superuser Event Triggers](#non-superuser-event-triggers)
 - [Privileged extensions](#privileged-extensions)
 - [Constrained extensions](#constrained-extensions)
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
@@ -42,22 +46,57 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 
 ### Privileged Role
 
-PostgreSQL doesn't allow non-superusers to create certain database objects like publications, foreign data wrappers or event triggers. supautils allows creating these by configuring a `supautils.privileged_role`.
-This role is a proxy role for a SUPERUSER, which is configured by `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to bootstrap the Postgres cluster).
+The privileged role is a proxy role for a SUPERUSER, which is configured by `supautils.superuser` (defaults to the bootstrap user, i.e. the role used to start the Postgres cluster).
 
-#### Non-Superuser Publications
+When the privileged role creates a superuser-only database object (like publications):
 
-The privileged role can create publications. When it executes `create publication`, supautils will detect the statement and:
+- supautils will switch the role to the `supautils.superuser`, allowing the operation and creating the database object.
+  + In cases like event triggers, it will add additional protections. See [Non-Superuser Event Triggers](#non-superuser-event-triggers).
+- It will change the ownership of the database object to the privileged role.
+- Finally, supautils will switch back to the privileged role.
 
-- It will switch to the `supautils.superuser`, allowing the operation and creating the publication.
-- It will change the ownership of the publication to the privileged role.
-- Finally, it will switch back to the privileged role.
+### Non-Superuser Publications
 
-#### Non-Superuser Foreign Data Wrappers
+The privileged role can create publications. Once created they will be owned by the privileged role.
 
-The privileged role can also execute `create foreign data wrapper..`, the logic followed is analogous to publication creation.
+```sql
+set role privileged_role;
+select current_setting('is_superuser');
+ current_setting
+-----------------
+ off
+(1 row)
 
-#### Non-Superuser Event Triggers
+create publication p for all tables;
+CREATE PUBLICATION
+
+drop publication p;
+DROP PUBLICATION
+```
+
+### Non-Superuser Foreign Data Wrappers
+
+The privileged role can create FDWs.
+
+
+```sql
+set role privileged_role;
+select current_setting('is_superuser');
+ current_setting
+-----------------
+ off
+(1 row)
+
+create extension postgres_fdw;
+CREATE EXTENSION
+
+create foreign data wrapper new_fdw
+  handler postgres_fdw_handler
+  validator postgres_fdw_validator;
+CREATE FOREIGN DATA WRAPPER
+```
+
+### Non-Superuser Event Triggers
 
 The privileged role is also able to create event triggers, while adding protection for privilege escalation.
 
@@ -72,17 +111,24 @@ The skipping behavior can be logged by setting the `supautils.log_skipped_evtrig
 Superuser event triggers work as usual, with the additional restriction that the event trigger function must be owned by a superuser.
 
 ```sql
+set role privileged_role;
+select current_setting('is_superuser');
+ current_setting
+-----------------
+ off
+(1 row)
+
 create event trigger evtrig on ddl_command_end
 execute procedure func(); -- func must be owned by the superuser
+CREATE EVENT TRIGGER
 ```
 
 The privileged role won't be able to ALTER or DROP a superuser event trigger.
 
 > [!IMPORTANT]
-> Limitation: privileged role event triggers won't fire when creating publications, foreign data wrappers or extensions.
-> This is due to implementation details, since supautils has to switch to `supautils.superuser` when creating the above database objects, and we have to skip privileged role event triggers here to avoid privilege escalation.
+> Limitation: privileged role event triggers won't fire when creating publications, foreign data wrappers or extensions. See https://github.com/supabase/supautils/issues/123.
 
-#### Non-Superuser Settings
+### Non-Superuser Settings
 
 Certain settings like `session_replication_role` can only be set by superusers. The privileged role can be allowed to change these settings by listing them in:
 
@@ -216,10 +262,12 @@ supautils.drop_trigger_grants = '{ "my_role": ["public.not_my_table", "public.al
 
 ### Reserved Roles
 
+Reserved roles are meant to be used by managed services that connect to the database. They're protected from mutations by end users.
+
 > [!IMPORTANT]
 > The CREATEROLE problem is solved starting from PostgreSQL 16.
 
-Roles with the CREATEROLE privilege can ALTER, DROP or GRANT other roles without restrictions.
+Additionally it solves a problem with the CREATEROLE privilege. As it can ALTER, DROP or GRANT other roles without restrictions.
 
 From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.html):
 
@@ -227,7 +275,7 @@ From [role attributes docs](https://www.postgresql.org/docs/15/role-attributes.h
 > However, to create, alter, drop, or change membership of a superuser role, superuser status is required;
 > CREATEROLE is insufficient for that.
 
-The above problem can be solved by configuring this extension to protect a set of roles, using the `reserved_roles` setting.
+The above can be solved by configuring this extension to protect a set of roles, using the `reserved_roles` setting.
 
 ```
 supautils.reserved_roles = 'connector, storage_admin'

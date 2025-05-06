@@ -1,7 +1,7 @@
 {
    "name": "supautils",
    "abstract": "Unlock advanced Postgres features without granting SUPERUSER access",
-   "description": "Loadable library that allows creating event triggers, publications, and other highly privileged database objects on cloud deployments where giving SUPERUSER rights to end users isn’t an option",
+   "description": "Loadable library that securely allows creating event triggers, publications, extensions to non-superusers",
    "version": "2.9.1",
    "maintainer": [
       "Steve Chavez <steve@supabase.io>",
