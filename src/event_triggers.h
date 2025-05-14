@@ -12,9 +12,14 @@ typedef struct {
         List     *funcname;
         FmgrInfo *finfo;
     } val;
-} func_owner_search;
+} func_search;
 
-extern Oid get_function_owner(func_owner_search search);
+typedef struct {
+  Oid owner;
+  bool is_security_definer;
+} func_attrs;
+
+extern func_attrs get_function_attrs(func_search search);
 
 extern void force_noop(FmgrInfo *finfo);
 

@@ -97,12 +97,18 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
     // we only need to change behavior before the function gets executed
     case FHET_START: {
         if (is_event_trigger_function(flinfo->fn_oid)){ // recheck the function is an event trigger in case another extension need_fmgr_hook passed our supautils_needs_fmgr_hook
-            const char *current_role_name = GetUserNameFromId(GetUserId(), false);
-            const bool role_is_super = superuser();
+            func_attrs fattrs = get_function_attrs((func_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo });
+            const Oid current_role_oid =
+                fattrs.is_security_definer?
+                // when the function is security definer, we need to get the session user id otherwise it will fire for superusers or reserved roles.
+                // See https://github.com/supabase/supautils/issues/140.
+                GetOuterUserId():
+                GetUserId();
+            const char *current_role_name = GetUserNameFromId(current_role_oid, false);
+            const bool role_is_super = superuser_arg(current_role_oid);
             const bool role_is_reserved = is_reserved_role(current_role_name, false);
             if (role_is_super || role_is_reserved) {
-                Oid func_owner = get_function_owner((func_owner_search){ .as = FO_SEARCH_FINFO, .val.finfo = flinfo });
-                bool function_is_owned_by_super = superuser_arg(func_owner);
+                bool function_is_owned_by_super = superuser_arg(fattrs.owner);
                 if (!function_is_owned_by_super){
                     if (log_skipped_evtrigs){
                       char *func_name = get_func_name(flinfo->fn_oid);
@@ -110,7 +116,7 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
                         NOTICE,
                         errmsg("Skipping event trigger function \"%s\" for user \"%s\"", func_name, current_role_name),
                         errdetail("\"%s\" %s and the function \"%s\" is not superuser-owned, it's owned by \"%s\"",
-                            current_role_name, role_is_super?"is a superuser":"is a reserved role", func_name, GetUserNameFromId(func_owner, false))
+                            current_role_name, role_is_super?"is a superuser":"is a reserved role", func_name, GetUserNameFromId(fattrs.owner, false))
                       );
                     }
                     // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
@@ -814,8 +820,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           const char *current_role_name = GetUserNameFromId(current_user_id, false);
 
           bool current_user_is_super = superuser_arg(current_user_id);
-          Oid  function_owner = get_function_owner((func_owner_search){FO_SEARCH_NAME, {stmt->funcname}});
-          bool function_is_owned_by_super = superuser_arg(function_owner);
+          func_attrs fattrs = get_function_attrs((func_search){FO_SEARCH_NAME, {stmt->funcname}});
+          bool function_is_owned_by_super = superuser_arg(fattrs.owner);
 
           if(!current_user_is_super && function_is_owned_by_super){
             ereport(ERROR, (

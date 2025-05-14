@@ -19,7 +19,7 @@ force_noop(FmgrInfo *finfo)
     finfo->fn_expr   = NULL;                 /* no parse tree */
 }
 
-Oid get_function_owner(func_owner_search search){
+func_attrs get_function_attrs(func_search search){
   // Lookup function name OID. Note that for event trigger functions, there's no arguments.
   Oid func_oid = InvalidOid;
 
@@ -39,10 +39,11 @@ Oid get_function_owner(func_owner_search search){
 
   Form_pg_proc procForm = (Form_pg_proc) GETSTRUCT(proc_tup);
   Oid func_owner = procForm->proowner;
+  bool is_secdef = procForm->prosecdef;
 
   ReleaseSysCache(proc_tup);
 
-  return func_owner;
+  return (func_attrs){func_owner, is_secdef};
 }
 
 bool is_event_trigger_function(Oid foid){

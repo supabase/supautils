@@ -144,3 +144,43 @@ drop event trigger event_trigger_1;
 set role privileged_role;
 drop event trigger event_trigger_1;
 drop event trigger event_trigger_2;
+\echo
+
+-- security definer function case
+set role privileged_role;
+create function secdef_show_current_user()
+    returns event_trigger
+    language plpgsql
+    security definer as
+$$
+begin
+    raise notice 'the event trigger is executed for %', current_user;
+end;
+$$;
+create event trigger event_trigger_3 on ddl_command_end
+execute procedure secdef_show_current_user();
+\echo
+
+-- secdef won't be executed for superuser
+set role postgres;
+create table super_foo();
+\echo
+
+-- secdef won't be executed for reserved roles
+set role supabase_storage_admin;
+create table storage_foo();
+\echo
+
+-- secdef will be executed for other roles
+set role rolecreator;
+create table rolecreator_foo();
+\echo
+
+-- secdef will be executed for privileged_role
+set role privileged_role;
+create table privileged_role_foo();
+\echo
+
+-- cleanup
+set role privileged_role;
+drop event trigger event_trigger_3;
