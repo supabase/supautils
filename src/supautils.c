@@ -464,39 +464,45 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       if (superuser()) {
           break;
       }
-      if (privileged_extensions == NULL) {
-          break;
-      }
 
       AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
-      handle_alter_extension(prev_hook,
-                             PROCESS_UTILITY_ARGS,
-                             stmt->extname,
-                             privileged_extensions,
-                             supautils_superuser);
-      return;
+      if (is_extension_privileged(stmt->extname, privileged_extensions)) {
+          bool already_switched_to_superuser = false;
+
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+          run_process_utility_hook(prev_hook);
+
+          if (!already_switched_to_superuser) {
+              switch_to_original_role();
+          }
+      }
+
+      break;
   }
 
   /*
    * ALTER EXTENSION <extension> SET SCHEMA
    */
   case T_AlterObjectSchemaStmt: {
+      if (superuser()) {
+          break;
+      }
+
       AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
 
-      if (stmt->objectType == OBJECT_EXTENSION){
-          if (superuser()) {
-              break;
-          }
-          if (privileged_extensions == NULL) {
-              break;
-          }
+      if (stmt->objectType == OBJECT_EXTENSION &&
+          is_extension_privileged(strVal(stmt->object), privileged_extensions)) {
+         bool already_switched_to_superuser = false;
 
-          handle_alter_extension(prev_hook,
-                                 PROCESS_UTILITY_ARGS,
-                                 strVal(stmt->object),
-                                 privileged_extensions,
-                                 supautils_superuser);
+         switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+         run_process_utility_hook(prev_hook);
+
+         if (!already_switched_to_superuser) {
+             switch_to_original_role();
+         }
 
          return;
       }
@@ -666,14 +672,21 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
            */
           case OBJECT_EXTENSION:
           {
-              if (privileged_extensions == NULL) {
-                  break;
+              if (all_extensions_are_privileged(stmt->objects, privileged_extensions)) {
+                bool already_switched_to_superuser = false;
+                switch_to_superuser(supautils_superuser,
+                                    &already_switched_to_superuser);
+
+                run_process_utility_hook(prev_hook);
+
+                if (!already_switched_to_superuser) {
+                    switch_to_original_role();
+                }
+
+                return;
               }
-              handle_drop_extension(prev_hook,
-                                    PROCESS_UTILITY_ARGS,
-                                    privileged_extensions,
-                                    supautils_superuser);
-              return;
+
+              break;
           }
 
           /*
