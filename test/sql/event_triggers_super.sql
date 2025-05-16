@@ -47,10 +47,18 @@ drop table storage_stuff;
 
 -- creating extensions will fire superuser evtrigs
 set role privileged_role;
-\echo
-
 create extension postgres_fdw;
 drop extension postgres_fdw;
+\echo
+
+-- creating fdws will fire superuser evtrigs
+create foreign data wrapper new_fdw;
+drop foreign data wrapper new_fdw;
+\echo
+
+-- creating publications will fire superuser evtrigs
+create publication p for all tables;
+drop publication p;
 \echo
 
 -- a non-privileged role cannot alter a superuser owned evtrig

@@ -56,12 +56,24 @@ NOTICE:  superuser mandated event trigger: current_user is supabase_storage_admi
 
 -- creating extensions will fire superuser evtrigs
 set role privileged_role;
-\echo
-
 create extension postgres_fdw;
 NOTICE:  superuser mandated event trigger: current_user is postgres
 drop extension postgres_fdw;
 NOTICE:  superuser mandated event trigger: current_user is postgres
+\echo
+
+-- creating fdws will fire superuser evtrigs
+create foreign data wrapper new_fdw;
+NOTICE:  superuser mandated event trigger: current_user is postgres
+drop foreign data wrapper new_fdw;
+NOTICE:  superuser mandated event trigger: current_user is privileged_role
+\echo
+
+-- creating publications will fire superuser evtrigs
+create publication p for all tables;
+NOTICE:  superuser mandated event trigger: current_user is postgres
+drop publication p;
+NOTICE:  superuser mandated event trigger: current_user is privileged_role
 \echo
 
 -- a non-privileged role cannot alter a superuser owned evtrig

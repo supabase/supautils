@@ -87,16 +87,32 @@ NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
 DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
 \echo
 
--- extensions won't execute the event trigger function (since they're executed by superuser under our implementation)
-set role rolecreator;
-\echo
-
+-- creating extensions will not fire evtrigs
+set role privileged_role;
 create extension postgres_fdw;
 NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
 DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
 drop extension postgres_fdw;
 NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
 DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
+\echo
+
+-- creating fdws will not fire evtrigs
+create foreign data wrapper new_fdw;
+NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
+DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
+-- TODO: while correct, this is inconsistent as dropping the fdw does fire the evtrig for the privileged_role
+drop foreign data wrapper new_fdw;
+NOTICE:  the event trigger is executed for privileged_role
+\echo
+
+-- creating pubs will not fire evtrigs
+create publication p for all tables;
+NOTICE:  Skipping event trigger function "show_current_user" for user "postgres"
+DETAIL:  "postgres" is a superuser and the function "show_current_user" is not superuser-owned, it's owned by "privileged_role"
+-- TODO: while correct, this is inconsistent as dropping the publication does fire the evtrig for the privileged_role
+drop publication p;
+NOTICE:  the event trigger is executed for privileged_role
 \echo
 
 -- privesc shouldn't happen due to superuser tripping over a user-defined event trigger
