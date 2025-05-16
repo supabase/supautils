@@ -248,56 +248,24 @@ void handle_create_extension(
     pfree(filename);
 }
 
-void handle_alter_extension(
-    void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS,
-    const char *extname, const char *privileged_extensions,
-    const char *superuser) {
+bool all_extensions_are_privileged(List *objects, const char *privileged_extensions){
+  ListCell *lc;
 
-    if (is_string_in_comma_delimited_string(extname,
-                                            privileged_extensions)) {
-        bool already_switched_to_superuser = false;
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
+  if(privileged_extensions == NULL) return false;
 
-        run_process_utility_hook(process_utility_hook);
+  foreach (lc, objects) {
+      char *name = strVal(lfirst(lc));
 
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    } else {
-        run_process_utility_hook(process_utility_hook);
-    }
+      if (!is_string_in_comma_delimited_string(name, privileged_extensions)) {
+          return false;
+      }
+  }
+
+  return true;
 }
 
-void handle_drop_extension(void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-                           PROCESS_UTILITY_PARAMS,
-                           const char *privileged_extensions,
-                           const char *superuser) {
-    DropStmt *stmt = (DropStmt *)pstmt->utilityStmt;
-    bool all_extensions_are_privileged = true;
-    ListCell *lc;
+bool is_extension_privileged(const char *extname, const char *privileged_extensions){
+  if(privileged_extensions == NULL) return false;
 
-    foreach (lc, stmt->objects) {
-        char *name = strVal(lfirst(lc));
-
-        if (!is_string_in_comma_delimited_string(name, privileged_extensions)) {
-            all_extensions_are_privileged = false;
-            break;
-        }
-    }
-
-    if (all_extensions_are_privileged) {
-        bool already_switched_to_superuser = false;
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
-
-        run_process_utility_hook(process_utility_hook);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    } else {
-        run_process_utility_hook(process_utility_hook);
-    }
+  return is_string_in_comma_delimited_string(extname, privileged_extensions);
 }
