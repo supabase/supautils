@@ -1,3 +1,7 @@
+-- enable logging skipped event triggers
+set supautils.log_skipped_evtrigs = true;
+\echo
+
 -- create a function owned by a non-superuser
 set role privileged_role;
 \echo
@@ -99,10 +103,12 @@ set role postgres;
 \echo
 
 create table super_duper_stuff();
+\echo
+
 select count(*) = 1 as only_one_super from pg_roles where rolsuper;
 
--- ensure logging skipped event triggers happens when enabled, for superusers and reserved roles
-set supautils.log_skipped_evtrigs = true;
+-- ensure logging doesn't happen when the GUC is disabled
+set supautils.log_skipped_evtrigs = false;
 \echo
 
 create table supa_stuff();
@@ -114,7 +120,8 @@ set role supabase_storage_admin;
 create table some_stuff();
 \echo
 
-reset supautils.log_skipped_evtrigs;
+-- restablish logging for the rest of the tests
+set supautils.log_skipped_evtrigs = true;
 \echo
 
 -- privesc won't happen because the event trigger function will fire with the privileges
