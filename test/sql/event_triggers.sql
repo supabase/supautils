@@ -71,12 +71,22 @@ set role postgres;
 create table super_stuff();
 \echo
 
--- extensions won't execute the event trigger function (since they're executed by superuser under our implementation)
-set role rolecreator;
-\echo
-
+-- creating extensions will not fire evtrigs
+set role privileged_role;
 create extension postgres_fdw;
 drop extension postgres_fdw;
+\echo
+
+-- creating fdws will not fire evtrigs
+create foreign data wrapper new_fdw;
+-- TODO: while correct, this is inconsistent as dropping the fdw does fire the evtrig for the privileged_role
+drop foreign data wrapper new_fdw;
+\echo
+
+-- creating pubs will not fire evtrigs
+create publication p for all tables;
+-- TODO: while correct, this is inconsistent as dropping the publication does fire the evtrig for the privileged_role
+drop publication p;
 \echo
 
 -- privesc shouldn't happen due to superuser tripping over a user-defined event trigger
