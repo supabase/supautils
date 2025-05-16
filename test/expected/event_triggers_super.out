@@ -1,3 +1,7 @@
+-- skipped event triggers are logged
+set supautils.log_skipped_evtrigs = true;
+\echo
+
 -- a superuser can create an event trigger
 set role postgres;
 \echo
@@ -116,3 +120,7 @@ ERROR:  must be owner of event trigger event_trigger_1
 -- only the superuser can drop its own event triggers
 set role postgres;
 drop event trigger event_trigger_1;
+\echo
+
+-- disable logging event triggers
+reset supautils.log_skipped_evtrigs;
