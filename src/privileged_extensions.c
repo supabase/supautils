@@ -67,94 +67,99 @@ static void run_custom_script(const char *filename, const char *extname,
     running_custom_script = false;
 }
 
-void handle_create_extension(
-    void (*process_utility_hook)(PROCESS_UTILITY_PARAMS),
-    PROCESS_UTILITY_PARAMS, const char *privileged_extensions,
-    const char *superuser,
-    const char *privileged_extensions_custom_scripts_path,
-    const extension_parameter_overrides *epos, const size_t total_epos) {
-    CreateExtensionStmt *stmt = (CreateExtensionStmt *)pstmt->utilityStmt;
-    char *filename = (char *)palloc(MAXPGPATH);
+void run_global_before_create_script(char *extname, List *options, const char *privileged_extensions_custom_scripts_path){
+    DefElem *d_schema = NULL, *d_new_version = NULL, *d_cascade = NULL;
+    char *extschema = NULL, *extversion = NULL;
+    bool extcascade = false;
+    char filename[MAXPGPATH];
 
-    // Run global before-create script.
-    {
-        DefElem *d_schema = NULL;
-        DefElem *d_new_version = NULL;
-        DefElem *d_cascade = NULL;
-        char *extschema = NULL;
-        char *extversion = NULL;
-        bool extcascade = false;
-        ListCell *option_cell = NULL;
-        bool already_switched_to_superuser = false;
+    ListCell *option_cell = NULL;
 
-        foreach (option_cell, stmt->options) {
-            DefElem *defel = (DefElem *)lfirst(option_cell);
+    foreach (option_cell, options) {
+        DefElem *defel = (DefElem *)lfirst(option_cell);
 
-            if (strcmp(defel->defname, "schema") == 0) {
-                d_schema = defel;
-                extschema = defGetString(d_schema);
-            } else if (strcmp(defel->defname, "new_version") == 0) {
-                d_new_version = defel;
-                extversion = defGetString(d_new_version);
-            } else if (strcmp(defel->defname, "cascade") == 0) {
-                d_cascade = defel;
-                extcascade = defGetBoolean(d_cascade);
-            }
-        }
-
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
-
-        snprintf(filename, MAXPGPATH, "%s/before-create.sql",
-                 privileged_extensions_custom_scripts_path);
-        run_custom_script(filename, stmt->extname, extschema, extversion,
-                          extcascade);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
+        if (strcmp(defel->defname, "schema") == 0) {
+            d_schema = defel;
+            extschema = defGetString(d_schema);
+        } else if (strcmp(defel->defname, "new_version") == 0) {
+            d_new_version = defel;
+            extversion = defGetString(d_new_version);
+        } else if (strcmp(defel->defname, "cascade") == 0) {
+            d_cascade = defel;
+            extcascade = defGetBoolean(d_cascade);
         }
     }
 
-    // Run per-extension before-create script.
-    {
-        DefElem *d_schema = NULL;
-        DefElem *d_new_version = NULL;
-        DefElem *d_cascade = NULL;
-        char *extschema = NULL;
-        char *extversion = NULL;
-        bool extcascade = false;
-        ListCell *option_cell = NULL;
-        bool already_switched_to_superuser = false;
+    snprintf(filename, MAXPGPATH, "%s/before-create.sql",
+             privileged_extensions_custom_scripts_path);
+    run_custom_script(filename, extname, extschema, extversion,
+                      extcascade);
+}
 
-        foreach (option_cell, stmt->options) {
-            DefElem *defel = (DefElem *)lfirst(option_cell);
+void run_ext_before_create_script(char *extname, List *options, const char *privileged_extensions_custom_scripts_path){
+    DefElem *d_schema = NULL;
+    DefElem *d_new_version = NULL;
+    DefElem *d_cascade = NULL;
+    char *extschema = NULL;
+    char *extversion = NULL;
+    bool extcascade = false;
+    ListCell *option_cell = NULL;
+    char filename[MAXPGPATH];
 
-            if (strcmp(defel->defname, "schema") == 0) {
-                d_schema = defel;
-                extschema = defGetString(d_schema);
-            } else if (strcmp(defel->defname, "new_version") == 0) {
-                d_new_version = defel;
-                extversion = defGetString(d_new_version);
-            } else if (strcmp(defel->defname, "cascade") == 0) {
-                d_cascade = defel;
-                extcascade = defGetBoolean(d_cascade);
-            }
-        }
+    foreach (option_cell, options) {
+        DefElem *defel = (DefElem *)lfirst(option_cell);
 
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
-
-        snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
-                 privileged_extensions_custom_scripts_path, stmt->extname);
-        run_custom_script(filename, stmt->extname, extschema, extversion,
-                          extcascade);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
+        if (strcmp(defel->defname, "schema") == 0) {
+            d_schema = defel;
+            extschema = defGetString(d_schema);
+        } else if (strcmp(defel->defname, "new_version") == 0) {
+            d_new_version = defel;
+            extversion = defGetString(d_new_version);
+        } else if (strcmp(defel->defname, "cascade") == 0) {
+            d_cascade = defel;
+            extcascade = defGetBoolean(d_cascade);
         }
     }
 
-    // Apply overrides.
+
+    snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
+             privileged_extensions_custom_scripts_path, extname);
+    run_custom_script(filename, extname, extschema, extversion,
+                      extcascade);
+}
+
+void run_ext_after_create_script(char *extname, List *options, const char *privileged_extensions_custom_scripts_path){
+    DefElem *d_schema = NULL;
+    DefElem *d_new_version = NULL;
+    DefElem *d_cascade = NULL;
+    char *extschema = NULL;
+    char *extversion = NULL;
+    bool extcascade = false;
+    ListCell *option_cell = NULL;
+    char filename[MAXPGPATH];
+
+    foreach (option_cell, options) {
+        DefElem *defel = (DefElem *)lfirst(option_cell);
+
+        if (strcmp(defel->defname, "schema") == 0) {
+            d_schema = defel;
+            extschema = defGetString(d_schema);
+        } else if (strcmp(defel->defname, "new_version") == 0) {
+            d_new_version = defel;
+            extversion = defGetString(d_new_version);
+        } else if (strcmp(defel->defname, "cascade") == 0) {
+            d_cascade = defel;
+            extcascade = defGetBoolean(d_cascade);
+        }
+    }
+
+    snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
+             privileged_extensions_custom_scripts_path, extname);
+    run_custom_script(filename, extname, extschema, extversion,
+                      extcascade);
+}
+
+void override_create_ext_statement(CreateExtensionStmt *stmt, const size_t total_epos, const extension_parameter_overrides *epos){
     for (size_t i = 0; i < total_epos; i++) {
         if (strcmp(epos[i].name, stmt->extname) == 0) {
             const extension_parameter_overrides *epo = &epos[i];
@@ -189,63 +194,6 @@ void handle_create_extension(
             }
         }
     }
-
-    // Run `CREATE EXTENSION`.
-    if (is_string_in_comma_delimited_string(stmt->extname,
-                                            privileged_extensions)) {
-        bool already_switched_to_superuser = false;
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
-
-        run_process_utility_hook(process_utility_hook);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    } else {
-        run_process_utility_hook(process_utility_hook);
-    }
-
-    // Run per-extension after-create script.
-    {
-        DefElem *d_schema = NULL;
-        DefElem *d_new_version = NULL;
-        DefElem *d_cascade = NULL;
-        char *extschema = NULL;
-        char *extversion = NULL;
-        bool extcascade = false;
-        ListCell *option_cell = NULL;
-        bool already_switched_to_superuser = false;
-
-        foreach (option_cell, stmt->options) {
-            DefElem *defel = (DefElem *)lfirst(option_cell);
-
-            if (strcmp(defel->defname, "schema") == 0) {
-                d_schema = defel;
-                extschema = defGetString(d_schema);
-            } else if (strcmp(defel->defname, "new_version") == 0) {
-                d_new_version = defel;
-                extversion = defGetString(d_new_version);
-            } else if (strcmp(defel->defname, "cascade") == 0) {
-                d_cascade = defel;
-                extcascade = defGetBoolean(d_cascade);
-            }
-        }
-
-        switch_to_superuser(superuser,
-                            &already_switched_to_superuser);
-
-        snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
-                 privileged_extensions_custom_scripts_path, stmt->extname);
-        run_custom_script(filename, stmt->extname, extschema, extversion,
-                          extcascade);
-
-        if (!already_switched_to_superuser) {
-            switch_to_original_role();
-        }
-    }
-
-    pfree(filename);
 }
 
 bool all_extensions_are_privileged(List *objects, const char *privileged_extensions){
