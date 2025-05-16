@@ -448,13 +448,29 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       constrain_extension(stmt->extname, cexts, total_cexts);
 
-      handle_create_extension(prev_hook,
-                              PROCESS_UTILITY_ARGS,
-                              privileged_extensions,
-                              supautils_superuser,
-                              privileged_extensions_custom_scripts_path,
-                              epos, total_epos);
-      return;
+      if (is_extension_privileged(stmt->extname, privileged_extensions)) {
+         bool already_switched_to_superuser = false;
+
+         switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+         run_global_before_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+
+         run_ext_before_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+
+         override_create_ext_statement(stmt, total_epos, epos);
+
+         run_process_utility_hook(prev_hook);
+
+         run_ext_after_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+
+         if (!already_switched_to_superuser) {
+             switch_to_original_role();
+         }
+
+         return;
+      }
+
+      break;
   }
 
   /*
