@@ -10,11 +10,15 @@
 #include <catalog/pg_authid.h>
 #include <catalog/pg_proc.h>
 #include <commands/defrem.h>
+#include <commands/publicationcmds.h>
+#include <commands/defrem.h>
+#include <commands/event_trigger.h>
 #include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
 #include <nodes/makefuncs.h>
 #include <nodes/pg_list.h>
+#include <nodes/value.h>
 #include <parser/parse_func.h>
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>
