@@ -553,10 +553,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       run_process_utility_hook(prev_hook);
 
       CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
-      const char *current_role_name = GetUserNameFromId(current_user_id, false);
 
       // Change FDW owner to the current role (which is a privileged role)
-      alter_owner(stmt->fdwname, current_role_name, ALT_FDW);
+      alter_owner(stmt->fdwname, current_user_id, ALT_FDW);
 
       if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -584,10 +583,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       run_process_utility_hook(prev_hook);
 
       CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
-      const char *current_role_name = GetUserNameFromId(current_user_id, false);
 
       // Change publication owner to the current role (which is a privileged role)
-      alter_owner(stmt->pubname, current_role_name, ALT_PUB);
+      alter_owner(stmt->pubname, current_user_id, ALT_PUB);
 
       if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -846,7 +844,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           const Oid current_user_id = GetUserId();
 
           CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
-          const char *current_role_name = GetUserNameFromId(current_user_id, false);
 
           bool current_user_is_super = superuser_arg(current_user_id);
           func_attrs fattrs = get_function_attrs((func_search){FO_SEARCH_NAME, {stmt->funcname}});
@@ -855,14 +852,14 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           if(!current_user_is_super && function_is_owned_by_super){
             ereport(ERROR, (
               errmsg("Non-superuser owned event trigger must execute a non-superuser owned function")
-            , errdetail("The current user \"%s\" is not a superuser and the function \"%s\" is owned by a superuser", current_role_name, NameListToString(stmt->funcname))
+            , errdetail("The current user \"%s\" is not a superuser and the function \"%s\" is owned by a superuser", GetUserNameFromId(current_user_id, false), NameListToString(stmt->funcname))
             ));
           }
 
           if(current_user_is_super && !function_is_owned_by_super){
             ereport(ERROR, (
               errmsg("Superuser owned event trigger must execute a superuser owned function")
-            , errdetail("The current user \"%s\" is a superuser and the function \"%s\" is owned by a non-superuser", current_role_name, NameListToString(stmt->funcname))
+            , errdetail("The current user \"%s\" is a superuser and the function \"%s\" is owned by a non-superuser", GetUserNameFromId(current_user_id, false), NameListToString(stmt->funcname))
             ));
           }
 
@@ -872,7 +869,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
           if (!current_user_is_super)
             // Change event trigger owner to the current role (which is a privileged role)
-            alter_owner(stmt->trigname, current_role_name, ALT_EVTRIG);
+            alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
 
           if (!already_switched_to_superuser) {
               switch_to_original_role();

@@ -107,7 +107,7 @@ typedef enum {
 
 extern void alter_owner(
     const char *obj_name,
-    const char *role_name,
+    Oid role_oid,
     altered_obj_type obj_type
 );
 

@@ -81,67 +81,62 @@ bool remove_ending_wildcard(char *elem) {
     return wildcard_removed;
 }
 
+static void alter_role_super(const char* rolename, bool make_super){
+  RoleSpec *rolespec   = makeNode(RoleSpec);
+  rolespec->roletype   = ROLESPEC_CSTRING;
+  rolespec->rolename   = pstrdup(rolename);
+  rolespec->location   = -1;
+
+  AlterRoleStmt *alter_stmt = makeNode(AlterRoleStmt);
+  alter_stmt->role          = rolespec;
+
+  alter_stmt->options = list_make1(
+    makeDefElem("superuser", (Node *) makeInteger(make_super), -1) // using makeInteger because makeBoolean is not available on pg <= 14
+  );
+
+#if PG15_GTE
+  AlterRole(NULL, alter_stmt);
+#else
+  AlterRole(alter_stmt);
+#endif
+
+  CommandCounterIncrement();
+}
+
 // Changes the OWNER of a database object.
 // Some objects (e.g. foreign data wrappers) can only be owned by superusers, so this switches to superuser accordingly and then goes backs to non-super.
-void alter_owner(const char *obj_name, const char *role_name, altered_obj_type obj_type){
-
-  // static allocations to avoid dynamic palloc
-  static const char sql_fdw_template[] =
-    "alter role \"%s\" superuser;\n"
-    "alter foreign data wrapper \"%s\" owner to \"%s\";\n"
-    "alter role \"%s\" nosuperuser;\n";
-
-  static const char sql_evtrig_template[] =
-    "alter role \"%s\" superuser;\n"
-    "alter event trigger \"%s\" owner to \"%s\";\n"
-    "alter role \"%s\" nosuperuser;\n";
-
-  static const char sql_sub_template[] =
-    "alter publication \"%s\" owner to \"%s\";\n";
-
-  // max sql length for above templates
-  static const size_t max_sql_len
-        = sizeof (sql_fdw_template) // the fdw template is the largest one
-        + 4 * NAMEDATALEN; // the max size of the 4 identifiers on the fdw template
-
-  char sql[max_sql_len];
-
+void alter_owner(const char *obj_name, Oid role_oid, altered_obj_type obj_type){
   switch(obj_type){
-  case ALT_FDW:
-    snprintf(sql,
-             max_sql_len,
-             sql_fdw_template,
-             role_name,
-             obj_name,
-             role_name,
-             role_name);
-    break;
-  case ALT_PUB:
-    snprintf(sql,
-             max_sql_len,
-             sql_sub_template,
-             obj_name,
-             role_name);
-    break;
-  case ALT_EVTRIG:
-    snprintf(sql,
-             max_sql_len,
-             sql_evtrig_template,
-             role_name,
-             obj_name,
-             role_name,
-             role_name);
-    break;
+    case ALT_FDW:{
+      char* role_name = GetUserNameFromId(role_oid, false);
+      alter_role_super(role_name, true);
+
+      AlterForeignDataWrapperOwner(obj_name, role_oid);
+      CommandCounterIncrement();
+
+      alter_role_super(role_name, false);
+
+      break;
+    }
+
+    case ALT_PUB:
+
+      AlterPublicationOwner(obj_name, role_oid);
+      CommandCounterIncrement();
+
+      break;
+
+    case ALT_EVTRIG:{
+      char* role_name = GetUserNameFromId(role_oid, false);
+
+      alter_role_super(role_name, true);
+
+      AlterEventTriggerOwner(obj_name, role_oid);
+      CommandCounterIncrement();
+
+      alter_role_super(role_name, false);
+
+      break;
+    }
   }
-
-  PushActiveSnapshot(GetTransactionSnapshot());
-  SPI_connect();
-
-  int rc = SPI_execute(sql, false, 0);
-  if (rc != SPI_OK_UTILITY) {
-      elog(ERROR, "SPI_execute failed with error code %d", rc);
-  }
-
-  SPI_finish();
-  PopActiveSnapshot();
 }
