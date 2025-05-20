@@ -1,5 +1,4 @@
 #include "pg_prelude.h"
-#include "extensions_parameter_overrides.h"
 #include "privileged_extensions.h"
 #include "utils.h"
 
@@ -157,43 +156,6 @@ void run_ext_after_create_script(char *extname, List *options, const char *privi
              privileged_extensions_custom_scripts_path, extname);
     run_custom_script(filename, extname, extschema, extversion,
                       extcascade);
-}
-
-void override_create_ext_statement(CreateExtensionStmt *stmt, const size_t total_epos, const extension_parameter_overrides *epos){
-    for (size_t i = 0; i < total_epos; i++) {
-        if (strcmp(epos[i].name, stmt->extname) == 0) {
-            const extension_parameter_overrides *epo = &epos[i];
-            DefElem *schema_option = NULL;
-            DefElem *schema_override_option = NULL;
-            ListCell *option_cell;
-
-            if (epo->schema != NULL) {
-                Node *schema_node = (Node *)makeString(pstrdup(epo->schema));
-                schema_override_option = makeDefElem("schema", schema_node, -1);
-            }
-
-            foreach (option_cell, stmt->options) {
-                DefElem *defel = (DefElem *)lfirst(option_cell);
-
-                if (strcmp(defel->defname, "schema") == 0) {
-                    if (schema_option != NULL) {
-                        ereport(ERROR,
-                                (errcode(ERRCODE_SYNTAX_ERROR),
-                                 errmsg("conflicting or redundant options")));
-                    }
-                    schema_option = defel;
-                }
-            }
-
-            if (schema_override_option != NULL) {
-                if (schema_option != NULL) {
-                    stmt->options =
-                        list_delete_ptr(stmt->options, schema_option);
-                }
-                stmt->options = lappend(stmt->options, schema_override_option);
-            }
-        }
-    }
 }
 
 bool all_extensions_are_privileged(List *objects, const char *privileged_extensions){
