@@ -1,6 +1,8 @@
 #ifndef EXTENSIONS_PARAMETER_OVERRIDES_H
 #define EXTENSIONS_PARAMETER_OVERRIDES_H
 
+#include "pg_prelude.h"
+
 typedef struct {
     char *name;
     char *schema;
@@ -28,5 +30,10 @@ typedef struct {
 extern json_extension_parameter_overrides_parse_state
 parse_extensions_parameter_overrides(const char *str,
                                      extension_parameter_overrides *epos);
+
+extern void
+override_create_ext_statement(CreateExtensionStmt *stmt,
+                              const size_t total_epos,
+                              const extension_parameter_overrides *epos);
 
 #endif
