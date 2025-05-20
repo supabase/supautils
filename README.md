@@ -169,18 +169,20 @@ This also works for updating and dropping privileged extensions.
 
 If you don't want to enable this functionality, simply leave `supautils.privileged_extensions` empty. Extensions **not** in `supautils.privileged_extensions` would behave normally, i.e. created using the current role.
 
-supautils also lets you set custom scripts per privileged extension that gets run at certain events. Currently supported scripts are `before-create` and `after-create`.
+### Extension Custom Scripts
+
+supautils also lets you set custom scripts per extension that gets run at certain events. Currently supported scripts are `before-create` and `after-create`.
 
 To make this work, configure the setting below:
 
 ```
-supautils.privileged_extensions_custom_scripts_path = '/opt/postgresql/privileged_extensions_custom_scripts'
+supautils.extension_custom_scripts_path = '/some/path/extension-custom-scripts'
 ```
 
 Then put the scripts inside the path, e.g.:
 
 ```sql
--- /opt/postgresql/privileged_extensions_custom_scripts/hstore/after-create.sql
+-- /some/path/extension-custom-scripts/hstore/after-create.sql
 grant all on type hstore to non_superuser_role;
 ```
 

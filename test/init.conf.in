@@ -15,4 +15,4 @@ supautils.placeholders_disallowed_values='"content-type","x-special-header",spec
 supautils.extensions_parameter_overrides='{"sslinfo":{"schema":"pg_catalog"}}'
 supautils.drop_trigger_grants='{"privileged_role":["allow_drop_triggers.my_table"]}'
 supautils.policy_grants='{"privileged_role":["allow_policies.my_table","allow_policies.nonexistent_table"]}'
-supautils.privileged_extensions_custom_scripts_path='@TMPDIR@/privileged_extensions_custom_scripts'
+supautils.extension_custom_scripts_path='@TMPDIR@/extension-custom-scripts'
