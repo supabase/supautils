@@ -39,7 +39,7 @@ static char *placeholders_disallowed_values            = NULL;
 static char *empty_placeholder                         = NULL;
 static char *privileged_extensions                     = NULL;
 static char *supautils_superuser                       = NULL;
-static char *privileged_extensions_custom_scripts_path = NULL;
+static char *extension_custom_scripts_path             = NULL;
 static char *privileged_role                           = NULL; // the privileged_role is a proxy role for the `supautils.superuser` role
 static char *privileged_role_allowed_configs           = NULL;
 
@@ -452,9 +452,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_global_before_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+      run_global_before_create_script(stmt->extname, stmt->options, extension_custom_scripts_path);
 
-      run_ext_before_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+      run_ext_before_create_script(stmt->extname, stmt->options, extension_custom_scripts_path);
 
       override_create_ext_statement(stmt, total_epos, epos);
 
@@ -471,7 +471,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
           switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
       }
 
-      run_ext_after_create_script(stmt->extname, stmt->options, privileged_extensions_custom_scripts_path);
+      run_ext_after_create_script(stmt->extname, stmt->options, extension_custom_scripts_path);
 
       if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -1268,9 +1268,19 @@ void _PG_init(void) {
                              NULL);
 
   DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
-                             "Path to load privileged extensions' custom scripts from",
+                             "Path to load privileged extensions' custom scripts from. Deprecated: use supautils.extension_custom_scripts_path instead.",
                              NULL,
-                             &privileged_extensions_custom_scripts_path,
+                             &extension_custom_scripts_path,
+                             NULL,
+                             PGC_SIGHUP, 0,
+                             NULL,
+                             NULL,
+                             NULL);
+
+  DefineCustomStringVariable("supautils.extension_custom_scripts_path",
+                             "Path to load extension custom scripts from",
+                             NULL,
+                             &extension_custom_scripts_path,
                              NULL,
                              PGC_SIGHUP, 0,
                              NULL,
