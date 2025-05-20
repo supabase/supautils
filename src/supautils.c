@@ -1,6 +1,7 @@
 #include "pg_prelude.h"
 #include "constrained_extensions.h"
 #include "drop_trigger_grants.h"
+#include "extension_custom_scripts.h"
 #include "extensions_parameter_overrides.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
