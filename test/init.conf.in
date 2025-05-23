@@ -6,7 +6,7 @@ wal_level=logical
 
 supautils.reserved_roles='supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*'
 supautils.reserved_memberships='pg_read_server_files,pg_write_server_files,pg_execute_server_program,role_with_reserved_membership'
-supautils.privileged_extensions='autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, postgres_fdw, pageinspect'
+supautils.privileged_extensions='autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, fuzzystrmatch, postgres_fdw, pageinspect'
 supautils.constrained_extensions='{"adminpack": { "cpu": 64}, "cube": { "mem": "17 GB"}, "lo": { "disk": "100 GB"}, "amcheck": { "cpu": 2, "mem": "100 MB", "disk": "100 MB"}}'
 supautils.privileged_role='privileged_role'
 supautils.privileged_role_allowed_configs='session_replication_role, pgrst.*, other.nested.*'

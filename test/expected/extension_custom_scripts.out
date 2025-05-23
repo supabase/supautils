@@ -1,0 +1,38 @@
+set role extensions_role;
+\echo
+
+-- per-extension custom scripts are run
+create extension fuzzystrmatch;
+drop extension fuzzystrmatch;
+select * from t2;
+ column1 
+---------
+       1
+(1 row)
+
+reset role;
+drop table t2;
+set role extensions_role;
+\echo
+
+-- global extension custom scripts are run
+create extension dict_xsyn;
+NOTICE:  extname: dict_xsyn, extschema: <NULL>, extversion: <NULL>, extcascade: f
+create extension insert_username version "1.0" schema public cascade;
+NOTICE:  extname: insert_username, extschema: public, extversion: 1.0, extcascade: t
+\echo
+
+-- custom scripts are run even for superusers
+reset role;
+create extension fuzzystrmatch;
+drop extension fuzzystrmatch;
+select * from t2;
+ column1 
+---------
+       1
+(1 row)
+
+drop table t2;
+set role extensions_role;
+\echo
+
