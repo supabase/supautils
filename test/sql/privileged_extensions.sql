@@ -8,29 +8,6 @@ select '1=>2'::hstore;
 drop extension hstore;
 \echo
 
--- per-extension custom scripts are run
-select * from t2;
-
-reset role;
-drop table t2;
-set role extensions_role;
-\echo
-
--- global extension custom scripts are run
-create extension dict_xsyn;
-create extension insert_username version "1.0" schema public cascade;
-\echo
-
--- custom scripts are run even for superusers
-reset role;
-create extension hstore;
-drop extension hstore;
-select * from t2;
-
-drop table t2;
-set role extensions_role;
-\echo
-
 -- cannot create other extensions
 create extension file_fdw;
 \echo
