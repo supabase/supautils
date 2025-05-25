@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 # print notice when creating an extension
 mkdir -p "$TMPDIR/extension-custom-scripts"
 echo "do \$\$

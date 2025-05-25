@@ -2,6 +2,14 @@ set role extensions_role;
 \echo
 
 -- per-extension custom scripts are run
+drop extension if exists citext;
+create extension autoinc;
+
+drop extension citext;
+drop extension autoinc;
+\echo
+
+-- per-extension custom scripts are run for extensions not in privileged_extensions
 create extension fuzzystrmatch;
 drop extension fuzzystrmatch;
 select * from t2;
