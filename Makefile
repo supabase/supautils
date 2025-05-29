@@ -17,14 +17,11 @@ ifeq ($(COVERAGE), 1)
 PG_CFLAGS += --coverage
 endif
 
-EXTENSION = supautils
-MODULE_big = $(EXTENSION)
+MODULE_big = supautils
 
 SRC_DIR = src
-BUILD_DIR ?= build
 
 SRC = $(wildcard src/*.c)
-OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
 
 PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQL )[0-9]+'))
 # 0 is true
@@ -56,6 +53,8 @@ EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 
+.DEFAULT_GOAL := all
+
 ifeq ($(OS), Linux)
   DL_SUFFIX=so
 else ifeq ($(OS), Darwin)
@@ -68,7 +67,15 @@ else
   DL_SUFFIX=dylib
 endif
 
-build: $(BUILD_DIR)/$(EXTENSION).$(DL_SUFFIX) test/init.conf
+PG_CPPFLAGS := $(CPPFLAGS) -DTEST=1
+
+ifdef BUILD_DIR
+OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))
+else
+OBJS = $(patsubst $(SRC_DIR)/%.c, src/%.o, $(SRC)) # if no BUILD_DIR, just build on src so standard PGXS `make` works
+endif
+
+build: $(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX) test/init.conf
 
 .PHONY: test/init.conf
 test/init.conf: test/init.conf.in
@@ -82,8 +89,6 @@ else
 		$? > $@
 endif
 
-PG_CPPFLAGS := $(CPPFLAGS) -DTEST=1
-
 $(BUILD_DIR)/.gitignore:
 	mkdir -p $(BUILD_DIR)
 	echo "*" > $(BUILD_DIR)/.gitignore
@@ -91,7 +96,7 @@ $(BUILD_DIR)/.gitignore:
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(BUILD_DIR)/.gitignore
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/$(EXTENSION).$(DL_SUFFIX): $(EXTENSION).$(DL_SUFFIX)
+$(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX): $(MODULE_big).$(DL_SUFFIX)
 	mv $? $@
 
 include $(PGXS)
