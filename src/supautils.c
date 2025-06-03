@@ -1268,8 +1268,8 @@ void _PG_init(void) {
                              NULL,
                              NULL);
 
-  DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
-                             "Path to load privileged extensions' custom scripts from. Deprecated: use supautils.extension_custom_scripts_path instead.",
+  DefineCustomStringVariable("supautils.extension_custom_scripts_path",
+                             "Path to load extension custom scripts from",
                              NULL,
                              &extension_custom_scripts_path,
                              NULL,
@@ -1278,8 +1278,8 @@ void _PG_init(void) {
                              NULL,
                              NULL);
 
-  DefineCustomStringVariable("supautils.extension_custom_scripts_path",
-                             "Path to load extension custom scripts from",
+  DefineCustomStringVariable("supautils.privileged_extensions_custom_scripts_path",
+                             "Path to load privileged extensions' custom scripts from. Deprecated: use supautils.extension_custom_scripts_path instead.",
                              NULL,
                              &extension_custom_scripts_path,
                              NULL,
