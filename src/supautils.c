@@ -1144,7 +1144,7 @@ static bool restrict_placeholders_check_hook(char **newval, __attribute__ ((unus
 
   if(*newval && not_empty) {
     char *token, *string, *tofree;
-    char *val = lowerstr(*newval);
+    char *val = str_tolower(*newval, strlen(*newval), DEFAULT_COLLATION_OID);
 
     tofree = string = pstrdup(placeholders_disallowed_values);
 

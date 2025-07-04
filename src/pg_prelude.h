@@ -9,6 +9,7 @@
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
 #include <catalog/pg_proc.h>
+#include <catalog/pg_collation_d.h>
 #include <commands/defrem.h>
 #include <commands/publicationcmds.h>
 #include <commands/defrem.h>
@@ -36,5 +37,6 @@
 #include <utils/regproc.h>
 #include <utils/snapmgr.h>
 #include <utils/varlena.h>
+#include <utils/formatting.h>
 
 #pragma GCC diagnostic pop
