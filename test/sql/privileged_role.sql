@@ -189,3 +189,12 @@ set role postgres;
 drop schema deny_drop_triggers cascade;
 set role privileged_role;
 \echo
+
+-- all-role including superuser cannot drop information_schema
+set role postgres;
+create schema allow_drop_schema;
+drop schema information_schema;
+drop schema information_schema cascade;
+drop schema allow_drop_schema, information_schema;
+drop schema allow_drop_schema;
+\echo

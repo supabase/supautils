@@ -683,6 +683,40 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_DropStmt: {
       DropStmt *stmt = (DropStmt *)utility_stmt;
 
+      /*
+       * DROP SCHEMA
+       */
+      if (stmt->removeType ==  OBJECT_SCHEMA) {
+          /*
+           * Prevent dropping information_schema, even by a superuser.
+           */
+          ListCell *cell;
+          bool already_switched_to_superuser = false;
+
+          foreach(cell, stmt->objects) {
+              /*
+               * Unlike other DROP statements (e.g., DROP TABLE), for DROP SCHEMA each
+               * element in stmt->objects is always a Value* of type T_String.
+               * Therefore, strVal(lfirst(cell)) is sufficient and safe here.
+               */
+              char *schema = strVal(lfirst(cell));
+
+              if (strcmp(schema, "information_schema") == 0) {
+                  elog(ERROR, "Cannot drop schema \"information_schema\"");
+                  return; /* NOTREACHED */
+              }
+          }
+
+          switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+
+          run_process_utility_hook(prev_hook);
+
+          if (!already_switched_to_superuser) {
+              switch_to_original_role();
+          }
+          return;
+      }
+
       if (superuser()) {
           break;
       }
