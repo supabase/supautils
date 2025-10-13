@@ -929,6 +929,20 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       }
   }
 
+  case T_CopyStmt: {
+  	CopyStmt *stmt = (CopyStmt *)utility_stmt;
+
+    if (stmt->is_program)
+    {
+        ereport(ERROR, (
+          errmsg("COPY TO/FROM PROGRAM not allowed")
+        , errdetail("The copy to/from program utility statement is disabled")
+        ));
+    }
+
+    break;
+  }
+
   default:
       break;
   }
