@@ -65,6 +65,7 @@ static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t total_dtgs = 0;
 
 bool log_skipped_evtrigs = false;
+bool disable_copy_program = false;
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -932,7 +933,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_CopyStmt: {
   	CopyStmt *stmt = (CopyStmt *)utility_stmt;
 
-    if (stmt->is_program)
+    if (stmt->is_program && disable_copy_program)
     {
         ereport(ERROR, (
           errmsg("COPY TO/FROM PROGRAM not allowed")
@@ -1421,6 +1422,14 @@ void _PG_init(void) {
                            &log_skipped_evtrigs,
                            false,
                            PGC_USERSET, 0,
+                           NULL, NULL, NULL);
+
+  DefineCustomBoolVariable("supautils.disable_program",
+                           "Disable COPY TO/FROM PROGRAM",
+                           NULL,
+                           &disable_copy_program,
+                           false,
+                           PGC_SIGHUP, 0,
                            NULL, NULL, NULL);
 
   if(placeholders){
