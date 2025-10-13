@@ -90,13 +90,17 @@ static void alter_role_super(const char* rolename, bool make_super){
   AlterRoleStmt *alter_stmt = makeNode(AlterRoleStmt);
   alter_stmt->role          = rolespec;
 
+#if PG15_GTE
   alter_stmt->options = list_make1(
-    makeDefElem("superuser", (Node *) makeInteger(make_super), -1) // using makeInteger because makeBoolean is not available on pg <= 14
+    makeDefElem("superuser", (Node *) makeBoolean(make_super), -1)
   );
 
-#if PG15_GTE
   AlterRole(NULL, alter_stmt);
 #else
+  alter_stmt->options = list_make1(
+    makeDefElem("superuser", (Node *) makeInteger(make_super), -1)
+  );
+
   AlterRole(alter_stmt);
 #endif
 
