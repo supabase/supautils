@@ -91,6 +91,33 @@ static bool supautils_needs_fmgr_hook(Oid functionId) {
   return is_event_trigger_function(functionId);
 }
 
+static void
+skip_event_trigger(
+  FmgrInfo *flinfo,
+  const char *func_name,
+  const char *current_role_name,
+  const char *role_descriptor,
+  const char *function_condition,
+  const char *owner_name
+){
+    if (log_skipped_evtrigs) {
+      ereport(NOTICE,
+          errmsg("Skipping event trigger function \"%s\" for user \"%s\"",
+                 func_name,
+                 current_role_name),
+          errdetail("\"%s\" is %s and the function \"%s\" %s \"%s\"",
+                    current_role_name,
+                    role_descriptor,
+                    func_name,
+                    function_condition,
+                    owner_name));
+    }
+
+    // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
+    // so instead we use the workaround of changing the function to a noop function
+    force_noop(flinfo);
+}
+
 // This function will fire twice: once before execution of the database function (event=FHET_START)
 // and once after execution has finished or failed (event=FHET_END/FHET_ABORT).
 static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum *private) {
@@ -105,34 +132,39 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo, Datum
                 // See https://github.com/supabase/supautils/issues/140.
                 GetOuterUserId():
                 GetUserId();
-            const char *current_role_name = GetUserNameFromId(current_role_oid, false);
-            const bool role_is_super = superuser_arg(current_role_oid);
-            const bool role_is_reserved = is_reserved_role(current_role_name, false);
-            if (role_is_super || role_is_reserved) {
-                bool function_is_owned_by_super = superuser_arg(fattrs.owner);
-                if (!function_is_owned_by_super ||
-                    (current_role_oid != fattrs.owner && role_is_super)){
-                    if (log_skipped_evtrigs){
-                      char *func_name = get_func_name(flinfo->fn_oid);
-                      if (!function_is_owned_by_super)
-                        ereport(
-                          NOTICE,
-                          errmsg("Skipping event trigger function \"%s\" for user \"%s\"", func_name, current_role_name),
-                          errdetail("\"%s\" %s and the function \"%s\" is not superuser-owned, it's owned by \"%s\"",
-                              current_role_name, role_is_super?"is a superuser":"is a reserved role", func_name, GetUserNameFromId(fattrs.owner, false))
-                        );
-                      else
-                        ereport(
-                          NOTICE,
-                          errmsg("Skipping event trigger function \"%s\" for user \"%s\"", func_name, current_role_name),
-                          errdetail("\"%s\" %s and the function \"%s\" is not owned by the same role, it's owned by \"%s\"",
-                              current_role_name, role_is_super?"is a superuser":"is a reserved role", func_name, GetUserNameFromId(fattrs.owner, false))
-                        );
-
-                    }
-                    // we can't skip execution directly inside the fmgr_hook (although we can abort it with ereport)
-                    // so instead we use the workaround of changing the event trigger function to a noop function
-                    force_noop(flinfo);
+            const char *current_role_name         = GetUserNameFromId(current_role_oid, false);
+            const bool role_is_super              = superuser_arg(current_role_oid);
+            const bool role_is_reserved           = is_reserved_role(current_role_name, false);
+            const bool function_is_owned_by_super = superuser_arg(fattrs.owner);
+            const bool role_is_function_owner     = current_role_oid == fattrs.owner;
+            const char *func_name                 = get_func_name(flinfo->fn_oid);
+            const char *function_owner_name       = GetUserNameFromId(fattrs.owner, false);
+            if (role_is_super) {
+                if (!function_is_owned_by_super){
+                    skip_event_trigger(flinfo,
+                                       func_name,
+                                       current_role_name,
+                                       "a superuser",
+                                       "is not superuser-owned, it's owned by",
+                                       function_owner_name);
+                }
+                else if (!role_is_function_owner){
+                    skip_event_trigger(flinfo,
+                                       func_name,
+                                       current_role_name,
+                                       "a superuser",
+                                       "is not owned by the same role, it's owned by",
+                                       function_owner_name);
+                }
+            }
+            else if (role_is_reserved) {
+                if (!function_is_owned_by_super){
+                    skip_event_trigger(flinfo,
+                                       func_name,
+                                       current_role_name,
+                                       "a reserved role",
+                                       "is not superuser-owned, it's owned by",
+                                       function_owner_name);
                 }
             }
         }
