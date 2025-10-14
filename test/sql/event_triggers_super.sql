@@ -27,6 +27,37 @@ select evtowner::regrole from pg_event_trigger where evtname = 'event_trigger_1'
 create table super_thing();
 \echo
 
+-- another superuser can create an event trigger
+create role super2 superuser;
+set role super2;
+create function super2_show_current_user()
+    returns event_trigger
+    language plpgsql as
+$$
+begin
+    raise notice 'Executing super2 event trigger: current_user is %', current_user;
+end;
+$$;
+create event trigger super2_event_trigger on ddl_command_end
+execute procedure super2_show_current_user();
+\echo
+
+-- only one superuser evtrig will execute for superuser (the one he owns)
+create table super2_thing();
+\echo
+
+-- super2 evtrigs won't run here, only the postgres owned evtrigs
+set role postgres;
+create table super_duper_thing();
+\echo
+
+-- super2 cleanup
+drop event trigger super2_event_trigger;
+drop function super2_show_current_user;
+drop table super2_thing;
+drop role super2;
+\echo
+
 -- A regular user is not able to create event trigger using a superuser function
 set role privileged_role;
 \echo

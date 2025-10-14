@@ -32,6 +32,47 @@ create table super_thing();
 NOTICE:  Executing superuser event trigger: current_user is postgres
 \echo
 
+-- another superuser can create an event trigger
+create role super2 superuser;
+set role super2;
+create function super2_show_current_user()
+    returns event_trigger
+    language plpgsql as
+$$
+begin
+    raise notice 'Executing super2 event trigger: current_user is %', current_user;
+end;
+$$;
+NOTICE:  Skipping event trigger function "super_show_current_user" for user "super2"
+DETAIL:  "super2" is a superuser and the function "super_show_current_user" is not owned by the same role, it's owned by "postgres"
+create event trigger super2_event_trigger on ddl_command_end
+execute procedure super2_show_current_user();
+\echo
+
+-- only one superuser evtrig will execute for superuser (the one he owns)
+create table super2_thing();
+NOTICE:  Skipping event trigger function "super_show_current_user" for user "super2"
+DETAIL:  "super2" is a superuser and the function "super_show_current_user" is not owned by the same role, it's owned by "postgres"
+NOTICE:  Executing super2 event trigger: current_user is super2
+\echo
+
+-- super2 evtrigs won't run here, only the postgres owned evtrigs
+set role postgres;
+create table super_duper_thing();
+NOTICE:  Executing superuser event trigger: current_user is postgres
+NOTICE:  Skipping event trigger function "super2_show_current_user" for user "postgres"
+DETAIL:  "postgres" is a superuser and the function "super2_show_current_user" is not owned by the same role, it's owned by "super2"
+\echo
+
+-- super2 cleanup
+drop event trigger super2_event_trigger;
+drop function super2_show_current_user;
+NOTICE:  Executing superuser event trigger: current_user is postgres
+drop table super2_thing;
+NOTICE:  Executing superuser event trigger: current_user is postgres
+drop role super2;
+\echo
+
 -- A regular user is not able to create event trigger using a superuser function
 set role privileged_role;
 \echo
