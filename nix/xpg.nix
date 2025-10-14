@@ -3,8 +3,8 @@ let
   dep = fetchFromGitHub {
     owner  = "steve-chavez";
     repo   = "xpg";
-    rev    = "v1.6.2";
-    sha256 = "sha256-97RHjB0xwWsSQQoI+KWw/WZ3h0OyKiYD1jLIq2kqx7k=";
+    rev    = "v1.7.0";
+    sha256 = "sha256-TWFK1u1UX7cm43BJGRbDtYKzbHF37pl+pMelxujqdjE=";
   };
   xpg = import dep;
 in
