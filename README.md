@@ -108,7 +108,10 @@ To protect against privilege escalation, the event triggers created by the privi
 
 The skipping behavior can be logged by setting the `supautils.log_skipped_evtrigs` config to true, this is false by default.
 
-Superuser event triggers work as usual, with the additional restriction that the event trigger function must be owned by a superuser.
+Superuser have the additional restriction that the event trigger function must be owned by a superuser:
+
+- They will be executed for all non-superusers, including [Reserved Roles](#reserved-roles).
+- A superuser will only run event triggers that are owned by the same superuser. Other superuser event triggers will be skipped.
 
 ```sql
 set role privileged_role;
