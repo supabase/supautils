@@ -29,10 +29,10 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build
-        run: nix-shell --run "xpg -v ${{ matrix.pg-version }} build"
+        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} build"
 
       - name: Run tests
-        run: nix-shell --run "xpg -v ${{ matrix.pg-version }} test"
+        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} test"
 
       - if: ${{ failure() }}
         run: cat regression.diffs
@@ -59,10 +59,10 @@ jobs:
           authtoken: ${{ secrets.cachix_auth_token }}
 
       - name: build
-        run: nix-shell --run "xpg -v ${{ matrix.pg-version }} build"
+        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} build"
 
       - name: run tests
-        run: nix-shell --run "xpg -v ${{ matrix.pg-version }} test"
+        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} test"
 
       - if: ${{ failure() }}
         run: cat regression.diffs

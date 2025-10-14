@@ -323,13 +323,22 @@ For testing the module locally, execute:
 $ nix-shell
 
 # test on pg 13
-$ xpg -v 13 make installcheck
+$ xpg -v 13 test
 
 # test on pg 14
-$ xpg -v 14 make installcheck
+$ xpg -v 14 test
 
 # you can also test manually with
 $ xpg -v 13 psql -U rolecreator
+```
+
+To test with a postgres built with assertions enabled:
+
+```bash
+$ nix-shell
+
+# test on pg 13
+$ xpg -v 17 --cassert test
 ```
 
 ### Coverage
