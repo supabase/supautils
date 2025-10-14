@@ -11,7 +11,7 @@ create function super_show_current_user()
     language plpgsql as
 $$
 begin
-    raise notice 'superuser mandated event trigger: current_user is %', current_user;
+    raise notice 'Executing superuser event trigger: current_user is %', current_user;
 end;
 $$;
 \echo
@@ -29,7 +29,7 @@ select evtowner::regrole from pg_event_trigger where evtname = 'event_trigger_1'
 
 -- the superuser evtrig will execute for superuser
 create table super_thing();
-NOTICE:  superuser mandated event trigger: current_user is postgres
+NOTICE:  Executing superuser event trigger: current_user is postgres
 \echo
 
 -- A regular user is not able to create event trigger using a superuser function
@@ -47,33 +47,33 @@ set role supabase_storage_admin;
 \echo
 
 create table storage_stuff();
-NOTICE:  superuser mandated event trigger: current_user is supabase_storage_admin
+NOTICE:  Executing superuser event trigger: current_user is supabase_storage_admin
 \echo
 
 drop table storage_stuff;
-NOTICE:  superuser mandated event trigger: current_user is supabase_storage_admin
+NOTICE:  Executing superuser event trigger: current_user is supabase_storage_admin
 \echo
 
 -- creating extensions will fire superuser evtrigs
 set role privileged_role;
 create extension postgres_fdw;
-NOTICE:  superuser mandated event trigger: current_user is postgres
+NOTICE:  Executing superuser event trigger: current_user is postgres
 drop extension postgres_fdw;
-NOTICE:  superuser mandated event trigger: current_user is postgres
+NOTICE:  Executing superuser event trigger: current_user is postgres
 \echo
 
 -- creating fdws will fire superuser evtrigs
 create foreign data wrapper new_fdw;
-NOTICE:  superuser mandated event trigger: current_user is postgres
+NOTICE:  Executing superuser event trigger: current_user is postgres
 drop foreign data wrapper new_fdw;
-NOTICE:  superuser mandated event trigger: current_user is privileged_role
+NOTICE:  Executing superuser event trigger: current_user is privileged_role
 \echo
 
 -- creating publications will fire superuser evtrigs
 create publication p for all tables;
-NOTICE:  superuser mandated event trigger: current_user is postgres
+NOTICE:  Executing superuser event trigger: current_user is postgres
 drop publication p;
-NOTICE:  superuser mandated event trigger: current_user is privileged_role
+NOTICE:  Executing superuser event trigger: current_user is privileged_role
 \echo
 
 -- a non-privileged role cannot alter a superuser owned evtrig
