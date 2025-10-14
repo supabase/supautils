@@ -11,7 +11,7 @@ create function super_show_current_user()
     language plpgsql as
 $$
 begin
-    raise notice 'superuser mandated event trigger: current_user is %', current_user;
+    raise notice 'Executing superuser event trigger: current_user is %', current_user;
 end;
 $$;
 \echo
