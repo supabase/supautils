@@ -1073,7 +1073,7 @@ privileged_role_allowed_configs_check_hook(char **newval, __attribute__ ((unused
 }
 
 static bool
-disable_program_guc_check_hook(char **newval,  __attribute__ ((unused)) void **extra, GucSource source)
+disable_program_guc_check_hook(__attribute__ ((unused)) char **newval,  __attribute__ ((unused)) void **extra, GucSource source)
 {
 	// only allow setting from the postgresql.conf
 	return source == PGC_S_FILE;
@@ -1437,7 +1437,7 @@ void _PG_init(void) {
                            &disable_copy_program,
                            false,
                            PGC_SIGHUP, GUC_SUPERUSER_ONLY,
-                           &disable_program_guc_check_hook,
+                           disable_program_guc_check_hook,
                            NULL,
                            NULL);
 
