@@ -1072,6 +1072,13 @@ privileged_role_allowed_configs_check_hook(char **newval, __attribute__ ((unused
     return true;
 }
 
+static bool
+disable_program_guc_check_hook(char **newval,  __attribute__ ((unused)) void **extra, GucSource source)
+{
+	// only allow setting from the postgresql.conf
+	return source == PGC_S_FILE;
+}
+
 static void
 check_parameter(char *val, char *name)
 {
@@ -1429,8 +1436,10 @@ void _PG_init(void) {
                            NULL,
                            &disable_copy_program,
                            false,
-                           PGC_POSTMASTER, 0,
-                           NULL, NULL, NULL);
+                           PGC_SIGHUP, GUC_SUPERUSER_ONLY,
+                           &disable_program_guc_check_hook,
+                           NULL,
+                           NULL);
 
   if(placeholders){
       List* comma_separated_list;
