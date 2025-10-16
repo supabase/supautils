@@ -65,7 +65,7 @@ static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t total_dtgs = 0;
 
 bool log_skipped_evtrigs = false;
-static bool disable_copy_program = true;
+static bool disable_copy_program = false;
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -1073,10 +1073,10 @@ privileged_role_allowed_configs_check_hook(char **newval, __attribute__ ((unused
 }
 
 static bool
-disable_program_guc_check_hook(__attribute__ ((unused)) char **newval,  __attribute__ ((unused)) void **extra, GucSource source)
+disable_program_guc_check_hook(__attribute__ ((unused)) bool *newval,  __attribute__ ((unused)) void **extra, GucSource source)
 {
-	// only allow setting from the postgresql.conf
-	return source == PGC_S_FILE;
+	// only allow setting from the postgresql.conf or the default value
+	return source == PGC_S_FILE || source == PGC_S_DEFAULT;
 }
 
 static void
