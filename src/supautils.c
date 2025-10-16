@@ -1429,7 +1429,7 @@ void _PG_init(void) {
                            NULL,
                            &disable_copy_program,
                            false,
-                           PGC_SIGHUP, 0,
+                           PGC_POSTMASTER, 0,
                            NULL, NULL, NULL);
 
   if(placeholders){
