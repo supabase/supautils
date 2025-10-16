@@ -65,7 +65,7 @@ static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t total_dtgs = 0;
 
 bool log_skipped_evtrigs = false;
-bool disable_copy_program = false;
+static bool disable_copy_program = true;
 
 void _PG_init(void);
 void _PG_fini(void);
