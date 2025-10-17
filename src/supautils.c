@@ -1076,7 +1076,8 @@ static bool
 disable_program_guc_check_hook(__attribute__ ((unused)) bool *newval,  __attribute__ ((unused)) void **extra, GucSource source)
 {
 	// only allow setting from the postgresql.conf or the default value
-	return source == PGC_S_FILE || source == PGC_S_DEFAULT;
+	// ALTER SYSTEM changes the PGC_S_GLOBAL, so this also prevents postgresql.auto.conf based changes
+	return  source == PGC_S_FILE||source == PGC_S_DEFAULT;
 }
 
 static void
