@@ -4,16 +4,16 @@
 #pragma GCC diagnostic ignored "-Wsign-compare"
 
 #include <postgres.h>
+
 #include <access/xact.h>
-#include <common/jsonapi.h>
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
-#include <catalog/pg_proc.h>
 #include <catalog/pg_collation_d.h>
-#include <commands/defrem.h>
-#include <commands/publicationcmds.h>
+#include <catalog/pg_proc.h>
 #include <commands/defrem.h>
 #include <commands/event_trigger.h>
+#include <commands/publicationcmds.h>
+#include <common/jsonapi.h>
 #include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
@@ -26,17 +26,17 @@
 #include <utils/acl.h>
 #include <utils/builtins.h>
 #include <utils/fmgrprotos.h>
+#include <utils/formatting.h>
 #include <utils/guc.h>
 #include <utils/guc_tables.h>
 #include <utils/json.h>
 #include <utils/jsonb.h>
 #include <utils/jsonfuncs.h>
-#include <utils/syscache.h>
 #include <utils/lsyscache.h>
 #include <utils/memutils.h>
 #include <utils/regproc.h>
 #include <utils/snapmgr.h>
+#include <utils/syscache.h>
 #include <utils/varlena.h>
-#include <utils/formatting.h>
 
 #pragma GCC diagnostic pop
