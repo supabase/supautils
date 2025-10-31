@@ -351,3 +351,11 @@ For coverage, execute:
 ```bash
 $ xpg -v 17 coverage
 ```
+
+### Style
+
+For automatic formatting of source and header files use:
+
+```bash
+$ supautils-style
+```

@@ -13,10 +13,21 @@ mkShell {
       pgmq15 = callPackage ./nix/pgmq.nix {
         postgresql = xpg.postgresql_15;
       };
+      style =
+        writeShellScriptBin "supautils-style" ''
+          ${clang-tools}/bin/clang-format -i src/*
+        '';
+      styleCheck =
+        writeShellScriptBin "supautils-style-check" ''
+          ${clang-tools}/bin/clang-format -i src/*
+          ${git}/bin/git diff-index --exit-code HEAD -- '*.c'
+        '';
     in
     [
       (xpg.xpgWithExtensions {
         exts15 = [ pgsqlcheck15 pgmq15 ];
       })
+      style
+      styleCheck
     ];
 }
