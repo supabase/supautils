@@ -72,14 +72,35 @@ jobs:
           asset_name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
           asset_content_type: application/octet-stream
 
-      - name: Configure aws credentials for uploading release artifacts
+      - name: Upload build artifacts for bundling
         if: ${{ matrix.box.arch == 'arm64' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
+          path: ./${{ matrix.extension_name }}.so
+
+  bundle-build-artifacts:
+    name: Bundle build artifacts
+    needs:
+      - build-linux-gnu
+    runs-on: ubuntu-22.04-arm
+    steps:
+      - name: Download build artifacts for bundling
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*.so'
+          merge-multiple: true
+
+      - name: Bundle build artifacts
+        run: |
+          tar -cJf supautils-${{ github.ref_name }}-arm64.tar.xz *.so
+
+      - name: Configure aws credentials for uploading release artifacts
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.PROD_AWS_ROLE }}
           aws-region: us-east-1
 
-      - name: Upload release artifacts to S3
-        if: ${{ matrix.box.arch == 'arm64' }}
+      - name: Upload bundle to shared services bucket
         run: |
-          aws s3api put-object --bucket ${{ secrets.PROD_ARTIFACTS_BUCKET }} --key extensions/${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so --body ./${{ matrix.extension_name }}.so
+          aws s3 sync --no-progress ./ s3://supabase-internal-artifacts/supautils/${GITHUB_REF_NAME#v} --exclude '*' --include '*tar.xz'
