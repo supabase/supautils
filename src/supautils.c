@@ -490,7 +490,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     } else {
       if (!already_switched_to_superuser) {
         switch_to_original_role();
-        already_switched_to_superuser = false;
       }
 
       run_process_utility_hook(prev_hook);
