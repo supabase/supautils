@@ -72,6 +72,20 @@
     standard_ProcessUtility(PROCESS_UTILITY_ARGS);                             \
   }
 
+#define run_process_utility_hook_with_cleanup(process_utility_hook,            \
+                                              already_switched_to_superuser,   \
+                                              switch_to_original_role)         \
+  PG_TRY();                                                                    \
+  { run_process_utility_hook(prev_hook); }                                     \
+  PG_CATCH();                                                                  \
+  {                                                                            \
+    if (!already_switched_to_superuser) {                                      \
+      switch_to_original_role();                                               \
+    }                                                                          \
+    PG_RE_THROW();                                                             \
+  }                                                                            \
+  PG_END_TRY();
+
 // helper for testing a guc config
 #if TEST
 #  define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_USERSET

@@ -227,7 +227,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     // Allow setting bypassrls & replication.
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook(prev_hook);
+    run_process_utility_hook_with_cleanup(
+        prev_hook, already_switched_to_superuser, switch_to_original_role);
 
     if (!already_switched_to_superuser) {
       switch_to_original_role();
@@ -278,7 +279,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       bool already_switched_to_superuser = false;
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -367,7 +369,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
         switch_to_superuser(supautils_superuser,
                             &already_switched_to_superuser);
 
-        run_process_utility_hook(prev_hook);
+        run_process_utility_hook_with_cleanup(
+            prev_hook, already_switched_to_superuser, switch_to_original_role);
 
         if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -482,7 +485,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     override_create_ext_statement(stmt, total_epos, epos);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
     } else {
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -519,7 +523,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -545,7 +550,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -580,7 +586,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook(prev_hook);
+    run_process_utility_hook_with_cleanup(
+        prev_hook, already_switched_to_superuser, switch_to_original_role);
 
     CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
@@ -610,7 +617,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook(prev_hook);
+    run_process_utility_hook_with_cleanup(
+        prev_hook, already_switched_to_superuser, switch_to_original_role);
 
     CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
 
@@ -639,7 +647,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook(prev_hook);
+    run_process_utility_hook_with_cleanup(
+        prev_hook, already_switched_to_superuser, switch_to_original_role);
 
     if (!already_switched_to_superuser) {
       switch_to_original_role();
@@ -663,7 +672,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -690,7 +700,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -719,7 +730,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
         switch_to_superuser(supautils_superuser,
                             &already_switched_to_superuser);
 
-        run_process_utility_hook(prev_hook);
+        run_process_utility_hook_with_cleanup(
+            prev_hook, already_switched_to_superuser, switch_to_original_role);
 
         if (!already_switched_to_superuser) {
           switch_to_original_role();
@@ -752,7 +764,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -782,7 +795,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -815,7 +829,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       bool already_switched_to_superuser = false;
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -852,7 +867,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       bool already_switched_to_superuser = false;
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();
@@ -904,7 +920,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook(prev_hook);
+      run_process_utility_hook_with_cleanup(
+          prev_hook, already_switched_to_superuser, switch_to_original_role);
 
       if (!current_user_is_super)
         // Change event trigger owner to the current role (which is a privileged

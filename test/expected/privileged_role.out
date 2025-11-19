@@ -246,3 +246,19 @@ drop cascades to function deny_drop_triggers.f()
 set role privileged_role;
 \echo
 
+-- regression: is_switched_to_superuser is restored when an exception is thrown
+create publication p;
+do $$
+begin
+  alter publication p add table missing_table;
+exception
+  when undefined_table then
+    null;
+end $$;
+-- if is_switched_to_superuser is not restored, role switching won't happen here
+-- and publication creation would fail
+create publication pp for all tables;
+drop publication p;
+drop publication pp;
+\echo
+
