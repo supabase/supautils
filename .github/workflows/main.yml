@@ -106,6 +106,8 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixpkgs-unstable
 
       - name: Use Cachix Cache
         uses: cachix/cachix-action@v10
