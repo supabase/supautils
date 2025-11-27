@@ -467,7 +467,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * CREATE EXTENSION <extension>
    */
   case T_CreateExtensionStmt: {
-    CreateExtensionStmt *stmt = (CreateExtensionStmt *)utility_stmt;
+    CreateExtensionStmt *volatile stmt = (CreateExtensionStmt *)utility_stmt;
 
     constrain_extension(stmt->extname, cexts, total_cexts);
 
