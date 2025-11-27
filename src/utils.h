@@ -76,7 +76,7 @@
                                               already_switched_to_superuser,   \
                                               switch_to_original_role)         \
   PG_TRY();                                                                    \
-  { run_process_utility_hook(prev_hook); }                                     \
+  { run_process_utility_hook(process_utility_hook); }                                     \
   PG_CATCH();                                                                  \
   {                                                                            \
     if (!already_switched_to_superuser) {                                      \
