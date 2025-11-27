@@ -191,18 +191,76 @@ set role privileged_role;
 \echo
 
 -- regression: is_switched_to_superuser is restored when an exception is thrown
-create publication p;
+-- case 1: alter role
 do $$
 begin
-  alter publication p add table missing_table;
+  create role r;
+  alter role r valid until 'invalid timestamp';
 exception
-  when undefined_table then
+  when others then
+    raise notice '%: %', sqlstate, sqlerrm;
     null;
 end $$;
 -- if is_switched_to_superuser is not restored, role switching won't happen here
 -- and publication creation would fail
-create publication pp for all tables;
-
+create publication p for all tables;
 drop publication p;
-drop publication pp;
+
+-- case 2: alter role set
+do $$
+begin
+  create role r;
+  alter role r set session_replication_role = 'invalid value';
+exception
+  when others then
+    raise notice '%: %', sqlstate, sqlerrm;
+    null;
+end $$;
+-- if is_switched_to_superuser is not restored, role switching won't happen here
+-- and publication creation would fail
+create publication p for all tables;
+drop publication p;
+
+-- case 3: create role
+do $$
+begin
+  create role r valid until 'invalid timestamp';
+exception
+  when others then
+    raise notice '%: %', sqlstate, sqlerrm;
+    null;
+end $$;
+-- if is_switched_to_superuser is not restored, role switching won't happen here
+-- and publication creation would fail
+create publication p for all tables;
+drop publication p;
+
+-- case 4: create extension
+do $$
+begin
+  create extension hstore version 'nonexistent';
+exception
+  when others then
+    raise notice '%: %', sqlstate, sqlerrm;
+    null;
+end $$;
+-- if is_switched_to_superuser is not restored, role switching won't happen here
+-- and publication creation would fail
+create publication p for all tables;
+drop publication p;
+
+-- case 5: alter publication
+do $$
+begin
+  create publication p;
+  alter publication p add table missing_table;
+exception
+  when others then
+    raise notice '%: %', sqlstate, sqlerrm;
+    null;
+end $$;
+-- if is_switched_to_superuser is not restored, role switching won't happen here
+-- and publication creation would fail
+create publication p for all tables;
+drop publication p;
 \echo
