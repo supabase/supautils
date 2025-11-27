@@ -15,10 +15,14 @@ mkShell {
       };
       style =
         writeShellScriptBin "supautils-style" ''
+          set -euo pipefail
+
           ${clang-tools}/bin/clang-format -i src/*
         '';
       styleCheck =
         writeShellScriptBin "supautils-style-check" ''
+          set -euo pipefail
+
           ${clang-tools}/bin/clang-format -i src/*
           ${git}/bin/git diff-index --exit-code HEAD -- '*.c'
         '';
