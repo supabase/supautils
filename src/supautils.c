@@ -348,16 +348,16 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
        */
       if (hasrolemembers) confirm_reserved_memberships(created_role);
 
-        // We don't want to switch to superuser on PG16+ because the
-        // creating role is implicitly granted ADMIN on the new
-        // role:
-        // https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-CREATEROLE-SELF-GRANT
-        //
-        // This ADMIN will be missing if we switch to superuser
-        // since the creating role becomes the superuser.
-        //
-        // We also no longer need superuser to grant BYPASSRLS &
-        // REPLICATION anyway.
+      // We don't want to switch to superuser on PG16+ because the
+      // creating role is implicitly granted ADMIN on the new
+      // role:
+      // https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-CREATEROLE-SELF-GRANT
+      //
+      // This ADMIN will be missing if we switch to superuser
+      // since the creating role becomes the superuser.
+      //
+      // We also no longer need superuser to grant BYPASSRLS &
+      // REPLICATION anyway.
 #if PG16_GTE
       run_process_utility_hook(prev_hook);
 #else
@@ -1008,10 +1008,10 @@ static bool policy_grants_check_hook(char                            **newval,
   return true;
 }
 
-static bool drop_trigger_grants_check_hook(char **newval,
-                                           __attribute__((unused)) void **extra,
-                                           __attribute__((unused))
-                                           GucSource source) {
+static bool
+drop_trigger_grants_check_hook(char                            **newval,
+                               __attribute__((unused)) void    **extra,
+                               __attribute__((unused)) GucSource source) {
   char *val = *newval;
 
   for (size_t i = 0; i < total_dtgs; i++) {
@@ -1037,10 +1037,9 @@ static bool drop_trigger_grants_check_hook(char **newval,
   return true;
 }
 
-static bool reserved_roles_check_hook(char                         **newval,
-                                      __attribute__((unused)) void **extra,
-                                      __attribute__((unused))
-                                      GucSource source) {
+static bool
+reserved_roles_check_hook(char **newval, __attribute__((unused)) void **extra,
+                          __attribute__((unused)) GucSource source) {
   check_parameter(*newval, "supautils.reserved_roles");
 
   return true;
