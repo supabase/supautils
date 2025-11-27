@@ -104,7 +104,7 @@ parse_extensions_parameter_overrides(const char                    *str,
   JsonSemAction      sem;
 
   json_extension_parameter_overrides_parse_state state = {
-    JEPO_EXPECT_TOPLEVEL_START, NULL, 0, epos};
+      JEPO_EXPECT_TOPLEVEL_START, NULL, 0, epos};
 
   lex = NEW_JSON_LEX_CONTEXT_CSTRING_LEN(pstrdup(str), strlen(str), PG_UTF8,
                                          true);

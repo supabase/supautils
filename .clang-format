@@ -18,7 +18,6 @@ SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 1
-BracedInitializerIndentWidth: 2
 
 # includes
 IncludeBlocks: Preserve
@@ -35,8 +34,3 @@ AllowShortIfStatementsOnASingleLine: true
 # case
 IndentCaseLabels: false
 AllowShortCaseLabelsOnASingleLine: true
-AlignConsecutiveShortCaseStatements:
-  Enabled: true
-  AcrossEmptyLines: true
-  AcrossComments: true
-  AlignCaseColons: true

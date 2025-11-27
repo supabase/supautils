@@ -572,7 +572,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   /**
    * CREATE FOREIGN DATA WRAPPER <fdw>
    */
-  case T_CreateFdwStmt             : {
+  case T_CreateFdwStmt: {
     const Oid current_user_id               = GetUserId();
     bool      already_switched_to_superuser = false;
 
