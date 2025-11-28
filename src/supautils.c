@@ -69,8 +69,7 @@ static char               *drop_trigger_grants_str       = NULL;
 static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t              total_dtgs                    = 0;
 
-bool        log_skipped_evtrigs  = false;
-static bool disable_copy_program = false;
+bool log_skipped_evtrigs = false;
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -935,19 +934,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
   }
 
-  case T_CopyStmt: {
-    CopyStmt *stmt = (CopyStmt *)utility_stmt;
-
-    if (stmt->is_program && disable_copy_program) {
-      ereport(ERROR,
-              (errmsg("COPY TO/FROM PROGRAM not allowed"),
-               errdetail(
-                   "The copy to/from program utility statement is disabled")));
-    }
-
-    break;
-  }
-
   default: break;
   }
 
@@ -1078,15 +1064,6 @@ static bool privileged_role_allowed_configs_check_hook(
   check_parameter(*newval, "supautils.privileged_role_allowed_configs");
 
   return true;
-}
-
-static bool disable_program_guc_check_hook(__attribute__((unused)) bool *newval,
-                                           __attribute__((unused)) void **extra,
-                                           GucSource source) {
-  // only allow setting from the postgresql.conf or the default value
-  // ALTER SYSTEM changes the PGC_S_GLOBAL, so this also prevents
-  // postgresql.auto.conf based changes
-  return source == PGC_S_FILE || source == PGC_S_DEFAULT;
 }
 
 static void check_parameter(char *val, char *name) {
@@ -1365,11 +1342,6 @@ void _PG_init(void) {
                            "Log skipped event triggers with a NOTICE level",
                            NULL, &log_skipped_evtrigs, false, PGC_USERSET, 0,
                            NULL, NULL, NULL);
-
-  DefineCustomBoolVariable(
-      "supautils.disable_program", "Disable COPY TO/FROM PROGRAM", NULL,
-      &disable_copy_program, false, PGC_SIGHUP, GUC_SUPERUSER_ONLY,
-      disable_program_guc_check_hook, NULL, NULL);
 
   if (placeholders) {
     List     *comma_separated_list;
