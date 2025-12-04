@@ -79,6 +79,7 @@ jobs:
           name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
           path: ./${{ matrix.extension_name }}.so
 
+  # Upload to shared-services bucket
   bundle-build-artifacts:
     name: Bundle build artifacts
     needs:
@@ -95,12 +96,22 @@ jobs:
         run: |
           tar -cJf supautils-${{ github.ref_name }}-arm64.tar.xz *.so
 
-      - name: Configure aws credentials for uploading release artifacts
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: GitHub OIDC Auth
+        uses: aws-actions/configure-aws-credentials@v4.1.0
         with:
-          role-to-assume: ${{ secrets.PROD_AWS_ROLE }}
-          aws-region: us-east-1
+          aws-region: ap-southeast-1
+          role-to-assume: ${{ secrets.SHARED_SERVICES_OIDC }}
+          role-session-name: shared-services-jump
+
+      - name: Assume destination role
+        uses: aws-actions/configure-aws-credentials@v4.1.0
+        with:
+          aws-region: ap-southeast-1
+          role-to-assume: ${{ secrets.SHARED_SERVICES_ROLE }}
+          role-skip-session-tagging: true
+          role-session-name: upload-assets
+          role-chaining: true
 
       - name: Upload bundle to shared services bucket
         run: |
-          aws s3 sync --no-progress ./ s3://supabase-internal-artifacts/supautils/${GITHUB_REF_NAME#v} --exclude '*' --include '*tar.xz'
+          aws s3 sync --no-progress ./ s3://${{ secrets.SHARED_SERVICES_BUCKET }}/supautils/${GITHUB_REF_NAME#v} --exclude '*' --include '*tar.xz'
