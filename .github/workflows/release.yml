@@ -59,8 +59,11 @@ jobs:
           # Build supautils
           make
 
-      - name: Get upload url
-        run: echo UPLOAD_URL=$(curl --silent https://api.github.com/repos/${{ github.repository }}/releases/latest | jq .upload_url --raw-output) >> $GITHUB_ENV
+      - name: Get asset name
+        run: |
+          ASSET_NAME=${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
+          mv ./${{ matrix.extension_name }}.so ./$ASSET_NAME
+          echo "ASSET_NAME=$ASSET_NAME" >> $GITHUB_ENV
 
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
@@ -68,16 +71,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload_url }}
-          asset_path: ./${{ matrix.extension_name }}.so
-          asset_name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
+          asset_path: ./${{ env.ASSET_NAME }}
+          asset_name: ${{ env.ASSET_NAME }}
           asset_content_type: application/octet-stream
 
       - name: Upload build artifacts for bundling
         if: ${{ matrix.box.arch == 'arm64' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.extension_name }}-${{ github.ref_name }}-pg${{ matrix.postgres }}-${{ matrix.box.arch }}-linux-gnu.so
-          path: ./${{ matrix.extension_name }}.so
+          name: ${{ env.ASSET_NAME }}
+          path: ./${{ env.ASSET_NAME }}
 
   # Upload to shared-services bucket
   bundle-build-artifacts:
