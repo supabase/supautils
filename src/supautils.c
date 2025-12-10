@@ -69,7 +69,8 @@ static char               *drop_trigger_grants_str       = NULL;
 static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t              total_dtgs                    = 0;
 
-bool log_skipped_evtrigs = false;
+static bool log_skipped_evtrigs = false;
+static bool disable_program     = false;
 
 void _PG_init(void);
 void _PG_fini(void);
@@ -1341,6 +1342,11 @@ void _PG_init(void) {
                            "Log skipped event triggers with a NOTICE level",
                            NULL, &log_skipped_evtrigs, false, PGC_USERSET, 0,
                            NULL, NULL, NULL);
+
+  // DO NOT USE; here for backward compat
+  DefineCustomBoolVariable("supautils.disable_program", NULL, NULL,
+                           &disable_program, false, PGC_SIGHUP,
+                           GUC_SUPERUSER_ONLY, NULL, NULL, NULL);
 
   if (placeholders) {
     List     *comma_separated_list;
