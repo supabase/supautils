@@ -45,5 +45,5 @@ func_attrs get_function_attrs(func_search search) {
 }
 
 bool is_event_trigger_function(Oid foid) {
-  return get_func_rettype(foid) == SUPAUTILS_EVENT_TRIGGER_OID;
+  return get_func_rettype(foid) == EVENT_TRIGGEROID;
 }
