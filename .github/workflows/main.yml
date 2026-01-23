@@ -42,7 +42,7 @@ jobs:
 
     strategy:
       matrix:
-        pg-version: ['15', '17']
+        pg-version: ['17', '18']
 
     steps:
       - uses: actions/checkout@v4
