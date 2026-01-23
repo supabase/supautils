@@ -33,8 +33,11 @@
 #define MAX_DROP_TRIGGER_GRANTS 100
 #define MAX_POLICY_GRANTS 100
 
-/* required macro for extension libraries to work */
+#if PG_VERSION_NUM >= 180000
+PG_MODULE_MAGIC_EXT(.name = "supautils", .version = MODVERSION);
+#else
 PG_MODULE_MAGIC;
+#endif
 
 static char *reserved_roles                 = NULL;
 static char *reserved_memberships           = NULL;
