@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         id: create-release
         with:
           generate_release_notes: true
@@ -100,14 +100,14 @@ jobs:
           tar -cJf supautils-${{ github.ref_name }}-arm64.tar.xz *.so
 
       - name: GitHub OIDC Auth
-        uses: aws-actions/configure-aws-credentials@v4.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           aws-region: ap-southeast-1
           role-to-assume: ${{ secrets.SHARED_SERVICES_OIDC }}
           role-session-name: shared-services-jump
 
       - name: Assume destination role
-        uses: aws-actions/configure-aws-credentials@v4.1.0
+        uses: aws-actions/configure-aws-credentials@v5.1.1
         with:
           aws-region: ap-southeast-1
           role-to-assume: ${{ secrets.SHARED_SERVICES_ROLE }}
