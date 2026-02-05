@@ -28,6 +28,8 @@ PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQ
 # 0 is true
 PG_EQ15 = $(shell test $(PG_VERSION) -eq 15; echo $$?)
 PG_NEQ15 = $(shell test $(PG_VERSION) -ne 15; echo $$?)
+PG_GE15 = $(shell test $(PG_VERSION) -ge 15; echo $$?)
+PG_LT15 = $(shell test $(PG_VERSION) -lt 15; echo $$?)
 PG_EQ18 = $(shell test $(PG_VERSION) -eq 18; echo $$?)
 PG_NEQ18 = $(shell test $(PG_VERSION) -ne 18; echo $$?)
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
@@ -54,7 +56,7 @@ endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
-GENERATED_OUT = test/expected/event_triggers.out
+GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -107,8 +109,8 @@ $(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX): $(MODULE_big).$(DL_SUFFIX)
 
 include $(PGXS)
 
-.PHONY: $(GENERATED_OUT)
-$(GENERATED_OUT): $(GENERATED_OUT).in
+.PHONY: test/expected/event_triggers.out
+test/expected/event_triggers.out: test/expected/event_triggers.out.in
 ifeq ($(PG_GE16), 0)
 	sed \
 		-e '/<\/\?PG_GE_16>/d' \
@@ -126,6 +128,20 @@ else
 		-e '/<\/\?PG_GE_13>/d' \
 		-e '/<PG_GE_14>/,/<\/PG_GE_14>/d' \
 		-e '/<PG_GE_16>/,/<\/PG_GE_16>/d' \
+		$? > $@
+endif
+
+.PHONY: test/expected/permission_hints.out
+test/expected/permission_hints.out: test/expected/permission_hints.out.in
+ifeq ($(PG_GE15), 0)
+	sed \
+		-e '/<\/\?PG_GE_15>/d' \
+		-e '/<PG_LT_15>/,/<\/PG_LT_15>/d' \
+		$? > $@
+else
+	sed \
+		-e '/<\/\?PG_LT_15>/d' \
+		-e '/<PG_GE_15>/,/<\/PG_GE_15>/d' \
 		$? > $@
 endif
 

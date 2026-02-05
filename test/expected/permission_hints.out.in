@@ -1,0 +1,123 @@
+set role postgres;
+\echo
+
+create role hint_role;
+create table hint_target(id int primary key);
+insert into hint_target values (1);
+create function hint_fn() returns trigger language plpgsql as $$
+begin
+  return NEW;
+end;
+$$;
+create table referencing_hint(id int);
+alter table referencing_hint owner to hint_role;
+\echo
+
+set role hint_role;
+\echo
+
+-- no column selected
+select from hint_target;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.hint_target TO hint_role;
+\echo
+
+-- no explicit column selected
+select * from hint_target;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.hint_target TO hint_role;
+select count(*) from hint_target;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.hint_target TO hint_role;
+\echo
+
+-- explicit column
+select id from hint_target;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.hint_target TO hint_role;
+\echo
+
+-- insert no specific columns
+insert into hint_target values (2);
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.hint_target TO hint_role;
+\echo
+
+-- insert no columns
+insert into hint_target default values;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.hint_target TO hint_role;
+\echo
+
+-- update explicit column
+update hint_target set id = id + 1;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.hint_target TO hint_role;
+\echo
+
+-- update no columns
+select * from hint_target for update;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.hint_target TO hint_role;
+\echo
+
+-- upserts
+insert into hint_target(id)
+values (1)
+on conflict (id) do update set id = excluded.id;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT, INSERT, UPDATE ON public.hint_target TO hint_role;
+\echo
+
+merge into hint_target t
+using (values (1)) as s(id)
+on t.id = s.id
+when matched then update set id = s.id;
+<PG_GE_15>
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.hint_target TO hint_role;
+\echo
+</PG_GE_15>
+<PG_LT_15>
+ERROR:  syntax error at or near "merge"
+LINE 1: merge into hint_target t
+        ^
+\echo
+</PG_LT_15>
+
+-- delete never chooses columns
+delete from hint_target;
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.hint_target TO hint_role;
+\echo
+
+-- ensure non-privilege errors don't hit the hint logic
+select * from non_existing_table;
+ERROR:  relation "non_existing_table" does not exist
+LINE 1: select * from non_existing_table;
+                      ^
+-- The TRUNCATE, TRIGGER and REFERENCES missing privileges won't add a hint
+-- ensure TRUNCATE don't have a hint
+truncate hint_target;
+ERROR:  permission denied for table hint_target
+\echo
+
+-- ensure TRIGGER privilege errors don't emit hints
+-- if `GRANT TRIGGER ON hint_target TO hint_role;` is done this succeeds
+create trigger hint_target_trg before insert on hint_target for each row
+    execute function hint_fn();
+ERROR:  permission denied for table hint_target
+\echo
+
+-- ensure REFERENCES privilege errors don't emit hints
+-- if `GRANT REFERENCES ON hint_target TO hint_role;` is done this succeeds
+alter table referencing_hint
+    add constraint referencing_hint_fk foreign key (id) references hint_target(id);
+ERROR:  permission denied for table hint_target
+\echo
+
+reset role;
+drop table referencing_hint;
+drop role hint_role;
+drop function hint_fn();
+drop table hint_target;
