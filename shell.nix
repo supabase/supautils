@@ -26,6 +26,35 @@ mkShell {
           ${clang-tools}/bin/clang-format -i src/*
           ${git}/bin/git diff-index --exit-code HEAD -- '*.c'
         '';
+      loadtest =
+        writeShellScriptBin "supautils-loadtest" ''
+          set -euo pipefail
+
+          file=./bench/utility.sql
+
+          common_opts="-n -c 1 -T 60 -f $file"
+
+          cat <<EOF
+          Results without supautils:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --options "-c wal_level=logical" pgbench $common_opts)
+          \`\`\`
+
+          Results with supautils and superuser:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --options "-c wal_level=logical -c session_preload_libraries=supautils" pgbench $common_opts)
+          \`\`\`
+
+          Results with supautils and privileged_role:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --options "-c wal_level=logical -c session_preload_libraries=supautils -c supautils.privileged_role='privileged_role' -c supautils.privileged_extensions=pg_trgm,postgres_fdw" pgbench -U privileged_role $common_opts)
+          \`\`\`
+
+          EOF
+        '';
     in
     [
       (xpg.xpgWithExtensions {
@@ -33,5 +62,6 @@ mkShell {
       })
       style
       styleCheck
+      loadtest
     ];
 }
