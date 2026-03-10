@@ -69,6 +69,9 @@ jobs:
 
 
   loadtest:
+    strategy:
+      matrix:
+        kind: ['utility', 'select']
     name: Loadtest
     runs-on: ubuntu-24.04
     steps:
@@ -86,7 +89,7 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Run loadtest
-        run: nix-shell --run "supautils-loadtest" >> "$GITHUB_STEP_SUMMARY"
+        run: nix-shell --run "supautils-loadtest-${{ matrix.kind }}" >> "$GITHUB_STEP_SUMMARY"
 
 
   coverage:
