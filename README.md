@@ -317,6 +317,7 @@ This is also useful to limit memberships to the [Reserved Roles](#reserved-roles
 ### Enhanced hints
 
 Errors that originated from "permission denied" (SQLSTATE 42501) errors, will produce a HINT that includes the exact privileges missing to clear the error.
+Only roles that are configured in `supautils.hint_roles` (comma-separated list of roles) get enhanced hints.
 
 For example:
 

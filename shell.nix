@@ -69,16 +69,16 @@ mkShell {
           $(${xpg.xpg}/bin/xpg --init-options "$init_opts" pgbench $common_opts)
           \`\`\`
 
-          Results with supautils and superuser:
+          Results with supautils and no hint_role:
 
           \`\`\`
           $(${xpg.xpg}/bin/xpg --init-options "$init_opts" --options "-c session_preload_libraries=supautils" pgbench $common_opts)
           \`\`\`
 
-          Results with supautils and privileged_role:
+          Results with supautils and hint_role:
 
           \`\`\`
-          $(${xpg.xpg}/bin/xpg --init-options "$init_opts" --options "-c session_preload_libraries=supautils -c supautils.privileged_role='privileged_role'" pgbench -U privileged_role $common_opts)
+          $(${xpg.xpg}/bin/xpg --init-options "$init_opts" --options "-c session_preload_libraries=supautils -c supautils.hint_roles='hint_role'" pgbench -U hint_role $common_opts)
           \`\`\`
 
           EOF

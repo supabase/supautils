@@ -2,6 +2,7 @@ set role postgres;
 \echo
 
 create role hint_role;
+create role non_hint_role;
 create table hint_target(id int primary key);
 insert into hint_target values (1);
 create function hint_fn() returns trigger language plpgsql as $$
@@ -82,7 +83,16 @@ alter table referencing_hint
 \echo
 
 reset role;
+set role non_hint_role;
+\echo
+
+-- roles outside supautils.hint_roles don't emit enhanced hints
+select from hint_target;
+\echo
+
+reset role;
 drop table referencing_hint;
 drop role hint_role;
+drop role non_hint_role;
 drop function hint_fn();
 drop table hint_target;

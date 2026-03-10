@@ -10,6 +10,7 @@ supautils.privileged_extensions='autoinc, citext, hstore, sslinfo, insert_userna
 supautils.constrained_extensions='{"adminpack": { "cpu": 64}, "cube": { "mem": "17 GB"}, "lo": { "disk": "100 GB"}, "amcheck": { "cpu": 2, "mem": "100 MB", "disk": "100 MB"}}'
 supautils.privileged_role='privileged_role'
 supautils.privileged_role_allowed_configs='session_replication_role, pgrst.*, other.nested.*'
+supautils.hint_roles='hint_role'
 supautils.placeholders='response.headers, another.placeholder'
 supautils.placeholders_disallowed_values='"content-type","x-special-header",special-value'
 supautils.extensions_parameter_overrides='{"sslinfo":{"schema":"pg_catalog"}}'
