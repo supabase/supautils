@@ -187,6 +187,8 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
 }
 
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
+  MemoryContext cur_ctx = CurrentMemoryContext;
+
   // for performance in the case hint_roles is not configured
   if (hint_roles == NULL ||
       !is_hint_role(GetUserNameFromId(GetUserId(), false))) {
@@ -207,7 +209,7 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
     {
       // we're on ErrorContext, we need to switch context because CopyErrorData
       // fails due to an asssertion that it must not be in ErrorContext
-      MemoryContext oldcxt = MemoryContextSwitchTo(TopMemoryContext);
+      MemoryContext oldcxt = MemoryContextSwitchTo(cur_ctx);
       ErrorData    *edata  = CopyErrorData();
       MemoryContextSwitchTo(oldcxt);
 
