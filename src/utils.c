@@ -143,3 +143,13 @@ void alter_owner(const char *obj_name, Oid role_oid,
   }
   }
 }
+
+#if PG17_LT
+// Polyfill for pg < 17
+// https://github.com/postgres/postgres/blob/3c4e26a62c31ebe296e3aedb13ac51a7a35103bd/src/common/stringinfo.c#L402-L416
+void destroyStringInfo(StringInfo str) {
+  Assert(str->maxlen != 0);
+  pfree(str->data);
+  pfree(str);
+}
+#endif

@@ -10,6 +10,7 @@ results/*.out
 result*
 tags
 test/expected/event_triggers.out
+test/expected/permission_hints.out
 *.gcno
 *.gcda
 coverage.info

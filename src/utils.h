@@ -43,4 +43,6 @@ typedef enum { ALT_FDW, ALT_PUB, ALT_EVTRIG } altered_obj_type;
 extern void alter_owner(const char *obj_name, Oid role_oid,
                         altered_obj_type obj_type);
 
+extern void destroyStringInfo(StringInfo str);
+
 #endif

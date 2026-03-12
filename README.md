@@ -43,6 +43,7 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 - [Table Ownership Bypass](#table-ownership-bypass)
 - [Reserved Roles](#reserved-roles)
 - [Reserved Memberships](#reserved-memberships)
+- [Enhanced Hints](#enhanced-hints)
 
 ### Privileged Role
 
@@ -312,6 +313,29 @@ supautils.reserved_memberships = 'pg_read_server_files'
 ```
 
 This is also useful to limit memberships to the [Reserved Roles](#reserved-roles).
+
+### Enhanced hints
+
+Errors that originated from "permission denied" (SQLSTATE 42501) errors, will produce a HINT that includes the exact privileges missing to clear the error.
+Only roles that are configured in `supautils.hint_roles` (comma-separated list of roles) get enhanced hints.
+
+For example:
+
+```sql
+set role hint_role;
+
+insert into hint_target(id)
+values (1)
+on conflict (id) do update set id = excluded.id;
+
+ERROR:  permission denied for table hint_target
+HINT:  Grant the required privileges to the current role with: GRANT SELECT, INSERT, UPDATE ON public.hint_target TO hint_role;
+```
+
+The hint is only included when there are lacking `SELECT`, `INSERT`, `UPDATE` or `DELETE` privileges.
+
+> [!IMPORTANT]
+> Limitation: enhanced hints do not work for views under pg 18. See https://github.com/supabase/supautils/issues/182.
 
 ## Development
 

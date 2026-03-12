@@ -1,0 +1,104 @@
+set role postgres;
+\echo
+
+create role hint_role;
+create role non_hint_role;
+create table hint_target(id int primary key);
+create view hint_view as select * from hint_target;
+insert into hint_target values (1);
+create function hint_fn() returns trigger language plpgsql as $$
+begin
+  return NEW;
+end;
+$$;
+create table referencing_hint(id int);
+alter table referencing_hint owner to hint_role;
+\echo
+
+set role hint_role;
+\echo
+
+-- no column selected
+select from hint_target;
+\echo
+
+-- no explicit column selected
+select * from hint_target;
+select count(*) from hint_target;
+\echo
+
+-- explicit column
+select id from hint_target;
+\echo
+
+-- insert no specific columns
+insert into hint_target values (2);
+\echo
+
+-- insert no columns
+insert into hint_target default values;
+\echo
+
+-- update explicit column
+update hint_target set id = id + 1;
+\echo
+
+-- update no columns
+select * from hint_target for update;
+\echo
+
+-- upserts
+insert into hint_target(id)
+values (1)
+on conflict (id) do update set id = excluded.id;
+\echo
+
+merge into hint_target t
+using (values (1)) as s(id)
+on t.id = s.id
+when matched then update set id = s.id;
+\echo
+
+-- delete never chooses columns
+delete from hint_target;
+\echo
+
+-- ensure non-privilege errors don't hit the hint logic
+select * from non_existing_table;
+
+-- The TRUNCATE, TRIGGER and REFERENCES missing privileges won't add a hint
+-- ensure TRUNCATE don't have a hint
+truncate hint_target;
+\echo
+
+-- ensure TRIGGER privilege errors don't emit hints
+-- if `GRANT TRIGGER ON hint_target TO hint_role;` is done this succeeds
+create trigger hint_target_trg before insert on hint_target for each row
+    execute function hint_fn();
+\echo
+
+-- ensure REFERENCES privilege errors don't emit hints
+-- if `GRANT REFERENCES ON hint_target TO hint_role;` is done this succeeds
+alter table referencing_hint
+    add constraint referencing_hint_fk foreign key (id) references hint_target(id);
+\echo
+
+-- views rely on the owner's privileges, ensure hints still fire
+select * from hint_view;
+\echo
+
+reset role;
+set role non_hint_role;
+\echo
+
+-- roles outside supautils.hint_roles don't emit enhanced hints
+select from hint_target;
+\echo
+
+reset role;
+drop table referencing_hint;
+drop role hint_role;
+drop role non_hint_role;
+drop function hint_fn();
+drop view hint_view;
+drop table hint_target;

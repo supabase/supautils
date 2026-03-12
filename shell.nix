@@ -26,13 +26,13 @@ mkShell {
           ${clang-tools}/bin/clang-format -i src/*
           ${git}/bin/git diff-index --exit-code HEAD -- '*.c'
         '';
-      loadtest =
-        writeShellScriptBin "supautils-loadtest" ''
+      loadtestUtility =
+        writeShellScriptBin "supautils-loadtest-utility" ''
           set -euo pipefail
 
           file=./bench/utility.sql
 
-          common_opts="-n -c 1 -T 60 -f $file"
+          common_opts="-n -T 60 -f $file"
 
           cat <<EOF
           Results without supautils:
@@ -55,6 +55,34 @@ mkShell {
 
           EOF
         '';
+      loadtestSelect =
+        writeShellScriptBin "supautils-loadtest-select" ''
+          set -euo pipefail
+
+          init_opts="-i -s 10"
+          common_opts="-S -T 120"
+
+          cat <<EOF
+          Results without supautils:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --init-options "$init_opts" pgbench $common_opts)
+          \`\`\`
+
+          Results with supautils and no hint_role:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --init-options "$init_opts" --options "-c session_preload_libraries=supautils" pgbench $common_opts)
+          \`\`\`
+
+          Results with supautils and hint_role:
+
+          \`\`\`
+          $(${xpg.xpg}/bin/xpg --init-options "$init_opts" --options "-c session_preload_libraries=supautils -c supautils.hint_roles='hint_role'" pgbench -U hint_role $common_opts)
+          \`\`\`
+
+          EOF
+        '';
     in
     [
       (xpg.xpgWithExtensions {
@@ -62,6 +90,7 @@ mkShell {
       })
       style
       styleCheck
-      loadtest
+      loadtestUtility
+      loadtestSelect
     ];
 }

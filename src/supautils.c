@@ -5,6 +5,7 @@
 #include "event_triggers.h"
 #include "extension_custom_scripts.h"
 #include "extensions_parameter_overrides.h"
+#include "permission_hints.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
 
@@ -50,10 +51,12 @@ static char *extension_custom_scripts_path  = NULL;
 static char *privileged_role = NULL; // the privileged_role is a proxy role for
                                      // the `supautils.superuser` role
 static char *privileged_role_allowed_configs = NULL;
+static char *hint_roles                      = NULL;
 
-static ProcessUtility_hook_type prev_hook            = NULL;
-static fmgr_hook_type           next_fmgr_hook       = NULL;
-static needs_fmgr_hook_type     next_needs_fmgr_hook = NULL;
+static ProcessUtility_hook_type prev_hook                = NULL;
+static fmgr_hook_type           next_fmgr_hook           = NULL;
+static needs_fmgr_hook_type     next_needs_fmgr_hook     = NULL;
+static ExecutorStart_hook_type  prev_executor_start_hook = NULL;
 
 static char                 *constrained_extensions_str        = NULL;
 static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
@@ -79,6 +82,7 @@ void _PG_init(void);
 void _PG_fini(void);
 
 static bool is_reserved_role(const char *target, bool allow_configurable_roles);
+static bool is_hint_role(const char *target);
 
 static void confirm_reserved_memberships(const char *target);
 
@@ -87,6 +91,8 @@ static void check_parameter(char *val, char *name);
 static bool is_current_role_privileged(void);
 
 static bool is_role_privileged(const char *role);
+
+static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
@@ -177,6 +183,85 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
     break;
 
   default: elog(ERROR, "unexpected event type: %d", (int)event); break;
+  }
+}
+
+static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
+  MemoryContext cur_ctx = CurrentMemoryContext;
+
+  // for performance in the case hint_roles is not configured
+  if (hint_roles == NULL ||
+      !is_hint_role(GetUserNameFromId(GetUserId(), false))) {
+    if (prev_executor_start_hook)
+      prev_executor_start_hook(queryDesc, eflags);
+    else
+      standard_ExecutorStart(queryDesc, eflags);
+  } else {
+    PG_TRY();
+    {
+      if (prev_executor_start_hook)
+        prev_executor_start_hook(queryDesc, eflags);
+      else
+        standard_ExecutorStart(queryDesc, eflags);
+    }
+    // adds enhanced hints
+    PG_CATCH();
+    {
+      // we're on ErrorContext, we need to switch context because CopyErrorData
+      // fails due to an asssertion that it must not be in ErrorContext
+      MemoryContext oldcxt = MemoryContextSwitchTo(cur_ctx);
+      ErrorData    *edata  = CopyErrorData();
+      MemoryContextSwitchTo(oldcxt);
+
+      FlushErrorState(); // should be called after CopyErrorData
+
+      if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
+        const Oid current_role_oid = GetUserId();
+
+        // edata->table_name is always NULL for some reason, so we need to find
+        // the relid (included in missing_perm)
+        missing_perm missing =
+            find_missing_perm(queryDesc->plannedstmt, current_role_oid);
+
+        // there must be some privilege missing given there was a
+        // ERRCODE_INSUFFICIENT_PRIVILEGE
+        Assert(missing.acl != 0);
+        Assert(missing.relid != InvalidOid);
+
+        // ERRCODE_INSUFFICIENT_PRIVILEGE also includes TRUNCATE, REFERENCES and
+        // TRIGGER error privileges but these are not visible in this function
+        // (a ExecutorStart_hook) so we assert here that these are impossible as
+        // a missing privilege
+        Assert((missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
+               0);
+
+        StringInfo privileges_str = makeStringInfo();
+        build_privileges_string(privileges_str, missing.acl);
+
+        // the string of privileges has to be built
+        Assert(privileges_str->len > 0);
+
+        char *schema  = get_namespace_name(get_rel_namespace(missing.relid));
+        char *relname = get_rel_name(missing.relid);
+        char *qualified_rel_name = quote_qualified_identifier(schema, relname);
+        char *quoted_role_name   = quote_qualified_identifier(
+            NULL, GetUserNameFromId(current_role_oid, false));
+
+        edata->hint = psprintf("Grant the required privileges to the current "
+                               "role with: GRANT %s ON %s TO %s;",
+                               privileges_str->data, qualified_rel_name,
+                               quoted_role_name);
+
+        destroyStringInfo(privileges_str);
+        pfree(schema);
+        pfree(relname);
+        pfree(qualified_rel_name);
+        pfree(quoted_role_name);
+      }
+
+      ReThrowError(edata);
+    }
+    PG_END_TRY();
   }
 }
 
@@ -1061,6 +1146,14 @@ privileged_extensions_check_hook(char                            **newval,
   return true;
 }
 
+static bool hint_roles_check_hook(char                            **newval,
+                                  __attribute__((unused)) void    **extra,
+                                  __attribute__((unused)) GucSource source) {
+  check_parameter(*newval, "supautils.hint_roles");
+
+  return true;
+}
+
 static bool privileged_role_allowed_configs_check_hook(
     char **newval, __attribute__((unused)) void **extra,
     __attribute__((unused)) GucSource source) {
@@ -1126,6 +1219,30 @@ static bool is_reserved_role(const char *target,
     }
     list_free(reserved_roles_list);
   }
+
+  return false;
+}
+
+static bool is_hint_role(const char *target) {
+  List     *hint_roles_list;
+  ListCell *role;
+
+  if (hint_roles == NULL || target == NULL) {
+    return false;
+  }
+
+  SplitIdentifierString(pstrdup(hint_roles), ',', &hint_roles_list);
+
+  foreach (role, hint_roles_list) {
+    char *configured_role = (char *)lfirst(role);
+
+    if (strcmp(target, configured_role) == 0) {
+      list_free(hint_roles_list);
+      return true;
+    }
+  }
+
+  list_free(hint_roles_list);
 
   return false;
 }
@@ -1251,6 +1368,9 @@ void _PG_init(void) {
   next_fmgr_hook = fmgr_hook;
   fmgr_hook      = supautils_fmgr_hook;
 
+  prev_executor_start_hook = ExecutorStart_hook;
+  ExecutorStart_hook       = supautils_executor_start;
+
   DefineCustomStringVariable(
       "supautils.extensions_parameter_overrides",
       "Overrides for CREATE EXTENSION parameters", NULL,
@@ -1324,6 +1444,12 @@ void _PG_init(void) {
       NULL, &privileged_role_allowed_configs, NULL, PGC_SIGHUP, 0,
       privileged_role_allowed_configs_check_hook, NULL, NULL);
 
+  DefineCustomStringVariable(
+      "supautils.hint_roles",
+      "Comma-separated list of roles that receive enhanced permission hints",
+      NULL, &hint_roles, NULL, PGC_SIGHUP, 0, hint_roles_check_hook, NULL,
+      NULL);
+
   DefineCustomStringVariable("supautils.constrained_extensions",
                              "Extensions that require a minimum amount of "
                              "CPUs, memory and free disk to be installed",
@@ -1376,4 +1502,5 @@ void _PG_init(void) {
  */
 void _PG_fini(void) {
   ProcessUtility_hook = prev_hook;
+  ExecutorStart_hook  = prev_executor_start_hook;
 }

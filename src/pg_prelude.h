@@ -8,6 +8,7 @@
 
 #include <postgres.h>
 
+#include <access/htup_details.h>
 #include <access/xact.h>
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
@@ -17,10 +18,13 @@
 #include <commands/event_trigger.h>
 #include <commands/publicationcmds.h>
 #include <common/jsonapi.h>
+#include <executor/executor.h>
 #include <executor/spi.h>
 #include <fmgr.h>
 #include <miscadmin.h>
+#include <nodes/bitmapset.h>
 #include <nodes/makefuncs.h>
+#include <nodes/parsenodes.h>
 #include <nodes/pg_list.h>
 #include <nodes/value.h>
 #include <parser/parse_func.h>
@@ -48,6 +52,8 @@
 #define PG15_GTE (PG_VERSION_NUM >= 150000)
 #define PG16_GTE (PG_VERSION_NUM >= 160000)
 #define PG17_GTE (PG_VERSION_NUM >= 170000)
+#define PG17_LT (PG_VERSION_NUM < 170000)
+#define PG16_LT (PG_VERSION_NUM < 160000)
 
 #if PG17_GTE
 
@@ -118,5 +124,24 @@
     PG_RE_THROW();                                                             \
   }                                                                            \
   PG_END_TRY();
+
+// polyfill
+#if PG17_LT
+
+#  define foreach_internal(type, pointer, var, lst, func)                      \
+    for (type pointer var = 0, pointer var##__outerloop = (type pointer)1;     \
+         var##__outerloop; var##__outerloop = 0)                               \
+      for (ForEachState var##__state = {(lst), 0};                             \
+           (var##__state.l != NIL &&                                           \
+            var##__state.i < var##__state.l->length &&                         \
+            (var = (type pointer)func(                                         \
+                 &var##__state.l->elements[var##__state.i]),                   \
+            true));                                                            \
+           var##__state.i++)
+
+#  define foreach_ptr(type, var, lst)                                          \
+    foreach_internal(type, *, var, lst, lfirst)
+
+#endif
 
 #endif /* PG_PRELUDE_H */
