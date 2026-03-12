@@ -4,6 +4,7 @@ set role postgres;
 create role hint_role;
 create role non_hint_role;
 create table hint_target(id int primary key);
+create view hint_view as select * from hint_target;
 insert into hint_target values (1);
 create function hint_fn() returns trigger language plpgsql as $$
 begin
@@ -82,6 +83,10 @@ alter table referencing_hint
     add constraint referencing_hint_fk foreign key (id) references hint_target(id);
 \echo
 
+-- views rely on the owner's privileges, ensure hints still fire
+select * from hint_view;
+\echo
+
 reset role;
 set role non_hint_role;
 \echo
@@ -95,4 +100,5 @@ drop table referencing_hint;
 drop role hint_role;
 drop role non_hint_role;
 drop function hint_fn();
+drop view hint_view;
 drop table hint_target;

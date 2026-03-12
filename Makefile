@@ -32,6 +32,7 @@ PG_GE15 = $(shell test $(PG_VERSION) -ge 15; echo $$?)
 PG_LT15 = $(shell test $(PG_VERSION) -lt 15; echo $$?)
 PG_EQ18 = $(shell test $(PG_VERSION) -eq 18; echo $$?)
 PG_NEQ18 = $(shell test $(PG_VERSION) -ne 18; echo $$?)
+PG_GE18 = $(shell test $(PG_VERSION) -ge 18; echo $$?)
 PG_GE16 = $(shell test $(PG_VERSION) -ge 16; echo $$?)
 PG_GE14 = $(shell test $(PG_VERSION) -ge 14; echo $$?)
 SYSTEM = $(shell uname -s)
@@ -133,14 +134,22 @@ endif
 
 .PHONY: test/expected/permission_hints.out
 test/expected/permission_hints.out: test/expected/permission_hints.out.in
-ifeq ($(PG_GE15), 0)
+ifeq ($(PG_GE18), 0)
 	sed \
 		-e '/<\/\?PG_GE_15>/d' \
+		-e '/<PG_LT_18>/,/<\/PG_LT_18>/d' \
+		-e '/<PG_LT_15>/,/<\/PG_LT_15>/d' \
+		$? > $@
+else ifeq ($(PG_GE15), 0)
+	sed \
+		-e '/<\/\?PG_GE_15>/d' \
+		-e '/<\/\?PG_LT_18>/d' \
 		-e '/<PG_LT_15>/,/<\/PG_LT_15>/d' \
 		$? > $@
 else
 	sed \
 		-e '/<\/\?PG_LT_15>/d' \
+		-e '/<\/\?PG_LT_18>/d' \
 		-e '/<PG_GE_15>/,/<\/PG_GE_15>/d' \
 		$? > $@
 endif

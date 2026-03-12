@@ -334,6 +334,9 @@ HINT:  Grant the required privileges to the current role with: GRANT SELECT, INS
 
 The hint is only included when there are lacking `SELECT`, `INSERT`, `UPDATE` or `DELETE` privileges.
 
+> [!IMPORTANT]
+> Limitation: enhanced hints do not work for views under pg 18. See https://github.com/supabase/supautils/issues/182.
+
 ## Development
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.
