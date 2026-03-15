@@ -276,7 +276,10 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_AlterRoleStmt: {
     AlterRoleStmt *stmt        = (AlterRoleStmt *)utility_stmt;
     ListCell      *option_cell = NULL;
+    Oid            role_oid;
+    char          *role_name;
     bool           already_switched_to_superuser = false;
+    bool           is_privileged = false;
 
     if (!IsTransactionState()) {
       break;
@@ -285,7 +288,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    char *role_name = get_rolespec_name(stmt->role);
+    /* This handles roletypes correctly*/
+    role_oid = get_rolespec_oid(stmt->role, false);
+    role_name = GetUserNameFromId(role_oid, false);
 
     if (is_reserved_role(role_name, false)) EREPORT_RESERVED_ROLE(role_name);
 
@@ -293,12 +298,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    if (is_role_privileged(stmt->role->rolename)) {
-      ereport(ERROR,
-              (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-               errmsg("permission denied to alter role"),
-               errdetail("Only superusers can alter privileged roles.")));
-    }
+    is_privileged = is_role_privileged(role_name);
 
     // Setting the superuser attribute is not allowed.
     foreach (option_cell, stmt->options) {
@@ -310,6 +310,20 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                                   "roles with the %s attribute.",
                                   "SUPERUSER", "SUPERUSER")));
       }
+
+      /* Allow user to change their own password */
+      if (strcmp(defel->defname, "password") == 0)
+      {
+        Oid       current_role_oid = GetUserId();
+        if (current_role_oid == role_oid)
+          continue;
+      }
+
+      if (is_privileged)
+        ereport(ERROR,
+                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                 errmsg("permission denied to alter role"),
+                 errdetail("Only superusers can alter privileged roles.")));
     }
 
     // Allow setting bypassrls & replication.
