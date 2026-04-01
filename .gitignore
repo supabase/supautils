@@ -11,6 +11,7 @@ result*
 tags
 test/expected/event_triggers.out
 test/expected/permission_hints.out
+test/expected/privileged_role.out
 *.gcno
 *.gcda
 coverage.info

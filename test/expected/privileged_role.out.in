@@ -168,14 +168,24 @@ DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERU
 alter role r nosuperuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
--- current_role/current_user doesn't result in a crash
+\echo
+
+-- current_role and current_user doesn't result in a crash
 alter role current_role;
+<PG_LE13>
 ERROR:  syntax error at or near "current_role"
 LINE 1: alter role current_role;
                    ^
+</PG_LE13>
+<PG_GT13>
+ERROR:  permission denied to alter role
+DETAIL:  Only superusers can alter privileged roles.
+</PG_GT13>
 alter role current_user;
 ERROR:  permission denied to alter role
 DETAIL:  Only superusers can alter privileged roles.
+\echo
+
 drop role r;
 \echo
 

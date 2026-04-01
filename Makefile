@@ -29,6 +29,7 @@ PG_VERSION = $(strip $(shell $(PG_CONFIG) --version | $(GREP) -oP '(?<=PostgreSQ
 PG_EQ15 = $(shell test $(PG_VERSION) -eq 15; echo $$?)
 PG_NEQ15 = $(shell test $(PG_VERSION) -ne 15; echo $$?)
 PG_GE15 = $(shell test $(PG_VERSION) -ge 15; echo $$?)
+PG_LE13 = $(shell test $(PG_VERSION) -le 13; echo $$?)
 PG_LT15 = $(shell test $(PG_VERSION) -lt 15; echo $$?)
 PG_EQ18 = $(shell test $(PG_VERSION) -eq 18; echo $$?)
 PG_NEQ18 = $(shell test $(PG_VERSION) -ne 18; echo $$?)
@@ -57,7 +58,7 @@ endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
-GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out
+GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -151,6 +152,20 @@ else
 		-e '/<\/\?PG_LT_15>/d' \
 		-e '/<\/\?PG_LT_18>/d' \
 		-e '/<PG_GE_15>/,/<\/PG_GE_15>/d' \
+		$? > $@
+endif
+
+.PHONY: test/expected/privileged_role.out
+test/expected/privileged_role.out: test/expected/privileged_role.out.in
+ifeq ($(PG_LE13), 0)
+	sed \
+		-e '/<\/\?PG_LE13>/d' \
+		-e '/<PG_GT13>/,/<\/PG_GT13>/d' \
+		$? > $@
+else
+	sed \
+		-e '/<\/\?PG_GT13>/d' \
+		-e '/<PG_LE13>/,/<\/PG_LE13>/d' \
 		$? > $@
 endif
 
