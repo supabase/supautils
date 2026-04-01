@@ -293,7 +293,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    if (is_role_privileged(stmt->role->rolename)) {
+    if (is_role_privileged(role_name)) {
       ereport(ERROR,
               (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
                errmsg("permission denied to alter role"),

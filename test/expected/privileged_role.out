@@ -168,6 +168,13 @@ DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERU
 alter role r nosuperuser;
 ERROR:  permission denied to alter role
 DETAIL:  Only roles with the SUPERUSER attribute may alter roles with the SUPERUSER attribute.
+-- current_role/current_user doesn't result in a crash
+alter role current_role;
+ERROR:  permission denied to alter role
+DETAIL:  Only superusers can alter privileged roles.
+alter role current_user;
+ERROR:  permission denied to alter role
+DETAIL:  Only superusers can alter privileged roles.
 drop role r;
 \echo
 
