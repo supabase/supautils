@@ -119,6 +119,12 @@ create role r superuser;
 create role r;
 alter role r superuser;
 alter role r nosuperuser;
+\echo
+
+-- current_role and current_user doesn't result in a crash
+alter role current_role;
+alter role current_user;
+\echo
 
 drop role r;
 \echo
