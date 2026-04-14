@@ -26,8 +26,10 @@ set role extensions_role;
 -- global extension custom scripts are run
 create extension dict_xsyn;
 NOTICE:  extname: dict_xsyn, extschema: <NULL>, extversion: <NULL>, extcascade: f
+reset role;
 create extension insert_username version "1.0" schema public cascade;
 NOTICE:  extname: insert_username, extschema: public, extversion: 1.0, extcascade: t
+set role extensions_role;
 \echo
 
 -- custom scripts are run even for superusers

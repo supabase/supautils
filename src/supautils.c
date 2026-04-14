@@ -265,6 +265,42 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   }
 }
 
+static void
+restrict_version_specification(List *options,
+                               const char *supautils_superuser,
+                               const char *stmt_type)
+{
+  ListCell *lc;
+
+  if (superuser())
+    return;
+
+  if (supautils_superuser != NULL && supautils_superuser[0] != '\0') {
+    const char *current_user = GetUserNameFromId(GetUserId(), false);
+    if (strcmp(current_user, supautils_superuser) == 0)
+      return;
+  }
+
+  foreach (lc, options) {
+    DefElem *defel = (DefElem *)lfirst(lc);
+
+    if (strcmp(defel->defname, "new_version") == 0) {
+      if (strcmp(stmt_type, "CREATE") == 0)
+        ereport(ERROR,
+                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                 errmsg("permission denied: only superusers can specify "
+                        "extension versions. Use CREATE EXTENSION <name> "
+                        "without a VERSION clause.")));
+      else
+        ereport(ERROR,
+                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                 errmsg("permission denied: only superusers can specify "
+                        "extension versions. Use ALTER EXTENSION <name> "
+                        "UPDATE without a TO clause.")));
+    }
+  }
+}
+
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   /* Get the utility statement from the planned statement */
   Node *utility_stmt = pstmt->utilityStmt;
@@ -558,6 +594,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_CreateExtensionStmt: {
     CreateExtensionStmt *volatile stmt = (CreateExtensionStmt *)utility_stmt;
 
+    restrict_version_specification(stmt->options, supautils_superuser, "CREATE");
+
     constrain_extension(stmt->extname, cexts, total_cexts);
 
     bool already_switched_to_superuser = false;
@@ -604,6 +642,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
+
+    restrict_version_specification(stmt->options, supautils_superuser, "ALTER");
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
       bool already_switched_to_superuser = false;
