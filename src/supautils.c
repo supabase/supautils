@@ -265,20 +265,16 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   }
 }
 
-static void
-restrict_version_specification(List *options,
-                               const char *supautils_superuser,
-                               const char *stmt_type)
-{
+static void restrict_version_specification(List       *options,
+                                           const char *supautils_superuser,
+                                           const char *stmt_type) {
   ListCell *lc;
 
-  if (superuser())
-    return;
+  if (superuser()) return;
 
   if (supautils_superuser != NULL && supautils_superuser[0] != '\0') {
     const char *current_user = GetUserNameFromId(GetUserId(), false);
-    if (strcmp(current_user, supautils_superuser) == 0)
-      return;
+    if (strcmp(current_user, supautils_superuser) == 0) return;
   }
 
   foreach (lc, options) {
@@ -292,11 +288,10 @@ restrict_version_specification(List *options,
                         "extension versions. Use CREATE EXTENSION <name> "
                         "without a VERSION clause.")));
       else
-        ereport(ERROR,
-                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                 errmsg("permission denied: only superusers can specify "
-                        "extension versions. Use ALTER EXTENSION <name> "
-                        "UPDATE without a TO clause.")));
+        ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                        errmsg("permission denied: only superusers can specify "
+                               "extension versions. Use ALTER EXTENSION <name> "
+                               "UPDATE without a TO clause.")));
     }
   }
 }
@@ -594,7 +589,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_CreateExtensionStmt: {
     CreateExtensionStmt *volatile stmt = (CreateExtensionStmt *)utility_stmt;
 
-    restrict_version_specification(stmt->options, supautils_superuser, "CREATE");
+    restrict_version_specification(stmt->options, supautils_superuser,
+                                   "CREATE");
 
     constrain_extension(stmt->extname, cexts, total_cexts);
 
