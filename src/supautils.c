@@ -218,7 +218,8 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
             find_missing_perm(queryDesc->plannedstmt, current_role_oid);
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
-            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) == 0) {
+            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
+                0) {
 
           StringInfo privileges_str = makeStringInfo();
           build_privileges_string(privileges_str, missing.acl);
@@ -228,9 +229,11 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
             char *relname = get_rel_name(missing.relid);
 
             if (relname != NULL) {
-              char *qualified_rel_name = quote_qualified_identifier(schema, relname);
+              char *qualified_rel_name =
+                  quote_qualified_identifier(schema, relname);
               char *username = GetUserNameFromId(current_role_oid, false);
-              char *quoted_role_name = quote_qualified_identifier(NULL, username);
+              char *quoted_role_name =
+                  quote_qualified_identifier(NULL, username);
 
               edata->hint = psprintf(
                   "Grant the required privileges to the current "
