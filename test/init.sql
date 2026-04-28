@@ -33,6 +33,13 @@ grant all on schema public to nonsuper;
 \c postgres
 grant all on schema public to nonsuper;
 grant all privileges on database postgres to nonsuper;
+
+-- non-superuser role configured as supautils.superuser for testing version restriction bypass
+-- Must be nosuperuser so the test exercises the supautils.superuser name comparison,
+-- not the superuser() early return.
+create role superuser_for_test nosuperuser login;
+grant all on database contrib_regression, postgres to superuser_for_test;
+
 \c contrib_regression
 
 -- starting from pg16 not every role can create objects on the public schema by default
