@@ -218,57 +218,47 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
       if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
         const Oid current_role_oid = GetUserId();
 
-        // edata->table_name is always NULL for some reason, so we need to find
-        // the relid (included in missing_perm)
         missing_perm missing =
             find_missing_perm(queryDesc->plannedstmt, current_role_oid);
 
-        // there must be some privilege missing given there was a
-        // ERRCODE_INSUFFICIENT_PRIVILEGE
-        Assert(missing.acl != 0);
-        Assert(missing.relid != InvalidOid);
+        if (missing.acl != 0 && OidIsValid(missing.relid) &&
+            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
+                0) {
+          StringInfo privileges_str = makeStringInfo();
+          build_privileges_string(privileges_str, missing.acl);
 
-        // ERRCODE_INSUFFICIENT_PRIVILEGE also includes TRUNCATE, REFERENCES and
-        // TRIGGER error privileges but these are not visible in this function
-        // (a ExecutorStart_hook) so we assert here that these are impossible as
-        // a missing privilege
-        Assert((missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
-               0);
+          if (privileges_str->len > 0) {
+            char *schema = get_namespace_name(get_rel_namespace(missing.relid));
+            char *relname = get_rel_name(missing.relid);
 
-        StringInfo privileges_str = makeStringInfo();
-        build_privileges_string(privileges_str, missing.acl);
+            if (relname != NULL) {
+              char *qualified_rel_name =
+                  quote_qualified_identifier(schema, relname);
+              char *username = GetUserNameFromId(current_role_oid, false);
+              char *quoted_role_name =
+                  quote_qualified_identifier(NULL, username);
 
-        // the string of privileges has to be built
-        Assert(privileges_str->len > 0);
+              // Prevent memory leak of existing hint
+              if (edata->hint != NULL)
+                pfree(edata->hint);
 
-        char *schema  = get_namespace_name(get_rel_namespace(missing.relid));
-        char *relname = get_rel_name(missing.relid);
+              edata->hint = psprintf(
+                  "Grant the required privileges to the current "
+                  "role with: GRANT %s ON %s TO %s;",
+                  privileges_str->data, qualified_rel_name, quoted_role_name);
 
-        if (relname != NULL) {
-          char *qualified_rel_name =
-              quote_qualified_identifier(schema, relname);
+              pfree(username);
+              pfree(qualified_rel_name);
+              pfree(quoted_role_name);
+              pfree(relname);
+            }
 
-          char *username         = GetUserNameFromId(current_role_oid, false);
-          char *quoted_role_name = quote_qualified_identifier(NULL, username);
+            if (schema != NULL)
+              pfree(schema);
+          }
 
-          // Free the hint if it is present. Otherwise we'll leak the old one
-          if (edata->hint != NULL) pfree(edata->hint);
-
-          edata->hint = psprintf("Grant the required privileges to the current "
-                                 "role with: GRANT %s ON %s TO %s;",
-                                 privileges_str->data, qualified_rel_name,
-                                 quoted_role_name);
-
-          // Clean up what we can here
-          pfree(username);
-          pfree(qualified_rel_name);
-          pfree(quoted_role_name);
-          pfree(relname);
+          destroyStringInfo(privileges_str);
         }
-
-        destroyStringInfo(privileges_str);
-
-        if (schema != NULL) pfree(schema);
       }
 
       ReThrowError(edata);
