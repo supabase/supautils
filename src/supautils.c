@@ -239,8 +239,9 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
                   quote_qualified_identifier(NULL, username);
 
               // Prevent memory leak of existing hint
-              if (edata->hint != NULL)
+              if (edata->hint != NULL) {
                 pfree(edata->hint);
+              }
 
               edata->hint = psprintf(
                   "Grant the required privileges to the current "
@@ -253,8 +254,9 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
               pfree(relname);
             }
 
-            if (schema != NULL)
+            if (schema != NULL) {
               pfree(schema);
+            }
           }
 
           destroyStringInfo(privileges_str);
