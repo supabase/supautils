@@ -18,7 +18,7 @@ PG_CFLAGS += --coverage
 endif
 
 MODULE_big = supautils
-MODVERSION = 3.2.1
+MODVERSION = 3.2.2
 
 SRC_DIR = src
 
