@@ -189,7 +189,6 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   MemoryContext cur_ctx = CurrentMemoryContext;
 
-  // for performance in the case hint_roles is not configured
   if (hint_roles == NULL ||
       !is_hint_role(GetUserNameFromId(GetUserId(), false))) {
     if (prev_executor_start_hook)
@@ -204,16 +203,13 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
       else
         standard_ExecutorStart(queryDesc, eflags);
     }
-    // adds enhanced hints
     PG_CATCH();
     {
-      // we're on ErrorContext, we need to switch context because CopyErrorData
-      // fails due to an asssertion that it must not be in ErrorContext
       MemoryContext oldcxt = MemoryContextSwitchTo(cur_ctx);
       ErrorData    *edata  = CopyErrorData();
       MemoryContextSwitchTo(oldcxt);
 
-      FlushErrorState(); // should be called after CopyErrorData
+      FlushErrorState();
 
       if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
         const Oid current_role_oid = GetUserId();
@@ -222,8 +218,8 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
             find_missing_perm(queryDesc->plannedstmt, current_role_oid);
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
-            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
-                0) {
+            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) == 0) {
+
           StringInfo privileges_str = makeStringInfo();
           build_privileges_string(privileges_str, missing.acl);
 
@@ -232,34 +228,16 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
             char *relname = get_rel_name(missing.relid);
 
             if (relname != NULL) {
-              char *qualified_rel_name =
-                  quote_qualified_identifier(schema, relname);
+              char *qualified_rel_name = quote_qualified_identifier(schema, relname);
               char *username = GetUserNameFromId(current_role_oid, false);
-              char *quoted_role_name =
-                  quote_qualified_identifier(NULL, username);
-
-              // Prevent memory leak of existing hint
-              if (edata->hint != NULL) {
-                pfree(edata->hint);
-              }
+              char *quoted_role_name = quote_qualified_identifier(NULL, username);
 
               edata->hint = psprintf(
                   "Grant the required privileges to the current "
                   "role with: GRANT %s ON %s TO %s;",
                   privileges_str->data, qualified_rel_name, quoted_role_name);
-
-              pfree(username);
-              pfree(qualified_rel_name);
-              pfree(quoted_role_name);
-              pfree(relname);
-            }
-
-            if (schema != NULL) {
-              pfree(schema);
             }
           }
-
-          destroyStringInfo(privileges_str);
         }
       }
 
