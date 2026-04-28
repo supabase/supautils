@@ -12,10 +12,25 @@ begin
 end;
 $$;
 create table referencing_hint(id int);
+
 alter table referencing_hint owner to hint_role;
+
+create function test_fnc()
+    returns void
+    language plpgsql as
+$fnc$
+begin
+end;
+$fnc$;
+revoke execute on function test_fnc() from public;
+alter function test_fnc() owner to non_hint_role;
 \echo
 
 set role hint_role;
+\echo
+
+-- function with no permissions
+select test_fnc();
 \echo
 
 -- no column selected
@@ -97,6 +112,7 @@ select from hint_target;
 
 reset role;
 drop table referencing_hint;
+drop function test_fnc();
 drop role hint_role;
 drop role non_hint_role;
 drop function hint_fn();
