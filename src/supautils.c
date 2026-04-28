@@ -243,20 +243,32 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
 
         char *schema  = get_namespace_name(get_rel_namespace(missing.relid));
         char *relname = get_rel_name(missing.relid);
-        char *qualified_rel_name = quote_qualified_identifier(schema, relname);
-        char *quoted_role_name   = quote_qualified_identifier(
-            NULL, GetUserNameFromId(current_role_oid, false));
 
-        edata->hint = psprintf("Grant the required privileges to the current "
-                               "role with: GRANT %s ON %s TO %s;",
-                               privileges_str->data, qualified_rel_name,
-                               quoted_role_name);
+        if (relname != NULL) {
+          char *qualified_rel_name =
+              quote_qualified_identifier(schema, relname);
+
+          char *username         = GetUserNameFromId(current_role_oid, false);
+          char *quoted_role_name = quote_qualified_identifier(NULL, username);
+
+          // Free the hint if it is present. Otherwise we'll leak the old one
+          if (edata->hint != NULL) pfree(edata->hint);
+
+          edata->hint = psprintf("Grant the required privileges to the current "
+                                 "role with: GRANT %s ON %s TO %s;",
+                                 privileges_str->data, qualified_rel_name,
+                                 quoted_role_name);
+
+          // Clean up what we can here
+          pfree(username);
+          pfree(qualified_rel_name);
+          pfree(quoted_role_name);
+          pfree(relname);
+        }
 
         destroyStringInfo(privileges_str);
-        pfree(schema);
-        pfree(relname);
-        pfree(qualified_rel_name);
-        pfree(quoted_role_name);
+
+        if (schema != NULL) pfree(schema);
       }
 
       ReThrowError(edata);
