@@ -318,7 +318,7 @@ exception
     raise notice '%: %', sqlstate, sqlerrm;
     null;
 end $$;
-NOTICE:  22023: extension "hstore" has no installation script nor update path for version "nonexistent"
+NOTICE:  42501: permission denied: only superusers can specify extension versions. Use CREATE EXTENSION <name> without a VERSION clause.
 -- if is_switched_to_superuser is not restored, role switching won't happen here
 -- and publication creation would fail
 create publication p for all tables;
