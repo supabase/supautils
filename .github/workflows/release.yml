@@ -99,6 +99,10 @@ jobs:
         run: |
           tar -cJf supautils-${{ github.ref_name }}-arm64.tar.xz *-arm64-*.so
           tar -cJf supautils-${{ github.ref_name }}-amd64.tar.xz *-amd64-*.so
+          echo '### SHA256 checksums' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          sha256sum *.tar.xz | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: GitHub OIDC Auth
         uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
