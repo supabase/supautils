@@ -341,6 +341,15 @@ The hint is only included when there are lacking `SELECT`, `INSERT`, `UPDATE` or
 
 [Nix](https://nixos.org/download.html) is required to set up the environment.
 
+The CI jobs use the `nxpg` Cachix cache. To reuse that cache locally and avoid
+building every dependency from source, install Cachix and enable the cache before
+running `nix-shell`:
+
+```bash
+$ nix profile install nixpkgs#cachix
+$ cachix use nxpg
+```
+
 ### Testing
 
 For testing the module locally, execute:
