@@ -11,10 +11,24 @@ Completely managed by configuration — no tables, functions, or security labels
 
 ## Installation
 
-Clone this repo and run
+Clone this repo and make sure the PostgreSQL server development package for
+your target PostgreSQL version is installed. On Debian/Ubuntu, for PostgreSQL
+15, that package is:
 
 ```bash
-make && make install
+sudo apt install build-essential postgresql-server-dev-15
+```
+
+Replace `15` with the major version of the PostgreSQL server you are building
+against.
+
+The build uses `pg_config` to locate PostgreSQL headers, libraries, and the PGXS
+makefile. If you have multiple PostgreSQL versions installed, point `PG_CONFIG`
+at the version that will load `supautils`:
+
+```bash
+make PG_CONFIG=/usr/lib/postgresql/15/bin/pg_config
+sudo make PG_CONFIG=/usr/lib/postgresql/15/bin/pg_config install
 ```
 
 To make supautils available to the whole cluster, you can add the following to `postgresql.conf` (use `SHOW config_file` for finding the location).
