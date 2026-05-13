@@ -346,8 +346,8 @@ The hint is only included when there are lacking `SELECT`, `INSERT`, `UPDATE` or
 For testing the module locally, execute:
 
 ```bash
-# might take a while in downloading all the dependencies
-$ nix-shell
+# This will download all the dependencies from the cache (when prompted for trusting the nxpg cache answer yes)
+$ nix develop
 
 # test on pg 13
 $ xpg -v 13 test
@@ -362,9 +362,6 @@ $ xpg -v 13 psql -U rolecreator
 To test with a postgres built with assertions enabled:
 
 ```bash
-$ nix-shell
-
-# test on pg 13
 $ xpg -v 17 --cassert test
 ```
 
