@@ -365,6 +365,17 @@ To test with a postgres built with assertions enabled:
 $ xpg -v 17 --cassert test
 ```
 
+### Regress testing against PostgreSQL core
+
+Since supautils modifies default postgres behavior with hooks, we need to test exactly what it changes and see if we don't break existing functionality.
+For this you can use:
+
+```
+xpg -v 15 test-core
+```
+
+Works on pg 15, 16, 17 and 18.
+
 ### Coverage
 
 For coverage, execute:

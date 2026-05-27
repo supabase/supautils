@@ -1,0 +1,15 @@
+# TODO Find out why this happens, see results/guc.out after running `xpg -v15 test-core`
+--- a/expected/guc.out
++++ b/expected/guc.out
+@@ -551,9 +551,9 @@
+ -- Check what happens when you try to set a "custom" GUC within the
+ -- namespace of an extension.
+ SET plpgsql.extra_foo_warnings = true;  -- allowed if plpgsql is not loaded yet
++ERROR:  invalid configuration parameter name "plpgsql.extra_foo_warnings"
++DETAIL:  "plpgsql" is a reserved prefix.
+ LOAD 'plpgsql';  -- this will throw a warning and delete the variable
+-WARNING:  invalid configuration parameter name "plpgsql.extra_foo_warnings", removing it
+-DETAIL:  "plpgsql" is now a reserved prefix.
+ SET plpgsql.extra_foo_warnings = true;  -- now, it's an error
+ ERROR:  invalid configuration parameter name "plpgsql.extra_foo_warnings"
+ DETAIL:  "plpgsql" is a reserved prefix.

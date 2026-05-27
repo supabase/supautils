@@ -172,6 +172,32 @@ endif
 # extra dep for target in pgxs.mk
 installcheck: $(GENERATED_OUT)
 
+CORE_STAGEDIR = $(BUILD_DIR)/$(notdir $(PG_REGRESS_TESTS))
+ifeq ($(PG_EQ15), 0)
+CORE_PATCHES = test/core_patches/15_create_role.out.patch \
+	test/core_patches/15_guc.out.patch \
+	test/core_patches/15_plpgsql.out.patch
+else ifeq ($(PG_GE16), 0)
+CORE_PATCHES = test/core_patches/ge16_create_role.out.patch
+endif
+
+$(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
+	rm -rf $(CORE_STAGEDIR)
+	mkdir -p $(CORE_STAGEDIR)/sql $(CORE_STAGEDIR)/expected $(CORE_STAGEDIR)/data
+	cp -R $(PG_REGRESS_TESTS)/sql/. $(CORE_STAGEDIR)/sql/
+	cp -R $(PG_REGRESS_TESTS)/expected/. $(CORE_STAGEDIR)/expected/
+	cp -R $(PG_REGRESS_TESTS)/data/. $(CORE_STAGEDIR)/data/
+	cp $(PG_REGRESS_TESTS)/parallel_schedule $(CORE_STAGEDIR)/
+	if test -f $(PG_REGRESS_TESTS)/init.conf; then cp $(PG_REGRESS_TESTS)/init.conf $(CORE_STAGEDIR)/; fi
+	@set -e; \
+	for patch in $(CORE_PATCHES); do \
+		patch -d $(CORE_STAGEDIR) -p1 < $$patch; \
+	done
+
+.PHONY: test-core
+test-core: $(CORE_STAGEDIR)/parallel_schedule
+	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression
+
 .PHONY: test
 test:
 	make installcheck

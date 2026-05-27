@@ -1,0 +1,37 @@
+# These failures are expected due to the reserved memberships and reserved roles
+--- a/expected/create_role.out
++++ b/expected/create_role.out
+@@ -4,7 +4,8 @@
+ -- fail, only superusers can create users with these privileges
+ SET SESSION AUTHORIZATION regress_role_admin;
+ CREATE ROLE regress_nosuch_superuser SUPERUSER;
+-ERROR:  must be superuser to create superusers
++ERROR:  permission denied to create role
++DETAIL:  Only roles with the SUPERUSER attribute may create roles with the SUPERUSER attribute.
+ CREATE ROLE regress_nosuch_replication_bypassrls REPLICATION BYPASSRLS;
+ ERROR:  must be superuser to create replication users
+ CREATE ROLE regress_nosuch_replication REPLICATION;
+@@ -82,8 +83,11 @@
+ CREATE ROLE regress_read_all_stats IN ROLE pg_read_all_stats;
+ CREATE ROLE regress_stat_scan_tables IN ROLE pg_stat_scan_tables;
+ CREATE ROLE regress_read_server_files IN ROLE pg_read_server_files;
++ERROR:  "pg_read_server_files" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_write_server_files IN ROLE pg_write_server_files;
++ERROR:  "pg_write_server_files" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_execute_server_program IN ROLE pg_execute_server_program;
++ERROR:  "pg_execute_server_program" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_signal_backend IN ROLE pg_signal_backend;
+ -- fail, creation of these roles failed above so they do not now exist
+ SET SESSION AUTHORIZATION regress_role_admin;
+@@ -123,8 +127,11 @@
+ DROP ROLE regress_read_all_stats;
+ DROP ROLE regress_stat_scan_tables;
+ DROP ROLE regress_read_server_files;
++ERROR:  role "regress_read_server_files" does not exist
+ DROP ROLE regress_write_server_files;
++ERROR:  role "regress_write_server_files" does not exist
+ DROP ROLE regress_execute_server_program;
++ERROR:  role "regress_execute_server_program" does not exist
+ DROP ROLE regress_signal_backend;
+ -- fail, role still owns database objects
+ DROP ROLE regress_tenant;

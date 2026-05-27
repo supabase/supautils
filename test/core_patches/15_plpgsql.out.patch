@@ -1,0 +1,12 @@
+# TODO Find out why this happens, see results/plpgsql.out after running `xpg -v15 test-core`
+--- a/expected/plpgsql.out
++++ b/expected/plpgsql.out
+@@ -2188,0 +2189,3 @@
++WARNING:  cursor "rc" is not closed
++DETAIL:  PL/pgSQL function return_unnamed_refcursor() line 5 at OPEN
++PL/pgSQL function use_refcursor(refcursor) line 6 at assignment
+@@ -2219,0 +2223,4 @@
++WARNING:  cursor "rc" is not closed
++DETAIL:  PL/pgSQL function return_refcursor(refcursor) line 3 at OPEN
++SQL statement "SELECT return_refcursor($1)"
++PL/pgSQL function refcursor_test1(refcursor) line 3 at PERFORM
