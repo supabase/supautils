@@ -10,7 +10,7 @@ PG_CFLAGS = -std=c11 -Wextra -Wall -Werror \
 	-Wno-long-long
 
 ifeq ($(TEST), 1)
-PG_CFLAGS += -DTEST
+PG_CFLAGS += -DTEST=1
 endif
 
 ifeq ($(COVERAGE), 1)
@@ -77,7 +77,7 @@ else
   DL_SUFFIX=dylib
 endif
 
-PG_CPPFLAGS := $(CPPFLAGS) -DMODVERSION=\"$(MODVERSION)\" -DTEST=1
+PG_CPPFLAGS := $(CPPFLAGS) -DMODVERSION=\"$(MODVERSION)\"
 
 ifdef BUILD_DIR
 OBJS = $(patsubst $(SRC_DIR)/%.c, $(BUILD_DIR)/%.o, $(SRC))

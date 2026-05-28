@@ -43,16 +43,16 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1779917553,
-        "narHash": "sha256-Gtsvs1StmiczcRe9PZXKTvDktvPYorKsdfsw1HRljSc=",
+        "lastModified": 1780028349,
+        "narHash": "sha256-dcJOAiyr5sisVQ65uSZFgqL7oKiPImSR5p80uk2t83E=",
         "owner": "steve-chavez",
         "repo": "xpg",
-        "rev": "efb20cca11a29a5d682dedac8e93debc92792b02",
+        "rev": "2d271556d13d0e74bc7213af5ca9ad34b20e3bf1",
         "type": "github"
       },
       "original": {
         "owner": "steve-chavez",
-        "ref": "v2.2.0",
+        "ref": "v2.3.1",
         "repo": "xpg",
         "type": "github"
       }
