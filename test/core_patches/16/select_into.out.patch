@@ -1,0 +1,11 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/select_into.out
++++ b/expected/select_into.out
+@@ -25,6 +25,7 @@
+   AS SELECT generate_series(1,3) WITH DATA;
+ INSERT INTO selinto_schema.tbl_withdata1 VALUES (4);
+ ERROR:  permission denied for table tbl_withdata1
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON selinto_schema.tbl_withdata1 TO regress_selinto_user;
+ EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+   CREATE TABLE selinto_schema.tbl_withdata2 (a) AS
+   SELECT generate_series(1,3) WITH DATA;

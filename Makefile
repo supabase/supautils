@@ -13,6 +13,10 @@ ifeq ($(TEST), 1)
 PG_CFLAGS += -DTEST=1
 endif
 
+ifeq ($(TEST_CORE), 1)
+PG_CFLAGS += -DTEST_CORE=1
+endif
+
 ifeq ($(COVERAGE), 1)
 PG_CFLAGS += --coverage
 endif
@@ -173,13 +177,8 @@ endif
 installcheck: $(GENERATED_OUT)
 
 CORE_STAGEDIR = $(BUILD_DIR)/$(notdir $(PG_REGRESS_TESTS))
-ifeq ($(PG_EQ15), 0)
-CORE_PATCHES = test/core_patches/15_create_role.out.patch \
-	test/core_patches/15_guc.out.patch \
-	test/core_patches/15_plpgsql.out.patch
-else ifeq ($(PG_GE16), 0)
-CORE_PATCHES = test/core_patches/ge16_create_role.out.patch
-endif
+CORE_VERSION_PATCH_DIR = $(if $(filter 15 16 17 18,$(PG_VERSION)),test/core_patches/$(PG_VERSION))
+CORE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/*.patch)
 
 $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 	rm -rf $(CORE_STAGEDIR)
@@ -188,7 +187,6 @@ $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 	cp -R $(PG_REGRESS_TESTS)/expected/. $(CORE_STAGEDIR)/expected/
 	cp -R $(PG_REGRESS_TESTS)/data/. $(CORE_STAGEDIR)/data/
 	cp $(PG_REGRESS_TESTS)/parallel_schedule $(CORE_STAGEDIR)/
-	if test -f $(PG_REGRESS_TESTS)/init.conf; then cp $(PG_REGRESS_TESTS)/init.conf $(CORE_STAGEDIR)/; fi
 	@set -e; \
 	for patch in $(CORE_PATCHES); do \
 		patch -d $(CORE_STAGEDIR) -p1 < $$patch; \

@@ -1,0 +1,424 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/updatable_views.out
++++ b/expected/updatable_views.out
+@@ -1410,10 +1410,12 @@
+ 
+ INSERT INTO base_tbl VALUES (3, 'Row 3', 3.0); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ INSERT INTO rw_view1 VALUES ('Row 3', 3.0, 3); -- not allowed
+ ERROR:  permission denied for view rw_view1
+ INSERT INTO rw_view2 VALUES ('Row 3', 3.0, 3); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t
+   USING (VALUES ('Row 3', 3.0, 3)) AS v(b,c,a) ON t.aa = v.a
+   WHEN NOT MATCHED THEN INSERT VALUES (v.b, v.c, v.a); -- not allowed
+@@ -1422,15 +1424,18 @@
+   USING (VALUES ('Row 3', 3.0, 3)) AS v(b,c,a) ON t.aa = v.a
+   WHEN NOT MATCHED THEN INSERT VALUES (v.b, v.c, v.a); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ UPDATE base_tbl SET a=a, c=c; -- ok
+ UPDATE base_tbl SET b=b; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view1 SET bb=bb, cc=cc; -- ok
+ UPDATE rw_view1 SET aa=aa; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET aa=aa, cc=cc; -- ok
+ UPDATE rw_view2 SET bb=bb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET bb = bb, cc = cc; -- ok
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+@@ -1441,12 +1446,15 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET bb = bb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ DELETE FROM base_tbl; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ DELETE FROM rw_view1; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ DELETE FROM rw_view2; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ RESET SESSION AUTHORIZATION;
+ SET SESSION AUTHORIZATION regress_view_user1;
+ GRANT INSERT, DELETE ON base_tbl TO regress_view_user2;
+@@ -1480,19 +1488,24 @@
+ SET SESSION AUTHORIZATION regress_view_user2;
+ INSERT INTO base_tbl VALUES (5, 'Row 5', 5.0); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ INSERT INTO rw_view1 VALUES ('Row 5', 5.0, 5); -- ok
+ INSERT INTO rw_view2 VALUES ('Row 6', 6.0, 6); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ DELETE FROM base_tbl WHERE a=3; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ DELETE FROM rw_view1 WHERE aa=3; -- ok
+ DELETE FROM rw_view2 WHERE aa=4; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED AND bb = 'xxx' THEN DELETE; -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED AND bb = 'xxx' THEN DELETE; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ SELECT * FROM base_tbl;
+  a |   b   | c 
+ ---+-------+---
+@@ -1512,13 +1525,17 @@
+ CREATE VIEW rw_view1 AS SELECT * FROM base_tbl;
+ SELECT * FROM rw_view1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user1;
+ SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+   WHEN MATCHED THEN UPDATE SET b = 'foo'; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ CREATE VIEW rw_view2 AS SELECT * FROM rw_view1;
+ SELECT * FROM rw_view2;  -- not allowed
+@@ -1541,11 +1558,14 @@
+ 
+ SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+   WHEN MATCHED THEN UPDATE SET b = 'foo'; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for view rw_view1
+@@ -1633,11 +1653,14 @@
+ 
+ SELECT * FROM rw_view1 FOR UPDATE;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ UPDATE rw_view1 SET b = 'foo' WHERE a = 1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+   WHEN MATCHED THEN UPDATE SET b = 'foo'; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;
+  a |  b  | c 
+@@ -1647,11 +1670,14 @@
+ 
+ SELECT * FROM rw_view2 FOR UPDATE;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET b = 'bar' WHERE a = 1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+   WHEN MATCHED THEN UPDATE SET b = 'foo'; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ RESET SESSION AUTHORIZATION;
+ DROP TABLE base_tbl CASCADE;
+ NOTICE:  drop cascades to 2 other objects
+@@ -1669,21 +1695,28 @@
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM base_tbl; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user2;
+ SELECT * FROM rw_view1; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user2;
+ INSERT INTO base_tbl VALUES (3, 'Row 3', 3.0); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ INSERT INTO rw_view1 VALUES ('Row 3', 3.0, 3); -- not allowed
+ ERROR:  permission denied for view rw_view1
+ UPDATE base_tbl SET a=a; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view1 SET bb=bb, cc=cc; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET bb = bb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ DELETE FROM base_tbl; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ DELETE FROM rw_view1; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+@@ -1710,6 +1743,7 @@
+ UPDATE base_tbl SET a=a, c=c; -- ok
+ UPDATE base_tbl SET b=b; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view1 SET cc=cc; -- ok
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET cc = cc; -- ok
+@@ -1717,12 +1751,14 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view1 SET bb=bb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET aa = aa; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET bb = bb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user1;
+ GRANT INSERT, DELETE ON base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user2;
+@@ -1741,11 +1777,14 @@
+ SET SESSION AUTHORIZATION regress_view_user2;
+ INSERT INTO rw_view1 VALUES ('Row 4', 4.0, 4); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.base_tbl TO regress_view_user2;
+ DELETE FROM rw_view1 WHERE aa=2; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN DELETE; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user1;
+ GRANT INSERT, DELETE ON base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user2;
+@@ -1770,11 +1809,14 @@
+ ALTER VIEW rw_view1 SET (security_invoker = true);
+ SELECT * FROM rw_view1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user1;
+ UPDATE rw_view1 SET aa=aa;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (2, 'Row 2', 2.0)) AS v(a,b,c) ON t.aa = v.a
+   WHEN NOT MATCHED THEN INSERT VALUES (v.b, v.c, v.a); -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, INSERT ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ CREATE VIEW rw_view2 AS SELECT cc AS ccc, aa AS aaa, bb AS bbb FROM rw_view1;
+ GRANT SELECT, UPDATE ON rw_view2 TO regress_view_user3;
+@@ -1798,11 +1840,13 @@
+ UPDATE rw_view1 SET aa=aa, bb=bb;  -- ok
+ UPDATE rw_view1 SET cc=cc;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET aa = aa, bb = bb; -- ok
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET cc = cc; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for view rw_view1
+@@ -1825,19 +1869,25 @@
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user3;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ RESET SESSION AUTHORIZATION;
+ GRANT SELECT ON base_tbl TO regress_view_user2;
+ GRANT UPDATE (a, c) ON base_tbl TO regress_view_user2;
+@@ -1852,6 +1902,7 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET ccc=ccc;  -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+@@ -1859,26 +1910,32 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- ok
+ SET SESSION AUTHORIZATION regress_view_user3;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET aaa=aaa;  -- not allowed
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET ccc=ccc;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user3;
+ RESET SESSION AUTHORIZATION;
+ GRANT SELECT ON base_tbl TO regress_view_user3;
+ GRANT UPDATE (a, c) ON base_tbl TO regress_view_user3;
+@@ -1893,6 +1950,7 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET ccc=ccc;  -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+@@ -1900,6 +1958,7 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- ok
+ RESET SESSION AUTHORIZATION;
+@@ -1907,11 +1966,14 @@
+ SET SESSION AUTHORIZATION regress_view_user1;
+ SELECT * FROM rw_view1;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user1;
+ UPDATE rw_view1 SET aa=aa;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+   WHEN MATCHED THEN UPDATE SET aa = aa; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user1;
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;  -- ok
+  ccc | aaa |  bbb  
+@@ -1923,6 +1985,7 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET ccc=ccc;  -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+@@ -1930,6 +1993,7 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- ok
+ SET SESSION AUTHORIZATION regress_view_user3;
+@@ -1943,6 +2007,7 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET ccc=ccc;  -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+@@ -1950,6 +2015,7 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- ok
+ RESET SESSION AUTHORIZATION;
+@@ -1957,21 +2023,26 @@
+ SET SESSION AUTHORIZATION regress_view_user2;
+ SELECT * FROM rw_view2;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET aaa=aaa;  -- not allowed
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ UPDATE rw_view2 SET ccc=ccc;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+ ERROR:  permission denied for view rw_view1
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.base_tbl TO regress_view_user2;
+ SET SESSION AUTHORIZATION regress_view_user3;
+ SELECT * FROM rw_view2;  -- ok
+  ccc | aaa |  bbb  
+@@ -1983,6 +2054,7 @@
+ ERROR:  permission denied for view rw_view1
+ UPDATE rw_view2 SET bbb=bbb;  -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ UPDATE rw_view2 SET ccc=ccc;  -- ok
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET aaa = aaa; -- not allowed
+@@ -1990,6 +2062,7 @@
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET bbb = bbb; -- not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.base_tbl TO regress_view_user3;
+ MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+   WHEN MATCHED THEN UPDATE SET ccc = ccc; -- ok
+ RESET SESSION AUTHORIZATION;
+@@ -3781,6 +3854,7 @@
+ insert into rw_view1 values ('yyy',2.0,1)
+   on conflict (aa) do update set bb = excluded.cc; -- Not allowed
+ ERROR:  permission denied for view rw_view1
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.rw_view1 TO regress_view_user2;
+ insert into rw_view1 values ('yyy',2.0,1)
+   on conflict (aa) do update set bb = rw_view1.cc; -- Not allowed
+ ERROR:  permission denied for view rw_view1
+@@ -3807,6 +3881,7 @@
+ insert into rw_view2 (aa,bb) values (1,'xxx')
+   on conflict (aa) do update set bb = excluded.bb; -- Not allowed
+ ERROR:  permission denied for table base_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.base_tbl TO regress_view_user2;
+ create view rw_view3 as select b as bb, a as aa from base_tbl;
+ insert into rw_view3 (aa,bb) values (1,'xxx')
+   on conflict (aa) do update set bb = excluded.bb; -- OK

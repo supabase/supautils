@@ -1,0 +1,103 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/rowsecurity.out
++++ b/expected/rowsecurity.out
+@@ -2697,14 +2697,18 @@
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ -- Query as role that is not the owner of the table or view without permissions.
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not owner of table but is owner of view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_bob;
+@@ -2887,14 +2891,18 @@
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ -- Query as role that is not the owner of the table or view without permissions.
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not owner of table but is owner of view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_bob;
+@@ -2919,8 +2927,10 @@
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not the owner of the table or view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_carol;
+@@ -3710,6 +3720,7 @@
+ SET row_security TO ON;
+ COPY (SELECT * FROM copy_t ORDER BY a ASC) TO STDOUT WITH DELIMITER ','; --fail - permission denied
+ ERROR:  permission denied for table copy_t
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.copy_t TO regress_rls_carol;
+ -- Check COPY relation TO; keep it just one row to avoid reordering issues
+ RESET SESSION AUTHORIZATION;
+ SET row_security TO ON;
+@@ -4494,8 +4505,10 @@
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SELECT * FROM ref_tbl; -- Permission denied
+ ERROR:  permission denied for table ref_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.ref_tbl TO regress_rls_alice;
+ SELECT * FROM rls_tbl; -- Permission denied
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM rls_view; -- OK
+  a  
+ ----
+@@ -4553,6 +4566,7 @@
+ 
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ SELECT * FROM rls_ptbl WHERE a <<< 1000;
+  a 
+ ---
+@@ -4572,6 +4586,7 @@
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ RESET SESSION AUTHORIZATION;
+ REVOKE SELECT ON rls_tbl FROM regress_rls_alice;
+ CREATE VIEW rls_tbl_view AS SELECT * FROM rls_tbl;
+@@ -4581,6 +4596,7 @@
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SELECT * FROM rls_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM rls_tbl_view WHERE a <<< 1000;
+ ERROR:  permission denied for view rls_tbl_view
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+@@ -4591,6 +4607,7 @@
+ SELECT * FROM (SELECT * FROM rls_tbl UNION ALL
+                SELECT * FROM rls_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+  a 

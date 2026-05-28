@@ -1,0 +1,82 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/rowsecurity.out
++++ b/expected/rowsecurity.out
+@@ -2640,8 +2640,10 @@
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for view rls_view
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_view TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for view rls_view
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_view TO regress_rls_carol;
+ -- Query as role that is not the owner of the table or view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ GRANT SELECT ON rls_view TO regress_rls_carol;
+@@ -2671,14 +2673,18 @@
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ -- Query as role that is not the owner of the table or view without permissions.
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not owner of table but is owner of view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_bob;
+@@ -2861,14 +2867,18 @@
+ SET SESSION AUTHORIZATION regress_rls_bob;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_bob;
+ -- Query as role that is not the owner of the table or view without permissions.
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not owner of table but is owner of view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_bob;
+@@ -2893,8 +2903,10 @@
+ SET SESSION AUTHORIZATION regress_rls_carol;
+ SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ EXPLAIN (COSTS OFF) SELECT * FROM rls_view; --fail - permission denied.
+ ERROR:  permission denied for table z1_blacklist
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.z1_blacklist TO regress_rls_carol;
+ -- Query as role that is not the owner of the table or view with permissions.
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ GRANT SELECT ON z1_blacklist TO regress_rls_carol;
+@@ -3684,6 +3696,7 @@
+ SET row_security TO ON;
+ COPY (SELECT * FROM copy_t ORDER BY a ASC) TO STDOUT WITH DELIMITER ','; --fail - permission denied
+ ERROR:  permission denied for table copy_t
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.copy_t TO regress_rls_carol;
+ -- Check COPY relation TO; keep it just one row to avoid reordering issues
+ RESET SESSION AUTHORIZATION;
+ SET row_security TO ON;
+@@ -4420,8 +4433,10 @@
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SELECT * FROM ref_tbl; -- Permission denied
+ ERROR:  permission denied for table ref_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.ref_tbl TO regress_rls_alice;
+ SELECT * FROM rls_tbl; -- Permission denied
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM rls_view; -- OK
+  a  
+ ----

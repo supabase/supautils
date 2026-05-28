@@ -1,0 +1,42 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/merge.out
++++ b/expected/merge.out
+@@ -167,6 +167,7 @@
+ WHEN MATCHED THEN
+ 	DO NOTHING;
+ ERROR:  permission denied for table target
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.target TO regress_merge_none;
+ SET SESSION AUTHORIZATION regress_merge_privs;
+ MERGE INTO target
+ USING source2
+@@ -174,6 +175,7 @@
+ WHEN MATCHED THEN
+ 	UPDATE SET balance = 0;
+ ERROR:  permission denied for table source2
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.source2 TO regress_merge_privs;
+ GRANT INSERT ON target TO regress_merge_no_privs;
+ SET SESSION AUTHORIZATION regress_merge_no_privs;
+ MERGE INTO target
+@@ -182,6 +184,7 @@
+ WHEN MATCHED THEN
+ 	UPDATE SET balance = 0;
+ ERROR:  permission denied for table target
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, UPDATE ON public.target TO regress_merge_no_privs;
+ GRANT UPDATE ON target2 TO regress_merge_privs;
+ SET SESSION AUTHORIZATION regress_merge_privs;
+ MERGE INTO target2
+@@ -190,12 +193,14 @@
+ WHEN MATCHED THEN
+ 	DELETE;
+ ERROR:  permission denied for table target2
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, DELETE ON public.target2 TO regress_merge_privs;
+ MERGE INTO target2
+ USING source
+ ON target2.tid = source.sid
+ WHEN NOT MATCHED THEN
+ 	INSERT DEFAULT VALUES;
+ ERROR:  permission denied for table target2
++HINT:  Grant the required privileges to the current role with: GRANT SELECT, INSERT ON public.target2 TO regress_merge_privs;
+ -- check if the target can be accessed from source relation subquery; we should
+ -- not be able to do so
+ MERGE INTO target t
