@@ -1,0 +1,11 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/rules.out
++++ b/expected/rules.out
+@@ -3821,6 +3821,7 @@
+ SET SESSION AUTHORIZATION regress_rule_user1;
+ UPDATE ruletest_t1 t1 SET x = 0 FROM ruletest_t3 t3 WHERE t1.x = t3.x;
+ ERROR:  permission denied for table ruletest_t3
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.ruletest_t3 TO regress_rule_user1;
+ RESET SESSION AUTHORIZATION;
+ SELECT * FROM ruletest_t1;
+  x 

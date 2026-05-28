@@ -189,8 +189,7 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   MemoryContext cur_ctx = CurrentMemoryContext;
 
-  if (hint_roles == NULL ||
-      !is_hint_role(GetUserNameFromId(GetUserId(), false))) {
+  if (!is_hint_role(GetUserNameFromId(GetUserId(), false))) {
     if (prev_executor_start_hook)
       prev_executor_start_hook(queryDesc, eflags);
     else
@@ -1211,6 +1210,10 @@ static bool is_reserved_role(const char *target,
 static bool is_hint_role(const char *target) {
   List     *hint_roles_list;
   ListCell *role;
+
+#if TEST_CORE // this is only added during testing
+  return true;
+#endif
 
   if (hint_roles == NULL || target == NULL) {
     return false;

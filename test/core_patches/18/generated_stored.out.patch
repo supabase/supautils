@@ -1,0 +1,11 @@
+# Differences here are expected due to the "Enhanced Hints" feature
+--- a/expected/generated_stored.out
++++ b/expected/generated_stored.out
+@@ -616,6 +616,7 @@
+ SET ROLE regress_user11;
+ SELECT a, b FROM gtest11;  -- not allowed
+ ERROR:  permission denied for table gtest11
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON generated_stored_tests.gtest11 TO regress_user11;
+ SELECT a, c FROM gtest11;  -- allowed
+  a | c  
+ ---+----

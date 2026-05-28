@@ -1,0 +1,21 @@
+# These failures are expected due to the reserved memberships feature
+--- a/expected/create_role.out
++++ b/expected/create_role.out
+@@ -184,14 +184,11 @@
+ ERROR:  permission denied to grant role "pg_stat_scan_tables"
+ DETAIL:  Only roles with the ADMIN option on role "pg_stat_scan_tables" may grant this role.
+ CREATE ROLE regress_read_server_files IN ROLE pg_read_server_files;
+-ERROR:  permission denied to grant role "pg_read_server_files"
+-DETAIL:  Only roles with the ADMIN option on role "pg_read_server_files" may grant this role.
++ERROR:  "pg_read_server_files" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_write_server_files IN ROLE pg_write_server_files;
+-ERROR:  permission denied to grant role "pg_write_server_files"
+-DETAIL:  Only roles with the ADMIN option on role "pg_write_server_files" may grant this role.
++ERROR:  "pg_write_server_files" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_execute_server_program IN ROLE pg_execute_server_program;
+-ERROR:  permission denied to grant role "pg_execute_server_program"
+-DETAIL:  Only roles with the ADMIN option on role "pg_execute_server_program" may grant this role.
++ERROR:  "pg_execute_server_program" role memberships are reserved, only superusers can grant them
+ CREATE ROLE regress_signal_backend IN ROLE pg_signal_backend;
+ ERROR:  permission denied to grant role "pg_signal_backend"
+ DETAIL:  Only roles with the ADMIN option on role "pg_signal_backend" may grant this role.
