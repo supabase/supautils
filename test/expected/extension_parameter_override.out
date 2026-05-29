@@ -9,10 +9,27 @@ alter system set supautils.extensions_parameter_overrides to '{"sslinfo": 123}';
 ERROR:  supautils.extensions_parameter_overrides: unexpected scalar, expected an object
 alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"schema": {}}}';
 ERROR:  supautils.extensions_parameter_overrides: unexpected object for schema, expected a value
-alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"version": "1.0"}}';
-ERROR:  supautils.extensions_parameter_overrides: unexpected field, only schema is allowed
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"version": {}}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected object for version, expected a value
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"unknown": "1.0"}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected field, only schema and version are allowed
 alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"schema": 123}}';
 ERROR:  supautils.extensions_parameter_overrides: unexpected schema value, expected a string
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"version": 123}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected version value, expected a string
+\echo
+
+alter system set supautils.extensions_parameter_overrides to
+  '{"sslinfo":{"schema":"pg_catalog"},"hstore":{"version":"1.6"}}';
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+\echo
+
+set role privileged_role;
 \echo
 
 -- can force sslinfo to be installed in pg_catalog
@@ -24,3 +41,33 @@ select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
 (1 row)
 
 drop extension sslinfo;
+\echo
+
+-- can force hstore to a configured version on create and alter
+create extension hstore version '1.7';
+select extversion from pg_extension where extname = 'hstore';
+ extversion 
+------------
+ 1.6
+(1 row)
+
+alter extension hstore update to '1.7';
+ERROR:  must be owner of extension hstore
+select extversion from pg_extension where extname = 'hstore';
+ extversion 
+------------
+ 1.6
+(1 row)
+
+drop extension hstore;
+\echo
+
+reset role;
+alter system set supautils.extensions_parameter_overrides to
+  '{"sslinfo":{"schema":"pg_catalog"}}';
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+

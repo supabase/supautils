@@ -1023,6 +1023,7 @@ static void clear_extensions_parameter_overrides_array(
   for (size_t i = 0; i < count; i++) {
     if (target[i].name != NULL) pfree(target[i].name);
     if (target[i].schema != NULL) pfree(target[i].schema);
+    if (target[i].version != NULL) pfree(target[i].version);
   }
   memset(target, 0, sizeof(extension_parameter_overrides) * count);
 }

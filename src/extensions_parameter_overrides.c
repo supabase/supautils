@@ -21,6 +21,10 @@ static JSON_ACTION_RETURN_TYPE json_object_start(void *state) {
     parse->error_msg = "unexpected object for schema, expected a value";
     parse->state     = JEPO_UNEXPECTED_OBJECT;
     break;
+  case JEPO_EXPECT_VERSION:
+    parse->error_msg = "unexpected object for version, expected a value";
+    parse->state     = JEPO_UNEXPECTED_OBJECT;
+    break;
   default: break;
   }
   JSON_ACTION_RETURN;
@@ -54,9 +58,12 @@ json_object_field_start(void *state, char *fname,
   case JEPO_EXPECT_PARAMETER_OVERRIDES_START:
     if (strcmp(fname, "schema") == 0)
       parse->state = JEPO_EXPECT_SCHEMA;
+    else if (strcmp(fname, "version") == 0)
+      parse->state = JEPO_EXPECT_VERSION;
     else {
-      parse->state     = JEPO_UNEXPECTED_FIELD;
-      parse->error_msg = "unexpected field, only schema is allowed";
+      parse->state = JEPO_UNEXPECTED_FIELD;
+      parse->error_msg =
+          "unexpected field, only schema and version are allowed";
     }
     break;
 
@@ -78,6 +85,16 @@ static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
     } else {
       parse->state     = JEPO_UNEXPECTED_SCHEMA_VALUE;
       parse->error_msg = "unexpected schema value, expected a string";
+    }
+    break;
+
+  case JEPO_EXPECT_VERSION:
+    if (tokentype == JSON_TOKEN_STRING) {
+      x->version   = MemoryContextStrdup(TopMemoryContext, token);
+      parse->state = JEPO_EXPECT_PARAMETER_OVERRIDES_START;
+    } else {
+      parse->state     = JEPO_UNEXPECTED_VERSION_VALUE;
+      parse->error_msg = "unexpected version value, expected a string";
     }
     break;
 
@@ -130,21 +147,31 @@ parse_extensions_parameter_overrides(const char                    *str,
 List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
                            List *options, const size_t total_epos,
                            const extension_parameter_overrides *epos) {
+
+  // The override is not applied for alter statements
+  if (stmt_kind == EXT_ALTER) return options;
+
   for (size_t i = 0; i < total_epos; i++) {
     if (strcmp(epos[i].name, extname) == 0) {
-      const extension_parameter_overrides *epo                    = &epos[i];
-      DefElem                             *schema_option          = NULL;
-      DefElem                             *schema_override_option = NULL;
+      const extension_parameter_overrides *epo                     = &epos[i];
+      DefElem                             *schema_option           = NULL;
+      DefElem                             *schema_override_option  = NULL;
+      DefElem                             *version_option          = NULL;
+      DefElem                             *version_override_option = NULL;
       ListCell                            *option_cell;
-
-      // The schema override is not applied for alter statements
-      if (stmt_kind == EXT_ALTER) continue;
 
       // TODO for observability it would be good to log a warning here,
       // when the user specifies a different schema than the one in the override
       if (epo->schema != NULL) {
         Node *schema_node      = (Node *)makeString(pstrdup(epo->schema));
         schema_override_option = makeDefElem("schema", schema_node, -1);
+      }
+
+      // Note that new_version is the internal DefElem postgres uses for an
+      // CREATE/ALTER EXTENSION version target
+      if (epo->version != NULL) {
+        Node *version_node      = (Node *)makeString(pstrdup(epo->version));
+        version_override_option = makeDefElem("new_version", version_node, -1);
       }
 
       foreach (option_cell, options) {
@@ -156,6 +183,12 @@ List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
                             errmsg("conflicting or redundant options")));
           }
           schema_option = defel;
+        } else if (strcmp(defel->defname, "new_version") == 0) {
+          if (version_option != NULL) {
+            ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR),
+                            errmsg("conflicting or redundant options")));
+          }
+          version_option = defel;
         }
       }
 
@@ -164,6 +197,13 @@ List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
           options = list_delete_ptr(options, schema_option);
         }
         options = lappend(options, schema_override_option);
+      }
+
+      if (version_override_option != NULL) {
+        if (version_option != NULL) {
+          options = list_delete_ptr(options, version_option);
+        }
+        options = lappend(options, version_override_option);
       }
     }
   }
