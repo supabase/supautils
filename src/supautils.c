@@ -554,7 +554,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     run_ext_before_create_script(stmt->extname, stmt->options,
                                  extension_custom_scripts_path);
 
-    override_create_ext_statement(stmt, total_epos, epos);
+    stmt->options = override_ext_options(EXT_CREATE, stmt->extname,
+                                         stmt->options, total_epos, epos);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
       run_process_utility_hook_with_cleanup(
@@ -588,6 +589,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
+
+    stmt->options = override_ext_options(EXT_ALTER, stmt->extname,
+                                         stmt->options, total_epos, epos);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
       bool already_switched_to_superuser = false;
