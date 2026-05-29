@@ -27,13 +27,15 @@ typedef struct {
   extension_parameter_overrides                    *epos;
 } json_extension_parameter_overrides_parse_state;
 
+typedef enum { EXT_CREATE, EXT_ALTER } extension_stmt_kind;
+
 extern json_extension_parameter_overrides_parse_state
 parse_extensions_parameter_overrides(const char                    *str,
                                      extension_parameter_overrides *epos);
 
-extern void
-override_create_ext_statement(CreateExtensionStmt                 *stmt,
-                              const size_t                         total_epos,
-                              const extension_parameter_overrides *epos);
+extern List *override_ext_options(extension_stmt_kind stmt_kind,
+                                  const char *extname, List *options,
+                                  const size_t total_epos,
+                                  const extension_parameter_overrides *epos);
 
 #endif
