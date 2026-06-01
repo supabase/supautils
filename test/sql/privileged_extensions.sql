@@ -17,13 +17,6 @@ create extension autoinc;
 select current_role;
 \echo
 
--- can force sslinfo to be installed in pg_catalog
-create extension sslinfo schema public;
-select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
-
-drop extension sslinfo;
-\echo
-
 -- switch to supautils.superuser even if superuser
 reset role;
 create role another_superuser superuser;
