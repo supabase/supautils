@@ -1161,24 +1161,54 @@ static void check_parameter(char *val, char *name) {
   }
 }
 
-static void
-constrained_extensions_assign_hook(const char                   *newval,
-                                   __attribute__((unused)) void *extra) {
+static void clear_constrained_extensions(void) {
   if (total_cexts > 0) {
     for (size_t i = 0; i < total_cexts; i++) {
       pfree(cexts[i].name);
     }
-    total_cexts = 0;
   }
-  if (newval) {
+  memset(cexts, 0, sizeof(cexts));
+  total_cexts = 0;
+}
+
+static bool
+constrained_extensions_check_hook(char                            **newval,
+                                  __attribute__((unused)) void    **extra,
+                                  __attribute__((unused)) GucSource source) {
+  constrained_extension tmp_cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
+
+  if (*newval) {
     json_constrained_extension_parse_state state =
-        parse_constrained_extensions(newval, cexts);
-    total_cexts = state.total_cexts;
+        parse_constrained_extensions(*newval, tmp_cexts);
+
+    for (int i = 0; i < state.total_cexts; i++) {
+      pfree(tmp_cexts[i].name);
+    }
+
     if (state.error_msg) {
       ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
                       errmsg("supautils.constrained_extensions: %s",
                              state.error_msg)));
     }
+  }
+
+  return true;
+}
+
+static void
+constrained_extensions_assign_hook(const char                   *newval,
+                                   __attribute__((unused)) void *extra) {
+  clear_constrained_extensions();
+
+  if (newval) {
+    json_constrained_extension_parse_state state =
+        parse_constrained_extensions(newval, cexts);
+    if (state.error_msg) {
+      ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                      errmsg("supautils.constrained_extensions: %s",
+                             state.error_msg)));
+    }
+    total_cexts = state.total_cexts;
   }
 }
 
@@ -1446,7 +1476,7 @@ void _PG_init(void) {
                              "Extensions that require a minimum amount of "
                              "CPUs, memory and free disk to be installed",
                              NULL, &constrained_extensions_str, NULL,
-                             SUPAUTILS_GUC_CONTEXT_SIGHUP, 0, NULL,
+                             PGC_SIGHUP, 0, constrained_extensions_check_hook,
                              constrained_extensions_assign_hook, NULL);
 
   DefineCustomStringVariable("supautils.drop_trigger_grants",

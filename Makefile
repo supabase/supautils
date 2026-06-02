@@ -9,10 +9,6 @@ PG_CFLAGS = -std=c11 -Wextra -Wall -Werror \
 	-Wno-vla \
 	-Wno-long-long
 
-ifeq ($(TEST), 1)
-PG_CFLAGS += -DTEST=1
-endif
-
 ifeq ($(TEST_CORE), 1)
 PG_CFLAGS += -DTEST_CORE=1
 endif
