@@ -1,3 +1,20 @@
+-- check json validation works
+alter system set supautils.extensions_parameter_overrides to '';
+ERROR:  supautils.extensions_parameter_overrides: invalid json
+alter system set supautils.extensions_parameter_overrides to '[]';
+ERROR:  supautils.extensions_parameter_overrides: unexpected array
+alter system set supautils.extensions_parameter_overrides to '1';
+ERROR:  supautils.extensions_parameter_overrides: unexpected scalar, expected an object
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": 123}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected scalar, expected an object
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"schema": {}}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected object for schema, expected a value
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"version": "1.0"}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected field, only schema is allowed
+alter system set supautils.extensions_parameter_overrides to '{"sslinfo": {"schema": 123}}';
+ERROR:  supautils.extensions_parameter_overrides: unexpected schema value, expected a string
+\echo
+
 -- can force sslinfo to be installed in pg_catalog
 create extension sslinfo schema public;
 select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
