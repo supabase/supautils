@@ -12,13 +12,6 @@
 #include <utils/acl.h>
 #include <utils/queryenvironment.h>
 
-// helper for testing a guc config
-#if TEST
-#  define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_USERSET
-#else
-#  define SUPAUTILS_GUC_CONTEXT_SIGHUP PGC_SIGHUP
-#endif
-
 /**
  * Switch to a superuser and save the original role. Caller is responsible for
  * calling switch_to_original_role() afterwards.
