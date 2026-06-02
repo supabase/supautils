@@ -1018,22 +1018,51 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   run_process_utility_hook(prev_hook);
 }
 
+static void clear_extensions_parameter_overrides_array(
+    extension_parameter_overrides *target, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    if (target[i].name != NULL) pfree(target[i].name);
+    if (target[i].schema != NULL) pfree(target[i].schema);
+  }
+  memset(target, 0, sizeof(extension_parameter_overrides) * count);
+}
+
+static void clear_extensions_parameter_overrides(void) {
+  clear_extensions_parameter_overrides_array(
+      epos, MAX_EXTENSIONS_PARAMETER_OVERRIDES);
+  total_epos = 0;
+}
+
 static bool extensions_parameter_overrides_check_hook(
     char **newval, __attribute__((unused)) void **extra,
     __attribute__((unused)) GucSource source) {
-  char *val = *newval;
+  extension_parameter_overrides tmp_epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] = {
+    0};
 
-  if (total_epos > 0) {
-    for (size_t i = 0; i < total_epos; i++) {
-      pfree(epos[i].name);
-      pfree(epos[i].schema);
+  if (*newval) {
+    json_extension_parameter_overrides_parse_state state =
+        parse_extensions_parameter_overrides(*newval, tmp_epos);
+
+    clear_extensions_parameter_overrides_array(
+        tmp_epos, MAX_EXTENSIONS_PARAMETER_OVERRIDES);
+
+    if (state.error_msg) {
+      ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                      errmsg("supautils.extensions_parameter_overrides: %s",
+                             state.error_msg)));
     }
-    total_epos = 0;
   }
 
-  if (val) {
+  return true;
+}
+
+static void extensions_parameter_overrides_assign_hook(
+    const char *newval, __attribute__((unused)) void *extra) {
+  clear_extensions_parameter_overrides();
+
+  if (newval) {
     json_extension_parameter_overrides_parse_state state =
-        parse_extensions_parameter_overrides(val, epos);
+        parse_extensions_parameter_overrides(newval, epos);
     if (state.error_msg) {
       ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
                       errmsg("supautils.extensions_parameter_overrides: %s",
@@ -1041,8 +1070,6 @@ static bool extensions_parameter_overrides_check_hook(
     }
     total_epos = state.total_epos;
   }
-
-  return true;
 }
 
 static bool policy_grants_check_hook(char                            **newval,
@@ -1393,11 +1420,12 @@ void _PG_init(void) {
   prev_executor_start_hook = ExecutorStart_hook;
   ExecutorStart_hook       = supautils_executor_start;
 
-  DefineCustomStringVariable(
-      "supautils.extensions_parameter_overrides",
-      "Overrides for CREATE EXTENSION parameters", NULL,
-      &extensions_parameter_overrides_str, NULL, PGC_SIGHUP, 0,
-      &extensions_parameter_overrides_check_hook, NULL, NULL);
+  DefineCustomStringVariable("supautils.extensions_parameter_overrides",
+                             "Overrides for CREATE EXTENSION parameters", NULL,
+                             &extensions_parameter_overrides_str, NULL,
+                             PGC_SIGHUP, 0,
+                             &extensions_parameter_overrides_check_hook,
+                             &extensions_parameter_overrides_assign_hook, NULL);
 
   DefineCustomStringVariable(
       "supautils.reserved_roles",
