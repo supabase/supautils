@@ -1,3 +1,7 @@
+-- restriction mode is set to 'error' in test/init.conf.in (defaults to 'off')
+show supautils.restrict_extension_versions;
+\echo
+
 -- Test: non-superuser cannot specify VERSION in CREATE EXTENSION
 set role extensions_role;
 
@@ -21,6 +25,33 @@ create extension if not exists hstore version '1.4';
 drop extension hstore;
 \echo
 
+-- Test: the restriction also applies to non-privileged extensions, and the
+-- bare forms stay allowed. seg is trusted and not in
+-- supautils.privileged_extensions, so extensions_role owns it and ALTER works
+-- without supautils delegation.
+
+-- should fail: VERSION clause blocked on the non-privileged path too
+create extension seg version '1.1';
+\echo
+
+-- should succeed: no VERSION clause
+create extension seg;
+\echo
+
+-- should fail: TO clause blocked
+alter extension seg update to '1.1';
+\echo
+
+-- should succeed: bare UPDATE is never blocked. It is a no-op here since seg
+-- is already at the default version; client_min_messages suppresses a NOTICE
+-- whose text embeds version numbers that differ across pg versions.
+set client_min_messages = warning;
+alter extension seg update;
+reset client_min_messages;
+
+drop extension seg;
+\echo
+
 -- Test: superuser CAN specify VERSION
 reset role;
 
@@ -33,4 +64,73 @@ alter extension hstore update to '1.7';
 drop extension hstore;
 \echo
 
+-- Test: warn mode ignores the specified version and uses the default
+set supautils.restrict_extension_versions = warn;
+set role extensions_role;
+
+-- suppress NOTICEs: their text embeds default versions that differ across pg versions
+set client_min_messages = warning;
+
+-- should succeed with a warning, installing the default version
+create extension hstore version '1.4';
+select extversion = default_version as installed_default
+  from pg_extension, pg_available_extensions
+ where extname = name and extname = 'hstore';
+
+-- warns and strips the TO clause; the subsequent "must be owner" error is
+-- pre-existing behavior for non-superuser ALTER EXTENSION UPDATE on privileged
+-- extensions (see supabase/supautils#118), unrelated to the version restriction
+alter extension hstore update to '1.4';
+
+-- the failed alter left the version unchanged
+select extversion = default_version as installed_default
+  from pg_extension, pg_available_extensions
+ where extname = name and extname = 'hstore';
+
+drop extension hstore;
+
+-- duplicate VERSION clauses are all stripped, none can slip through
+create extension hstore version '1.8' version '1.4';
+select extversion = default_version as installed_default
+  from pg_extension, pg_available_extensions
+ where extname = name and extname = 'hstore';
+
+-- duplicate TO clauses are also all stripped (the trailing error is the same
+-- pre-existing supabase/supautils#118 behavior as above)
+alter extension hstore update to '1.8' to '1.4';
+
+drop extension hstore;
+
+-- no warning when no version is specified
+create extension hstore;
+drop extension hstore;
+
+reset client_min_messages;
 reset role;
+\echo
+
+-- Test: off mode allows specifying versions
+set supautils.restrict_extension_versions = off;
+set role extensions_role;
+
+-- should succeed: no restriction
+create extension hstore version '1.4';
+select extversion from pg_extension where extname = 'hstore';
+
+drop extension hstore;
+reset role;
+\echo
+
+-- Test: GUC hygiene
+
+-- should fail: invalid values are rejected
+set supautils.restrict_extension_versions = blocked;
+\echo
+
+-- should fail: non-superusers cannot change the setting
+set role extensions_role;
+set supautils.restrict_extension_versions = off;
+reset role;
+\echo
+
+reset supautils.restrict_extension_versions;

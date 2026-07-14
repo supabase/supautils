@@ -78,6 +78,20 @@ static size_t              total_dtgs                    = 0;
 static bool log_skipped_evtrigs = false;
 static bool disable_program     = false;
 
+typedef enum {
+  RESTRICT_EXTENSION_VERSIONS_OFF,
+  RESTRICT_EXTENSION_VERSIONS_WARN,
+  RESTRICT_EXTENSION_VERSIONS_ERROR
+} restrict_extension_versions_mode;
+
+static const struct config_enum_entry restrict_extension_versions_options[] = {
+  {"off", RESTRICT_EXTENSION_VERSIONS_OFF, false},
+  {"warn", RESTRICT_EXTENSION_VERSIONS_WARN, false},
+  {"error", RESTRICT_EXTENSION_VERSIONS_ERROR, false},
+  {NULL, 0, false}};
+
+static int restrict_extension_versions = RESTRICT_EXTENSION_VERSIONS_OFF;
+
 void _PG_init(void);
 void _PG_fini(void);
 
@@ -249,23 +263,28 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   }
 }
 
-static void restrict_version_specification(List       *options,
-                                           const char *supautils_superuser,
-                                           const char *stmt_type) {
+static List *restrict_version_specification(extension_stmt_kind stmt_kind,
+                                            List               *options,
+                                            const char *supautils_superuser) {
   ListCell *lc;
 
-  if (superuser()) return;
+  if (restrict_extension_versions == RESTRICT_EXTENSION_VERSIONS_OFF)
+    return options;
+
+  if (superuser()) return options;
 
   if (supautils_superuser != NULL && supautils_superuser[0] != '\0') {
     const char *current_user = GetUserNameFromId(GetUserId(), false);
-    if (strcmp(current_user, supautils_superuser) == 0) return;
+    if (strcmp(current_user, supautils_superuser) == 0) return options;
   }
 
   foreach (lc, options) {
     DefElem *defel = (DefElem *)lfirst(lc);
 
-    if (strcmp(defel->defname, "new_version") == 0) {
-      if (strcmp(stmt_type, "CREATE") == 0)
+    if (strcmp(defel->defname, "new_version") != 0) continue;
+
+    if (restrict_extension_versions == RESTRICT_EXTENSION_VERSIONS_ERROR) {
+      if (stmt_kind == EXT_CREATE)
         ereport(ERROR,
                 (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
                  errmsg("permission denied: only superusers can specify "
@@ -277,7 +296,25 @@ static void restrict_version_specification(List       *options,
                                "extension versions. Use ALTER EXTENSION <name> "
                                "UPDATE without a TO clause.")));
     }
+
+    // warn mode: drop the version option so the default version is used
+    if (stmt_kind == EXT_CREATE)
+      ereport(WARNING,
+              (errmsg("only superusers can specify extension versions, "
+                      "ignoring version \"%s\" and installing the default "
+                      "version",
+                      strVal(defel->arg))));
+    else
+      ereport(WARNING,
+              (errmsg("only superusers can specify extension versions, "
+                      "ignoring version \"%s\" and updating to the default "
+                      "version",
+                      strVal(defel->arg))));
+
+    options = foreach_delete_current(options, lc);
   }
+
+  return options;
 }
 
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
@@ -574,8 +611,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_CreateExtensionStmt: {
     CreateExtensionStmt *volatile stmt = (CreateExtensionStmt *)utility_stmt;
 
-    restrict_version_specification(stmt->options, supautils_superuser,
-                                   "CREATE");
+    stmt->options = restrict_version_specification(EXT_CREATE, stmt->options,
+                                                   supautils_superuser);
 
     constrain_extension(stmt->extname, cexts, total_cexts);
 
@@ -625,7 +662,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
 
-    restrict_version_specification(stmt->options, supautils_superuser, "ALTER");
+    stmt->options = restrict_version_specification(EXT_ALTER, stmt->options,
+                                                   supautils_superuser);
 
     stmt->options = override_ext_options(EXT_ALTER, stmt->extname,
                                          stmt->options, total_epos, epos);
@@ -1553,6 +1591,14 @@ void _PG_init(void) {
                              "Allow non-owners to manage policies on tables",
                              NULL, &policy_grants_str, NULL, PGC_SIGHUP, 0,
                              &policy_grants_check_hook, NULL, NULL);
+
+  DefineCustomEnumVariable(
+      "supautils.restrict_extension_versions",
+      "Restrict CREATE/ALTER EXTENSION version specification to superusers",
+      "off: no restriction; warn: ignore the specified version with a warning "
+      "and use the default version; error: reject the statement",
+      &restrict_extension_versions, RESTRICT_EXTENSION_VERSIONS_OFF,
+      restrict_extension_versions_options, PGC_SUSET, 0, NULL, NULL, NULL);
 
   DefineCustomBoolVariable("supautils.log_skipped_evtrigs",
                            "Log skipped event triggers with a NOTICE level",
