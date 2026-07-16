@@ -508,7 +508,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
        * REVOKE <role> FROM <reserved_roles>
        */
       foreach (grantee_role_cell, stmt->grantee_roles) {
-        RoleSpec *spec = lfirst_node(RoleSpec, grantee_role_cell);
+        RoleSpec *spec      = lfirst_node(RoleSpec, grantee_role_cell);
         char     *role_name = get_rolespec_name(spec);
         // privileged_role can do GRANT <role> to <reserved_role>
         if (is_reserved_role(role_name, role_is_privileged))
