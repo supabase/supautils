@@ -73,6 +73,21 @@ set role supabase_storage_admin;
 alter role current_user set search_path to 'test';
 \echo
 
+-- granting or revoking role membership with current_user/session_user must not crash
+set role rolecreator;
+grant non_reserved to current_user;
+revoke non_reserved from current_user;
+grant non_reserved to session_user;
+revoke non_reserved from session_user;
+grant non_reserved to public;
+\echo
+
+-- cannot bypass the reserved-role grantee check by using current_user
+set role anon;
+grant non_reserved to current_user;
+revoke non_reserved from current_user;
+\echo
+
 -- use a role that has the SUPERUSER privilege
 set role postgres;
 \echo

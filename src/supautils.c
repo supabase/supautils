@@ -286,7 +286,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     // Setting the superuser attribute is not allowed.
     foreach (option_cell, stmt->options) {
-      DefElem *defel = (DefElem *)lfirst(option_cell);
+      DefElem *defel = lfirst_node(DefElem, option_cell);
       if (strcmp(defel->defname, "superuser") == 0) {
         ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
                         errmsg("permission denied to alter role"),
@@ -385,7 +385,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       /* Check to see if there are any descriptions related to membership. */
       foreach (option_cell, stmt->options) {
-        DefElem *defel = (DefElem *)lfirst(option_cell);
+        DefElem *defel = lfirst_node(DefElem, option_cell);
         if (strcmp(defel->defname, "addroleto") == 0)
           addroleto = (List *)defel->arg;
 
@@ -407,7 +407,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       if (addroleto) {
         ListCell *role_cell;
         foreach (role_cell, addroleto) {
-          RoleSpec *rolemember = lfirst(role_cell);
+          RoleSpec *rolemember = lfirst_node(RoleSpec, role_cell);
           confirm_reserved_memberships(get_rolespec_name(rolemember));
         }
       }
@@ -466,7 +466,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       ListCell     *item;
 
       foreach (item, stmt->roles) {
-        RoleSpec *role = lfirst(item);
+        RoleSpec *role = lfirst_node(RoleSpec, item);
 
         /*
          * We check only for a named role being dropped; we ignore
@@ -496,7 +496,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       /* GRANT <reserved_role> TO <role> */
       if (stmt->is_grant) {
         foreach (role_cell, stmt->granted_roles) {
-          AccessPriv *priv = (AccessPriv *)lfirst(role_cell);
+          AccessPriv *priv = lfirst_node(AccessPriv, role_cell);
           confirm_reserved_memberships(priv->priv_name);
         }
       }
@@ -508,10 +508,11 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
        * REVOKE <role> FROM <reserved_roles>
        */
       foreach (grantee_role_cell, stmt->grantee_roles) {
-        AccessPriv *priv = (AccessPriv *)lfirst(grantee_role_cell);
+        RoleSpec *spec = lfirst_node(RoleSpec, grantee_role_cell);
+        char     *role_name = get_rolespec_name(spec);
         // privileged_role can do GRANT <role> to <reserved_role>
-        if (is_reserved_role(priv->priv_name, role_is_privileged))
-          EREPORT_RESERVED_ROLE(priv->priv_name);
+        if (is_reserved_role(role_name, role_is_privileged))
+          EREPORT_RESERVED_ROLE(role_name);
       }
     }
     break;
