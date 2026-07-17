@@ -148,7 +148,7 @@ List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
       }
 
       foreach (option_cell, options) {
-        DefElem *defel = (DefElem *)lfirst(option_cell);
+        DefElem *defel = lfirst_node(DefElem, option_cell);
 
         if (strcmp(defel->defname, "schema") == 0) {
           if (schema_option != NULL) {

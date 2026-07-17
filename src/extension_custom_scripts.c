@@ -70,7 +70,7 @@ void run_global_before_create_script(
   ListCell *option_cell = NULL;
 
   foreach (option_cell, options) {
-    DefElem *defel = (DefElem *)lfirst(option_cell);
+    DefElem *defel = lfirst_node(DefElem, option_cell);
 
     if (strcmp(defel->defname, "schema") == 0) {
       d_schema  = defel;
@@ -102,7 +102,7 @@ void run_ext_before_create_script(
   char      filename[MAXPGPATH];
 
   foreach (option_cell, options) {
-    DefElem *defel = (DefElem *)lfirst(option_cell);
+    DefElem *defel = lfirst_node(DefElem, option_cell);
 
     if (strcmp(defel->defname, "schema") == 0) {
       d_schema  = defel;
@@ -134,7 +134,7 @@ void run_ext_after_create_script(
   char      filename[MAXPGPATH];
 
   foreach (option_cell, options) {
-    DefElem *defel = (DefElem *)lfirst(option_cell);
+    DefElem *defel = lfirst_node(DefElem, option_cell);
 
     if (strcmp(defel->defname, "schema") == 0) {
       d_schema  = defel;

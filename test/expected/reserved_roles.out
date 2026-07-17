@@ -95,6 +95,24 @@ alter role current_user set search_path to 'test';
 ERROR:  "supabase_storage_admin" is a reserved role, only superusers can modify it
 \echo
 
+-- granting or revoking role membership with current_user/session_user must not crash
+set role rolecreator;
+grant non_reserved to current_user;
+revoke non_reserved from current_user;
+grant non_reserved to session_user;
+revoke non_reserved from session_user;
+grant non_reserved to public;
+ERROR:  role "public" does not exist
+\echo
+
+-- cannot bypass the reserved-role grantee check by using current_user
+set role anon;
+grant non_reserved to current_user;
+ERROR:  "anon" is a reserved role, only superusers can modify it
+revoke non_reserved from current_user;
+ERROR:  "anon" is a reserved role, only superusers can modify it
+\echo
+
 -- use a role that has the SUPERUSER privilege
 set role postgres;
 \echo
