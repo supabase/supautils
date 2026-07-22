@@ -26,9 +26,9 @@ bool is_extension_privileged(const char *extname,
 }
 
 /*
- * Return true if the extension is present in the pg_available_extensions
+ * Returns true if the extension is present in the pg_available_extensions
  * view, false otherwise. Only those extensions are present in this view
- * which have their control files on the disk.
+ * which have their control files on disk.
  */
 bool is_extension_available(const char *extname) {
   bool found = false;
