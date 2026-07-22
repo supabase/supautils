@@ -167,7 +167,7 @@ supautils.privileged_extensions = 'hstore'
 
 Once you do, the extension creation will be delegated to the configured `supautils.superuser`. That means the `hstore` extension would be created as if by the superuser.
 
-Note that extension creation would behave normally (i.e. no delegation) if the current role is already a superuser. Delegation to superuser will also be skipped if the extension does not have a control file on disk. This is done to prevent non-superusers to run code as a superuser via extensions managed by pg_tle or other similar virtual-extension-managing extensions.
+Note that extension creation would behave normally (i.e. no delegation) if the current role is already a superuser. Delegation to superuser will also be skipped if the extension does not have a control file on disk. This is done to prevent non-superusers from running code as a superuser via extensions managed by pg_tle or other similar virtual-extension-managing extensions.
 
 This also works for updating and dropping privileged extensions.
 
