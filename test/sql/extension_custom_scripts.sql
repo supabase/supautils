@@ -21,7 +21,9 @@ set role extensions_role;
 
 -- global extension custom scripts are run
 create extension dict_xsyn;
+reset role;
 create extension insert_username version "1.0" schema public cascade;
+set role extensions_role;
 \echo
 
 -- custom scripts are run even for superusers

@@ -243,6 +243,35 @@ postgres=> \dx pg_cron
 (1 row)
 ```
 
+### Restrict Extension Versions
+
+By default, any user who can create an extension can install any of its available versions via `CREATE EXTENSION <name> VERSION '<version>'` or `ALTER EXTENSION <name> UPDATE TO '<version>'`. To restrict this, set:
+
+```
+supautils.restrict_extension_versions = error
+```
+
+The possible modes are:
+
+- `off` (default): no restriction.
+- `warn`: the specified version is ignored with a warning and the extension's `default_version` (declared in its control file) is used instead.
+- `error`: the statement is rejected.
+
+Only superusers and the configured `supautils.superuser` are exempt; the restriction applies to everyone else:
+
+```sql
+-- with supautils.restrict_extension_versions = error
+postgres=> create extension hstore version '1.4';
+ERROR:  permission denied: only superusers can specify extension versions. Use CREATE EXTENSION <name> without a VERSION clause.
+
+-- with supautils.restrict_extension_versions = warn
+postgres=> create extension hstore version '1.4';
+WARNING:  only superusers can specify extension versions, ignoring version "1.4" and installing the default version
+CREATE EXTENSION
+```
+
+`CREATE EXTENSION <name>` and `ALTER EXTENSION <name> UPDATE` (without version clauses) remain allowed in all modes, subject to the existing privilege checks.
+
 ### Table Ownership Bypass
 
 #### Manage Policies
