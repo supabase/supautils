@@ -143,6 +143,7 @@ grant usage on schema allow_policies to privileged_role;
 set role privileged_role;
 create policy p on allow_policies.my_table for select using (true);
 alter policy p on allow_policies.my_table using (false);
+comment on policy p on allow_policies.my_table is 'a comment';
 drop policy p on allow_policies.my_table;
 
 set role postgres;
@@ -159,6 +160,7 @@ grant usage on schema deny_policies to privileged_role;
 set role privileged_role;
 create policy p2 on deny_policies.my_table for select using (true);
 alter policy p1 on deny_policies.my_table using (false);
+comment on policy p1 on deny_policies.my_table is 'a comment';
 drop policy p1 on deny_policies.my_table;
 
 set role postgres;

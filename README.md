@@ -256,7 +256,7 @@ With supautils, this can be done like so:
 supautils.policy_grants = '{ "my_role": ["public.not_my_table", "public.also_not_my_table"] }'
 ```
 
-This allows `my_role` to manage policies for `public.not_my_table` and `public.also_not_my_table` without being an owner of these tables.
+This allows `my_role` to manage policies for `public.not_my_table` and `public.also_not_my_table` without being an owner of these tables. This includes `CREATE POLICY`, `ALTER POLICY`, `DROP POLICY` and `COMMENT ON POLICY`.
 
 #### Drop Triggers
 
