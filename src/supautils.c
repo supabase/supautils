@@ -899,14 +899,15 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
      * COMMENT ON POLICY
      */
     if (((CommentStmt *)utility_stmt)->objtype == OBJECT_POLICY) {
-      CommentStmt *stmt              = (CommentStmt *)utility_stmt;
-      List        *object            = castNode(List, stmt->object);
-      List        *table_name_list   = list_truncate(
-          list_copy(object), list_length(object) - 1);
-      RangeVar    *table_range_var                 = makeRangeVarFromNameList(table_name_list);
-      bool        already_switched_to_superuser = false;
+      CommentStmt *stmt   = (CommentStmt *)utility_stmt;
+      List        *object = castNode(List, stmt->object);
+      List        *table_name_list =
+          list_truncate(list_copy(object), list_length(object) - 1);
+      RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
+      bool      already_switched_to_superuser = false;
 
-      if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs)) {
+      if (!is_current_role_granted_table_policy(table_range_var, pgs,
+                                                total_pgs)) {
         break;
       }
 
