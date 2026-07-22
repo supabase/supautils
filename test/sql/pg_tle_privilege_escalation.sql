@@ -95,3 +95,24 @@ select pgtle.install_extension(
 -- Create the extension and verify that the attempt to escalate the privilege failed
 create extension no_control_file_extension version '1.0';
 select * from public.user;
+
+-- A similar test for alter extension ...
+truncate table public.user;
+
+-- Register an upgrade path for the extension
+select pgtle.install_update_path(
+    'no_control_file_extension',
+    '1.0',
+    '2.0',
+    $$
+        insert into public.user (username, is_superuser)
+        select current_user, rolsuper 
+        from pg_roles 
+        where rolname = current_user;
+    $$
+);
+\echo
+
+-- Update the extension and verify that the attempt to escalate the privilege failed
+alter extension no_control_file_extension update to '2.0';
+select * from public.user;
