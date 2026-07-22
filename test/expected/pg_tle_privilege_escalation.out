@@ -41,6 +41,10 @@
 -- view.
 --
 -- Actual test follows.
+-- off mode allows specifying versions which this test needs
+set supautils.restrict_extension_versions = off;
+\echo
+
 -- Needs superuser to create pg_tle and setup permissions
 create extension if not exists pg_tle;
 grant pgtle_admin to extensions_role;
