@@ -46,8 +46,15 @@
 -- address_standardizer extension
 --
 -- Thus closing the attack vector.
-
+-- Needs superuser to create pg_tle and setup permissions
 create extension if not exists pg_tle;
+grant pgtle_admin to extensions_role;
+grant create on schema public to extensions_role;
+\echo
+
+-- Now we use the non-superuser extensions_role to drop the privileges for the rest of the test
+set role extensions_role;
+\echo
 
 --Verify that pg_tle does not allow shadowing an extension which already has a control file on disk
 select pgtle.install_extension(
@@ -58,18 +65,53 @@ select pgtle.install_extension(
         select 1;
     $$
 );
+ERROR:  control file already exists for the pageinspect extension
+\echo
 
+-- Wrap the creation of the pageinspect extension in begin/rollback pair
+-- to avoid polluting results for other tests.
+begin;
+-- But even with pg_tle installed, extensions with on disk control file are still run as superuser
+create extension pageinspect;
+\echo
+
+-- Verify that pageinspect was created by the superuser postgres, not extensions_role
+select rolname as extension_owner
+from pg_extension e
+join pg_roles r on r.oid = e.extowner
+where e.extname = 'pageinspect';
+ extension_owner 
+-----------------
+ postgres
+(1 row)
+
+rollback;
+\echo
+
+-- Now test the privilege escalation attempt by letting a TLE extension claim an extension
+-- which has no control file on disk. This should not escalate to superuser.
 select pgtle.install_extension(
-    'plls',
+    'no_control_file_extension',
     '1.0',
-    'Shadow plls which is not available on the disk, hence no control file',
+    'Shadow no_control_file_extension which is has no control file on disk',
     $$
         create table if not exists public.user as
             select current_user as username,
             (select rolsuper from pg_roles where rolname=current_user) as is_superuser;
     $$
 );
+ install_extension 
+-------------------
+ t
+(1 row)
 
-create extension plls version '1.0';
+\echo
 
+-- Create the extension and verify that the attempt to escalate the privilege failed
+create extension no_control_file_extension version '1.0';
 select * from public.user;
+    username     | is_superuser 
+-----------------+--------------
+ extensions_role | f
+(1 row)
+

@@ -10,4 +10,6 @@ extern bool all_extensions_are_privileged(List       *objects,
 extern bool is_extension_privileged(const char *extname,
                                     const char *privileged_extensions);
 
+extern bool is_extension_available(const char *extname);
+
 #endif
