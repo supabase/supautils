@@ -1,5 +1,6 @@
+shared_preload_libraries='pg_tle'
 <PG_EQ_15>
-shared_preload_libraries='plpgsql_check'
+shared_preload_libraries='pg_tle,plpgsql_check'
 </PG_EQ_15>
 session_preload_libraries = 'supautils'
 wal_level=logical

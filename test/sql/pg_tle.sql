@@ -1,0 +1,51 @@
+-- This test verfies that a privilege escalation attack vector is closed. First, let's
+-- understand how the attack worked before the fix:
+-- 
+-- 1. supautils.privileged_extensions has an extension listed in it which does not
+--    have a control file. For example `plls` which is not available on many projects
+--    on our platform.
+-- 2. A non-superuser attacker runs the following code:
+--
+--    create extension if not exists pg_tle; 
+--    select pgtle.install_extension('plls','1.0','poc', $$ create table if not exists public.poc_privesc as select current_user as ran_as, (select rolsuper from pg_roles where rolname=current_user) as effective_role_is_superuser; $$); 
+--
+--    The above code registers an extension named `plls` as a pg_tle extension with the
+--    code to create the poc_privsec table and insert the current_user and it's superuser
+--    status as columns.
+--
+-- 3. The attacker then runs `create extension plls version '1.0';` which is first
+--    caught by the supautils hook, which looks in the supautils.privileged_extensions
+--    GUC for the presence of `plls`, finds it and elevates the role to superuser.
+--    Next, the pg_tle hook runs, finds that plls is not a control file based extension
+--    and runs the code registered against the plls extension as superuser. This can be
+--    verified by running the following code:
+--
+--    select * from public.poc_privesc;
+--
+--    Which shows that the extension code indeed ran as a superuser:
+--
+--    | ran_as         | effective_role_is_superuser |
+--    | -------------- | --------------------------- |
+--    | supabase_admin | true                        |
+--
+-- The fix was to filter out control-file-less extensions from the
+-- supautils.privileged_extensions GUC, leaving behind only extensions with a controle file.
+-- Since pg_tle does not shadowing an extension with control file, the attacker wouldn't be
+-- able to register the sql with pgtle.install_extension call, which fails with an error:
+--
+-- Error: Failed to run sql query: ERROR: 55000: control file already exists for the
+-- address_standardizer extension
+--
+-- Thus closing the attack vector.
+
+create extension if not exists pg_tle;
+
+--Verify that pg_tle does not allow shadowing an extension which already has a control file on disk
+select pgtle.install_extension(
+    'pageinspect',
+    '1.0',
+    'Trying to shadow pageinspect which already has a control file on disk',
+    $$
+        select 1;
+    $$
+);
