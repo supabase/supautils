@@ -7,7 +7,16 @@
 -- 2. A non-superuser attacker runs the following code:
 --
 --    create extension if not exists pg_tle; 
---    select pgtle.install_extension('plls','1.0','poc', $$ create table if not exists public.poc_privesc as select current_user as ran_as, (select rolsuper from pg_roles where rolname=current_user) as effective_role_is_superuser; $$); 
+--    select pgtle.install_extension(
+--        'plls',
+--        '1.0',
+--        'Shadow plls which is not available, hence no control file',
+--        $$
+--            create table if not exists public.user as
+--                select current_user as username,
+--                (select rolsuper from pg_roles where rolname=current_user) as is_superuser;
+--        $$
+--    );
 --
 --    The above code registers an extension named `plls` as a pg_tle extension with the
 --    code to create the poc_privsec table and insert the current_user and it's superuser
@@ -20,13 +29,13 @@
 --    and runs the code registered against the plls extension as superuser. This can be
 --    verified by running the following code:
 --
---    select * from public.poc_privesc;
+--    select * from public.user;
 --
 --    Which shows that the extension code indeed ran as a superuser:
 --
---    | ran_as         | effective_role_is_superuser |
---    | -------------- | --------------------------- |
---    | supabase_admin | true                        |
+--     username | is_superuser 
+--    ----------+--------------
+--     postgres | t
 --
 -- The fix was to filter out control-file-less extensions from the
 -- supautils.privileged_extensions GUC, leaving behind only extensions with a controle file.
@@ -49,3 +58,18 @@ select pgtle.install_extension(
         select 1;
     $$
 );
+
+select pgtle.install_extension(
+    'plls',
+    '1.0',
+    'Shadow plls which is not available on the disk, hence no control file',
+    $$
+        create table if not exists public.user as
+            select current_user as username,
+            (select rolsuper from pg_roles where rolname=current_user) as is_superuser;
+    $$
+);
+
+create extension plls version '1.0';
+
+select * from public.user;
