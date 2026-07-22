@@ -1,16 +1,15 @@
 -- This test verfies that a privilege escalation attack vector is closed. First, let's
 -- understand how the attack worked before the fix:
 -- 
--- 1. supautils.privileged_extensions has an extension listed in it which does not
---    have a control file. For example `plls` which is not available on many projects
---    on our platform.
--- 2. A non-superuser attacker runs the following code:
+-- 1. supautils.privileged_extensions had an extension listed in it which did not
+--    have a control file.
+-- 2. A non-superuser attacker ran the following code:
 --
 --    create extension if not exists pg_tle; 
 --    select pgtle.install_extension(
---        'plls',
+--        'no_control_file_extension',
 --        '1.0',
---        'Shadow plls which is not available, hence no control file',
+--        'Shadow no_control_file_extension which has no control file on disk',
 --        $$
 --            create table if not exists public.user as
 --                select current_user as username,
@@ -18,16 +17,16 @@
 --        $$
 --    );
 --
---    The above code registers an extension named `plls` as a pg_tle extension with the
---    code to create the poc_privsec table and insert the current_user and it's superuser
+--    The above code registered an extension named `no_control_file_extension` as a pg_tle extension
+--    with the code to create the public.user table and insert the current_user and its superuser
 --    status as columns.
 --
--- 3. The attacker then runs `create extension plls version '1.0';` which is first
---    caught by the supautils hook, which looks in the supautils.privileged_extensions
---    GUC for the presence of `plls`, finds it and elevates the role to superuser.
---    Next, the pg_tle hook runs, finds that plls is not a control file based extension
---    and runs the code registered against the plls extension as superuser. This can be
---    verified by running the following code:
+-- 3. The attacker then ran `create extension no_control_file_extension version '1.0';` which was first
+--    caught by the supautils hook, which looks in the supautils.privileged_extensions GUC for the
+--    presence of `no_control_file_extension`, finds it and elevates the role to superuser.
+--    Next, the pg_tle hook runs, finds that no_control_file_extension is not a control file based
+--    extension and runs the code registered against the no_control_file_extension extension as superuser.
+--    This can be verified by running the following code:
 --
 --    select * from public.user;
 --
@@ -37,15 +36,11 @@
 --    ----------+--------------
 --     postgres | t
 --
--- The fix was to filter out control-file-less extensions from the
--- supautils.privileged_extensions GUC, leaving behind only extensions with a controle file.
--- Since pg_tle does not shadowing an extension with control file, the attacker wouldn't be
--- able to register the sql with pgtle.install_extension call, which fails with an error:
+-- The fix is to look at pg_catalog.pg_available_extensions to find out extensions with
+-- a control file on disk and only escalate to superuser if an extension is found in this
+-- view.
 --
--- Error: Failed to run sql query: ERROR: 55000: control file already exists for the
--- address_standardizer extension
---
--- Thus closing the attack vector.
+-- Actual test follows.
 
 -- Needs superuser to create pg_tle and setup permissions
 create extension if not exists pg_tle;
@@ -88,7 +83,7 @@ rollback;
 select pgtle.install_extension(
     'no_control_file_extension',
     '1.0',
-    'Shadow no_control_file_extension which is has no control file on disk',
+    'Shadow no_control_file_extension which has no control file on disk',
     $$
         create table if not exists public.user as
             select current_user as username,
