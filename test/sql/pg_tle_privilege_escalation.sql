@@ -96,7 +96,7 @@ select pgtle.install_extension(
 create extension no_control_file_extension version '1.0';
 select * from public.user;
 
--- A similar test for alter extension ...
+-- A similar test for alter extension update command
 truncate table public.user;
 
 -- Register an upgrade path for the extension

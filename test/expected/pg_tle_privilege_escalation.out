@@ -110,7 +110,7 @@ select * from public.user;
  extensions_role | f
 (1 row)
 
--- A similar test for alter extension ...
+-- A similar test for alter extension update command
 truncate table public.user;
 -- Register an upgrade path for the extension
 select pgtle.install_update_path(
