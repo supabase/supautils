@@ -1,16 +1,36 @@
-From 3a2553ad738c14bfbeebe3981a17a6cf53d3dc2f Mon Sep 17 00:00:00 2001
+From e4467126e84cf28c32ee37132d28c2550379c496 Mon Sep 17 00:00:00 2001
 From: Raminder Singh <romi_ssk@yahoo.co.in>
 Date: Wed, 22 Jul 2026 10:45:25 +0530
-Subject: [PATCH] feat: add support for extension_control_path GUC
+Subject: [PATCH] feat: allow pg_tle to be loaded from extension_control_path
+ GUC's location
 
-The extension_control_path GUC allows admins to configure a colon separated list
-of directories where Postgres looks for extensions to load. This patch adds the
-same support to pg_tle. Without this patch pg_tle itself was not loaded because
-it looked at standard extension path (sharedir) to look for the control files
-when loading an extension (including itself). If you are thinking how can pg_tle
-itself play a part it loading before it's loaded, then the answer is that it's
-added to shared_preload_libraries so it starts hooking the create extension
-commands at startup.
+Without this patch pg_tle fails to load in a nix/xpg environment. When pg_tle is
+being loaded, it checks for its own control file in the Postgres sharedir folder
+where it is not found because it exists in its own nix store path outside the
+Postgres derivation's sharedir folder. This patch makes pg_tle instead look at
+the same directories set in extension_control_path GUC.
+
+The step-by-step failure happens like this:
+
+1. pg_tle is specified in shared_preload_libraries and on load it hooks the
+   utility commands.
+2. User runs the `create extension pg_tle` command, which is handled by the
+   hook, but it delegates to standard Postgres behaviour, which correctly finds
+   pg_tle's control and sql files.
+3. Postgres starts running the commands in pg_tle's sql files. The sql
+   files contain `create function ...` commads to create pg_tle's functions (
+   like pgtle.install_extension()).
+4. The `create function ...` commands are handled by pg_tle's hook in which it
+   tries to find the pg_tle control file inside the sharedir folder. This is
+   where it fails. This is apparently done by pg_tle to disallow callers to
+   spoof pg_tle installation itself.
+
+The patch updates the function get_extension_control_filename (and other related
+functions for consistency) which is called at step #4 to start looking at the
+extension_control_path GUC's locations to find control files, hence allowing
+pg_tle sql files to run successfully. It is just incidental that the same
+functions are used by pg_tle to look for control files for other extensions, but
+that's not the main reason for the patch.
 ---
  src/tleextension.c | 86 ++++++++++++++++++++++++++++++++++++++++------
  1 file changed, 76 insertions(+), 10 deletions(-)
