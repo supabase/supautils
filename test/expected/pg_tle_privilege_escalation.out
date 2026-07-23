@@ -51,8 +51,37 @@ grant pgtle_admin to extensions_role;
 grant create on schema public to extensions_role;
 \echo
 
+-- Create an event trigger for drop extension command to test which user does
+-- the command runs as
+create or replace function log_current_user() returns event_trigger as $$
+begin
+    insert into public.user (username, is_superuser)
+    select current_user, rolsuper 
+    from pg_roles 
+    where rolname = current_user;
+end;
+$$ language plpgsql;
+\echo
+
+create event trigger drop_extension on ddl_command_end
+    when tag in ('DROP EXTENSION')
+    execute function log_current_user();
+\echo
+
+-- Schema to use in alter extension ... set schema command
+create schema if not exists ext_schema;
+grant create on schema ext_schema to extensions_role;
+\echo
+
 -- Now we use the non-superuser extensions_role to drop the privileges for the rest of the test
 set role extensions_role;
+\echo
+
+-- Create the table to capture current user details
+create table public.user (
+    username text,
+    is_superuser bool
+);
 \echo
 
 --Verify that pg_tle does not allow shadowing an extension which already has a control file on disk
@@ -94,9 +123,10 @@ select pgtle.install_extension(
     '1.0',
     'Shadow no_control_file_extension which has no control file on disk',
     $$
-        create table if not exists public.user as
-            select current_user as username,
-            (select rolsuper from pg_roles where rolname=current_user) as is_superuser;
+        insert into public.user (username, is_superuser)
+        select current_user, rolsuper 
+        from pg_roles 
+        where rolname = current_user;
     $$
 );
  install_extension 
@@ -114,8 +144,12 @@ select * from public.user;
  extensions_role | f
 (1 row)
 
+\echo
+
 -- A similar test for alter extension update command
 truncate table public.user;
+\echo
+
 -- Register an upgrade path for the extension
 select pgtle.install_update_path(
     'no_control_file_extension',
@@ -137,6 +171,24 @@ select pgtle.install_update_path(
 
 -- Update the extension and verify that the attempt to escalate the privilege failed
 alter extension no_control_file_extension update to '2.0';
+select * from public.user;
+    username     | is_superuser 
+-----------------+--------------
+ extensions_role | f
+(1 row)
+
+\echo
+
+-- Now test alter extension set schema command
+-- This will fail because pg_tle makes all TLE extensions non-relocatable by
+-- hardcoding in pg_tle's source code
+alter extension no_control_file_extension set schema ext_schema;
+ERROR:  extension "no_control_file_extension" does not support SET SCHEMA
+\echo
+
+-- And finally the drop extension command
+truncate table public.user;
+drop extension no_control_file_extension;
 select * from public.user;
     username     | is_superuser 
 -----------------+--------------
