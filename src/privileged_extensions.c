@@ -31,10 +31,17 @@ bool is_extension_privileged(const char *extname,
  * which have their control files on disk.
  */
 bool is_extension_available(const char *extname) {
+  int  ret;
   bool found = false;
 
+  Assert(ActiveSnapshotSet());
+
   PushActiveSnapshot(GetTransactionSnapshot());
-  SPI_connect();
+
+  if ((ret = SPI_connect()) < 0)
+    elog(ERROR,
+         "SPI connect to get avaialble extension failed with error code %d",
+         ret);
 
   StringInfoData sql;
 
@@ -47,8 +54,7 @@ bool is_extension_available(const char *extname) {
 
   if (rc != SPI_OK_SELECT) {
     elog(ERROR,
-         "SPI_execute to get available extensions failed with error "
-         "code %d",
+         "SPI_execute to get available extensions failed with error code %d",
          rc);
   }
 
