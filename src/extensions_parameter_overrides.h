@@ -6,6 +6,7 @@
 typedef struct {
   char *name;
   char *schema;
+  char *version;
 } extension_parameter_overrides;
 
 typedef enum {
@@ -13,11 +14,13 @@ typedef enum {
   JEPO_EXPECT_TOPLEVEL_FIELD,
   JEPO_EXPECT_PARAMETER_OVERRIDES_START,
   JEPO_EXPECT_SCHEMA,
+  JEPO_EXPECT_VERSION,
   JEPO_UNEXPECTED_FIELD,
   JEPO_UNEXPECTED_ARRAY,
   JEPO_UNEXPECTED_SCALAR,
   JEPO_UNEXPECTED_OBJECT,
-  JEPO_UNEXPECTED_SCHEMA_VALUE
+  JEPO_UNEXPECTED_SCHEMA_VALUE,
+  JEPO_UNEXPECTED_VERSION_VALUE
 } json_extension_parameter_overrides_semantic_state;
 
 typedef struct {
