@@ -38,9 +38,10 @@ bool is_extension_available(const char *extname) {
 
   PushActiveSnapshot(GetTransactionSnapshot());
 
-  if ((ret = SPI_connect()) < 0)
+  if ((ret = SPI_connect()) != SPI_OK_CONNECT)
     elog(ERROR,
-         "SPI connect to get avaialble extension failed with error code %d",
+         "SPI_connect failed when getting avaialble extensions with error code "
+         "%d",
          ret);
 
   StringInfoData sql;
@@ -54,14 +55,21 @@ bool is_extension_available(const char *extname) {
 
   if (rc != SPI_OK_SELECT) {
     elog(ERROR,
-         "SPI_execute to get available extensions failed with error code %d",
+         "SPI_execute failed when getting avaialble extensions with error code "
+         "%d",
          rc);
   }
 
   found = SPI_processed > 0;
 
   pfree(sql.data);
-  SPI_finish();
+
+  if ((ret = SPI_finish()) != SPI_OK_FINISH)
+    elog(ERROR,
+         "SPI_finish failed when getting avaialble extensions with error code "
+         "%d",
+         ret);
+
   PopActiveSnapshot();
 
   return found;
