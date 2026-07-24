@@ -9,7 +9,7 @@ bool all_extensions_are_privileged(List       *objects,
   foreach (lc, objects) {
     char *name = strVal(lfirst(lc));
 
-    if (!is_string_in_comma_delimited_string(name, privileged_extensions)) {
+    if (!is_extension_privileged(name, privileged_extensions)) {
       return false;
     }
   }
@@ -21,5 +21,56 @@ bool is_extension_privileged(const char *extname,
                              const char *privileged_extensions) {
   if (privileged_extensions == NULL) return false;
 
-  return is_string_in_comma_delimited_string(extname, privileged_extensions);
+  return is_string_in_comma_delimited_string(extname, privileged_extensions) &&
+         is_extension_available(extname);
+}
+
+/*
+ * Returns true if the extension is present in the pg_available_extensions
+ * view, false otherwise. Only those extensions are present in this view
+ * which have their control files on disk.
+ */
+bool is_extension_available(const char *extname) {
+  int  ret;
+  bool found = false;
+
+  Assert(ActiveSnapshotSet());
+
+  PushActiveSnapshot(GetTransactionSnapshot());
+
+  if ((ret = SPI_connect()) != SPI_OK_CONNECT)
+    elog(ERROR,
+         "SPI_connect failed when getting avaialble extensions with error code "
+         "%d",
+         ret);
+
+  StringInfoData sql;
+
+  initStringInfo(&sql);
+  appendStringInfo(
+      &sql, "select 1 from pg_catalog.pg_available_extensions where name = %s",
+      quote_literal_cstr(extname));
+
+  int rc = SPI_execute(sql.data, true, 1);
+
+  if (rc != SPI_OK_SELECT) {
+    elog(ERROR,
+         "SPI_execute failed when getting avaialble extensions with error code "
+         "%d",
+         rc);
+  }
+
+  found = SPI_processed > 0;
+
+  pfree(sql.data);
+
+  if ((ret = SPI_finish()) != SPI_OK_FINISH)
+    elog(ERROR,
+         "SPI_finish failed when getting avaialble extensions with error code "
+         "%d",
+         ret);
+
+  PopActiveSnapshot();
+
+  return found;
 }

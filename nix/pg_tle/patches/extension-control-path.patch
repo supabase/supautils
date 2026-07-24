@@ -1,0 +1,172 @@
+From e4467126e84cf28c32ee37132d28c2550379c496 Mon Sep 17 00:00:00 2001
+From: Raminder Singh <romi_ssk@yahoo.co.in>
+Date: Wed, 22 Jul 2026 10:45:25 +0530
+Subject: [PATCH] feat: allow pg_tle to be loaded from extension_control_path
+ GUC's location
+
+Without this patch pg_tle fails to load in a nix/xpg environment. When pg_tle is
+being loaded, it checks for its own control file in the Postgres sharedir folder
+where it is not found because it exists in its own nix store path outside the
+Postgres derivation's sharedir folder. This patch makes pg_tle instead look at
+the same directories set in extension_control_path GUC.
+
+The step-by-step failure happens like this:
+
+1. pg_tle is specified in shared_preload_libraries and on load it hooks the
+   utility commands.
+2. User runs the `create extension pg_tle` command, which is handled by the
+   hook, but it delegates to standard Postgres behaviour, which correctly finds
+   pg_tle's control and sql files.
+3. Postgres starts running the commands in pg_tle's sql files. The sql
+   files contain `create function ...` commads to create pg_tle's functions (
+   like pgtle.install_extension()).
+4. The `create function ...` commands are handled by pg_tle's hook in which it
+   tries to find the pg_tle control file inside the sharedir folder. This is
+   where it fails. This is apparently done by pg_tle to disallow callers to
+   spoof pg_tle installation itself.
+
+The patch updates the function get_extension_control_filename (and other related
+functions for consistency) which is called at step #4 to start looking at the
+extension_control_path GUC's locations to find control files, hence allowing
+pg_tle sql files to run successfully. It is just incidental that the same
+functions are used by pg_tle to look for control files for other extensions, but
+that's not the main reason for the patch.
+---
+ src/tleextension.c | 86 ++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 76 insertions(+), 10 deletions(-)
+
+diff --git a/src/tleextension.c b/src/tleextension.c
+index 272a13a..37e9838 100644
+--- a/src/tleextension.c
++++ b/src/tleextension.c
+@@ -573,15 +573,77 @@ is_extension_script_filename(const char *filename)
+ 		(strncmp(extension, TLE_EXT_SQL_SUFFIX, sizeof(TLE_EXT_SQL_SUFFIX)) == 0);
+ }
+ 
++ /* 
++ * Finds the correct extension base directory given an extension name.
++ * The base directory contains the control file for the given extension
++ * at the <basedir>/extension/<extname>.control location. To find this
++ * directory, the function first looks inside the directories listed in
++ * the extension_control_path GUC one by one and returns the first one
++ * that has the extensions's control file. The extension_control_path
++ * contains potential extension paths separated by colons. A single path
++ * can either point to a location on the file system or be $system which
++ * resolves to Postgres sharedir location. If none of the paths contain
++ * the control file, it return the sharepath. The caller is responsible
++ * for calling pfree on the returned string.
++ */
+ static char *
+-pg_tle_get_extension_control_directory(void)
++pg_tle_find_extension_control_directory(const char *extname)
+ {
+ 	char		sharepath[MAXPGPATH];
+-	char	   *result;
++	char	   *ecp;
++	char	   *path;
++	char	   *saveptr;
++	char	   *result = NULL;
+ 
+ 	get_share_path(my_exec_path, sharepath);
++
++	if (Extension_control_path == NULL || strlen(Extension_control_path) == 0) {
++		ecp = pstrdup("$system");
++	} else {
++		ecp = pstrdup(Extension_control_path);
++	}
++
++	for (path = strtok_r(ecp, ":", &saveptr); path != NULL;
++		 path = strtok_r(NULL, ":", &saveptr))
++	{
++		const char *basedir = (strcmp(path, "$system") == 0) ? sharepath : path;
++		char	   *control_file;
++
++		control_file = psprintf("%s/extension/%s.control",
++								   basedir, extname);
++
++		if (filestat(control_file))
++		{
++			result = pstrdup(basedir);
++			pfree(control_file);
++			break;
++		}
++
++		pfree(control_file);
++	}
++
++	pfree(ecp);
++
++	if (result == NULL)
++	{
++		return pstrdup(sharepath);
++	}
++	else
++	{
++		return result;
++	}
++}
++
++static char *
++pg_tle_get_extension_control_directory(const char *extname)
++{
++	char *result;
++	char *control_directory = pg_tle_find_extension_control_directory(extname);
++
+ 	result = (char *) palloc(MAXPGPATH);
+-	snprintf(result, MAXPGPATH, "%s/extension", sharepath);
++	snprintf(result, MAXPGPATH, "%s/extension", control_directory);
++
++	pfree(control_directory);
+ 
+ 	return result;
+ }
+@@ -603,12 +665,13 @@ static char *
+ get_extension_control_filename_for_file(const char *extname)
+ {
+ 	char	   *result;
+-	char		sharepath[MAXPGPATH];
++	char *control_directory = pg_tle_find_extension_control_directory(extname);
+ 
+-	get_share_path(my_exec_path, sharepath);
+ 	result = (char *) palloc(MAXPGPATH);
+ 	snprintf(result, MAXPGPATH, "%s/extension/%s.control",
+-			 sharepath, extname);
++			 control_directory, extname);
++
++	pfree(control_directory);
+ 
+ 	return result;
+ }
+@@ -616,22 +679,25 @@ get_extension_control_filename_for_file(const char *extname)
+ static char *
+ get_extension_script_directory(ExtensionControlFile *control)
+ {
+-	char		sharepath[MAXPGPATH];
+ 	char	   *result;
++	char	   *control_directory;
+ 
+ 	/*
+ 	 * The directory parameter can be omitted, absolute, or relative to the
+ 	 * installation's share directory.
+ 	 */
+ 	if (!control->directory)
+-		return pg_tle_get_extension_control_directory();
++		return pg_tle_get_extension_control_directory(control->name);
+ 
+ 	if (is_absolute_path(control->directory))
+ 		return pstrdup(control->directory);
+ 
+-	get_share_path(my_exec_path, sharepath);
++	control_directory = pg_tle_find_extension_control_directory(control->name);
++
+ 	result = (char *) palloc(MAXPGPATH);
+-	snprintf(result, MAXPGPATH, "%s/%s", sharepath, control->directory);
++	snprintf(result, MAXPGPATH, "%s/%s", control_directory, control->directory);
++
++	pfree(control_directory);
+ 
+ 	return result;
+ }
+-- 
+2.50.1 (Apple Git-155)
+
