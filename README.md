@@ -372,7 +372,7 @@ If you are a repo member, you can skip building for hours and download packages 
 
 3. Use the cache:
   ```sh
-  nix run nixpkgs#cachix use nxpg
+  sudo nix run nixpkgs#cachix use nxpg
   ```
 
 > [!CAUTION]
