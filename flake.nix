@@ -1,15 +1,6 @@
 {
   description = "Development shell for supautils";
 
-  nixConfig = {
-    extra-substituters = [
-      "https://nxpg.cachix.org"
-    ];
-    extra-trusted-public-keys = [
-      "nxpg.cachix.org-1:6HKVOmmG/ptPEogBAJ+zR6kRji5F4uHTNx7EGt7WBh0="
-    ];
-  };
-
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/91c9a64ce2a84e648d0cf9671274bb9c2fb9ba60";
     xpg = {
