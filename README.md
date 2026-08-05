@@ -431,12 +431,22 @@ To test with a postgres built with assertions enabled:
 $ xpg -v 17 --cassert test
 ```
 
+### Running a single test
+
+`xpg test` always runs the full test suite. To narrow it down to one test, set
+its name in the `REGRESS` variable via `MAKEFLAGS`. For example, to run just the
+`test/sql/permission_hints.sql` test:
+
+```bash
+$ MAKEFLAGS="REGRESS=permission_hints" xpg -v 15 test
+```
+
 ### Regress testing against PostgreSQL core
 
 Since supautils modifies default postgres behavior with hooks, we need to test exactly what it changes and see if we don't break existing functionality.
 For this you can use:
 
-```
+```bash
 xpg -v 15 test-core
 ```
 
