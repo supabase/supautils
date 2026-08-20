@@ -19,3 +19,7 @@ echo 'create extension citext;' > "$TMPDIR/extension-custom-scripts/autoinc/afte
 mkdir -p "$TMPDIR/extension-custom-scripts/fuzzystrmatch"
 echo 'create table t1();' > "$TMPDIR/extension-custom-scripts/fuzzystrmatch/before-create.sql"
 echo 'drop table t1; create table t2 as values (1);' > "$TMPDIR/extension-custom-scripts/fuzzystrmatch/after-create.sql"
+
+# a custom script that always fails, to assert global state is restored on error
+mkdir -p "$TMPDIR/extension-custom-scripts/plls"
+echo "do \$\$ begin raise exception 'failing custom script'; end \$\$;" > "$TMPDIR/extension-custom-scripts/plls/before-create.sql"

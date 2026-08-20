@@ -35,3 +35,36 @@ select * from t2;
 drop table t2;
 set role extensions_role;
 \echo
+
+-- global state is restored when a custom script errors
+-- (terse errors, the CONTEXT would contain the machine dependent scripts path)
+\set VERBOSITY terse
+create extension plls;
+\set VERBOSITY default
+\echo
+
+-- the original role is restored after the error
+select current_role;
+\echo
+
+-- elevation still works after the error
+create extension hstore;
+select '1=>2'::hstore;
+drop extension hstore;
+
+-- sslinfo can only be created by a superuser, so this proves supautils still
+-- elevates after the failed custom script
+create extension sslinfo;
+select extowner::regrole from pg_extension where extname = 'sslinfo';
+drop extension sslinfo;
+\echo
+
+-- custom scripts still run after the error
+create extension fuzzystrmatch;
+drop extension fuzzystrmatch;
+select * from t2;
+
+reset role;
+drop table t2;
+set role extensions_role;
+\echo
