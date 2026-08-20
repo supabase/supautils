@@ -620,30 +620,44 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_global_before_create_script(stmt->extname, stmt->options,
-                                    extension_custom_scripts_path);
+    // The custom scripts below run arbitrary user provided SQL, and the whole
+    // region runs elevated. Wrap it all so an ERROR anywhere cannot leave the
+    // role switch state stuck, which would stop later elevations.
+    PG_TRY();
+    {
+      run_global_before_create_script(stmt->extname, stmt->options,
+                                      extension_custom_scripts_path);
 
-    run_ext_before_create_script(stmt->extname, stmt->options,
-                                 extension_custom_scripts_path);
+      run_ext_before_create_script(stmt->extname, stmt->options,
+                                   extension_custom_scripts_path);
 
-    stmt->options = override_ext_options(EXT_CREATE, stmt->extname,
-                                         stmt->options, total_epos, epos);
+      stmt->options = override_ext_options(EXT_CREATE, stmt->extname,
+                                           stmt->options, total_epos, epos);
 
-    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-    } else {
+      if (is_extension_privileged(stmt->extname, privileged_extensions)) {
+        run_process_utility_hook(prev_hook);
+      } else {
+        if (!already_switched_to_superuser) {
+          switch_to_original_role();
+        }
+
+        run_process_utility_hook(prev_hook);
+
+        switch_to_superuser(supautils_superuser,
+                            &already_switched_to_superuser);
+      }
+
+      run_ext_after_create_script(stmt->extname, stmt->options,
+                                  extension_custom_scripts_path);
+    }
+    PG_CATCH();
+    {
       if (!already_switched_to_superuser) {
         switch_to_original_role();
       }
-
-      run_process_utility_hook(prev_hook);
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+      PG_RE_THROW();
     }
-
-    run_ext_after_create_script(stmt->extname, stmt->options,
-                                extension_custom_scripts_path);
+    PG_END_TRY();
 
     if (!already_switched_to_superuser) {
       switch_to_original_role();
@@ -736,13 +750,25 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
+    // alter_owner() also runs elevated and can throw, so it has to be inside
+    // the protected region too, not just the utility hook.
+    PG_TRY();
+    {
+      run_process_utility_hook(prev_hook);
 
-    CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
+      CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
-    // Change FDW owner to the current role (which is a privileged role)
-    alter_owner(stmt->fdwname, current_user_id, ALT_FDW);
+      // Change FDW owner to the current role (which is a privileged role)
+      alter_owner(stmt->fdwname, current_user_id, ALT_FDW);
+    }
+    PG_CATCH();
+    {
+      if (!already_switched_to_superuser) {
+        switch_to_original_role();
+      }
+      PG_RE_THROW();
+    }
+    PG_END_TRY();
 
     if (!already_switched_to_superuser) {
       switch_to_original_role();
@@ -767,13 +793,26 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
+    // alter_owner() also runs elevated and can throw, so it has to be inside
+    // the protected region too, not just the utility hook.
+    PG_TRY();
+    {
+      run_process_utility_hook(prev_hook);
 
-    CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
+      CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
 
-    // Change publication owner to the current role (which is a privileged role)
-    alter_owner(stmt->pubname, current_user_id, ALT_PUB);
+      // Change publication owner to the current role (which is a privileged
+      // role)
+      alter_owner(stmt->pubname, current_user_id, ALT_PUB);
+    }
+    PG_CATCH();
+    {
+      if (!already_switched_to_superuser) {
+        switch_to_original_role();
+      }
+      PG_RE_THROW();
+    }
+    PG_END_TRY();
 
     if (!already_switched_to_superuser) {
       switch_to_original_role();
@@ -1099,13 +1138,25 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
+      // alter_owner() also runs elevated and can throw, so it has to be inside
+      // the protected region too, not just the utility hook.
+      PG_TRY();
+      {
+        run_process_utility_hook(prev_hook);
 
-      if (!current_user_is_super)
-        // Change event trigger owner to the current role (which is a privileged
-        // role)
-        alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
+        if (!current_user_is_super)
+          // Change event trigger owner to the current role (which is a
+          // privileged role)
+          alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
+      }
+      PG_CATCH();
+      {
+        if (!already_switched_to_superuser) {
+          switch_to_original_role();
+        }
+        PG_RE_THROW();
+      }
+      PG_END_TRY();
 
       if (!already_switched_to_superuser) {
         switch_to_original_role();

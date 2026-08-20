@@ -47,15 +47,28 @@ static void run_custom_script(const char *filename, const char *extname,
            sql_literal(extname), sql_literal(extschema),
            sql_literal(extversion), extcascade ? "'true'" : "'false'");
 
-  PushActiveSnapshot(GetTransactionSnapshot());
-  SPI_connect();
+  // Ensure the recursion guard is cleared even if the script (or any of the SPI
+  // calls) throws, otherwise custom scripts would be silently skipped for the
+  // rest of the session.
+  PG_TRY();
+  {
+    PushActiveSnapshot(GetTransactionSnapshot());
+    SPI_connect();
 
-  int rc = SPI_execute(sql, false, 0);
-  if (rc != SPI_OK_UTILITY) {
-    elog(ERROR, "SPI_execute failed with error code %d", rc);
+    int rc = SPI_execute(sql, false, 0);
+    if (rc != SPI_OK_UTILITY) {
+      elog(ERROR, "SPI_execute failed with error code %d", rc);
+    }
+    SPI_finish();
+    PopActiveSnapshot();
   }
-  SPI_finish();
-  PopActiveSnapshot();
+  PG_CATCH();
+  {
+    running_custom_script = false;
+    PG_RE_THROW();
+  }
+  PG_END_TRY();
+
   running_custom_script = false;
 }
 

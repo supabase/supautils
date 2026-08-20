@@ -19,19 +19,36 @@ void switch_to_superuser(const char *supauser, bool *already_switched) {
   if (*already_switched) {
     return;
   }
-  is_switched_to_superuser = true;
 
+  // get_role_oid() can throw, so resolve the target before touching any global
+  // state. That way is_switched_to_superuser is never left true with a
+  // half-initialized prev_role_*, which switch_to_original_role() would then
+  // restore from.
   if (supauser != NULL) {
     superuser_oid = get_role_oid(supauser, false);
   }
 
   GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
+
+  // SetUserIdAndSecContext() only assigns CurrentUserId and
+  // SecurityRestrictionContext, it cannot throw, so once prev_role_* is
+  // captured the switch below always completes.
   SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
                                             SECURITY_LOCAL_USERID_CHANGE |
                                             SECURITY_RESTRICTED_OPERATION);
+
+  is_switched_to_superuser = true;
 }
 
 void switch_to_original_role(void) {
+  // Idempotent, so error cleanup paths can call this unconditionally without
+  // risking restoring a stale prev_role_* on top of an already restored role.
+  // is_switched_to_superuser is only true once prev_role_* is valid and the
+  // switch has completed, see switch_to_superuser().
+  if (!is_switched_to_superuser) {
+    return;
+  }
+
   SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
   is_switched_to_superuser = false;
 }
