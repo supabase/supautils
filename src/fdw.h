@@ -3,6 +3,6 @@
 
 #include "pg_prelude.h"
 
-extern void verify_fdw_functions_ownership(List *func_options);
+extern void validate_func_options(List *func_options);
 
 #endif

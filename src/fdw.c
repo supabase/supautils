@@ -6,24 +6,21 @@
 #include "privileged_extensions.h"
 
 /*
- * Returns true if the function indicated by `func_oid` is owned by
- * a non TLE extension, false otherwise.
+ * Returns true if the extension indicated by `extension_oid` is
+ * a TLE extension, false otherwise.
  */
-static bool is_func_owned_by_non_tle_extension(Oid func_oid) {
-  if (!OidIsValid(func_oid)) return false;
-
-  Oid extension_oid = getExtensionOfObject(ProcedureRelationId, func_oid);
-  if (!OidIsValid(extension_oid)) return false;
-
+static bool is_extension_tle(Oid extension_oid) {
   char *extension_name = get_extension_name(extension_oid);
   if (extension_name == NULL) return false;
 
-  // Available extensions are not TLEs
-  bool available = is_extension_available(extension_name);
+  // Available extensions are not TLEs, for our purposes assuming
+  // all other are TLEs work fine to avoid the security issues
+  // we want to prevent.
+  bool is_tle_extension = !is_extension_available(extension_name);
 
   pfree(extension_name);
 
-  return available;
+  return is_tle_extension;
 }
 
 /*
@@ -130,7 +127,7 @@ static Node *get_qualified_func(Oid funcOid) {
  * framework wrappers on our hosted projects. All three of them always needed
  * both handler and validator function to be specified.
  */
-void verify_fdw_functions_ownership(List *func_options) {
+void validate_func_options(List *func_options) {
   Oid      fdw_handler_oid;
   Oid      fdw_validator_oid;
   DefElem *handler   = NULL;
@@ -139,31 +136,54 @@ void verify_fdw_functions_ownership(List *func_options) {
   parse_func_options(func_options, &fdw_handler_oid, &fdw_validator_oid,
                      &handler, &validator);
 
-  if (OidIsValid(fdw_handler_oid)) {
-    if (!is_func_owned_by_non_tle_extension(fdw_handler_oid)) {
-      ereport(
-          ERROR,
-          (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-           errmsg("\"%s\" must be a function owned by an extension "
-                  "which is not a Trusted Language Extension, to use "
-                  "in foreign-data wrapper's %s option",
-                  NameListToString((List *)handler->arg), handler->defname)));
-    }
-
-    handler->arg = get_qualified_func(fdw_handler_oid);
+  // Ensure that both handler and validator function are specified
+  if (!OidIsValid(fdw_handler_oid)) {
+    ereport(ERROR, (errcode(ERRCODE_FDW_OPTION_NAME_NOT_FOUND),
+                    errmsg("A handler must be specified when creating a "
+                           "foreign data wrapper")));
   }
 
-  if (OidIsValid(fdw_validator_oid)) {
-    if (!is_func_owned_by_non_tle_extension(fdw_validator_oid)) {
-      ereport(ERROR,
-              (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-               errmsg("\"%s\" must be a function owned by an extension "
-                      "which is not a Trusted Language Extension, to use "
-                      "in foreign-data wrapper's %s option",
-                      NameListToString((List *)validator->arg),
-                      validator->defname)));
-    }
-
-    validator->arg = get_qualified_func(fdw_validator_oid);
+  if (!OidIsValid(fdw_validator_oid)) {
+    ereport(ERROR, (errcode(ERRCODE_FDW_OPTION_NAME_NOT_FOUND),
+                    errmsg("A validator must be specified when creating a "
+                           "foreign data wrapper")));
   }
+
+  // Ensure that both handler and validator belong to the same extension
+  Oid handler_extension_oid =
+      getExtensionOfObject(ProcedureRelationId, fdw_handler_oid);
+  Oid validator_extension_oid =
+      getExtensionOfObject(ProcedureRelationId, fdw_validator_oid);
+
+  if (!OidIsValid(handler_extension_oid) ||
+      !OidIsValid(validator_extension_oid) ||
+      handler_extension_oid != validator_extension_oid) {
+    ereport(ERROR, (errcode(ERRCODE_FDW_OPTION_NAME_NOT_FOUND),
+                    errmsg("Handler and validator functions must both be owned "
+                           "by the same extension")));
+  }
+
+  // Ensure that both handler and validator functions are owned by a non-TLE
+  // extension
+  if (is_extension_tle(handler_extension_oid)) {
+    ereport(
+        ERROR,
+        (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+         errmsg("Handler function \"%s\" must be owned by a non-TLE extension",
+                NameListToString((List *)handler->arg))));
+  }
+
+  if (is_extension_tle(validator_extension_oid)) {
+    ereport(
+        ERROR,
+        (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+         errmsg(
+             "Validator function \"%s\" must be owned by a non-TLE extension",
+             NameListToString((List *)validator->arg))));
+  }
+
+  // Assign fully qualified names to the handler and validator options
+  // to block search_path attacks.
+  handler->arg   = get_qualified_func(fdw_handler_oid);
+  validator->arg = get_qualified_func(fdw_validator_oid);
 }
