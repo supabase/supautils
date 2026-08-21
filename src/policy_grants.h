@@ -5,6 +5,7 @@
 
 #include <catalog/namespace.h>
 
+#define MAX_POLICY_GRANTS 100
 #define MAX_POLICY_GRANT_TABLES 100
 
 typedef struct {
@@ -21,7 +22,9 @@ typedef enum {
   JPG_UNEXPECTED_ARRAY,
   JPG_UNEXPECTED_SCALAR,
   JPG_UNEXPECTED_OBJECT,
-  JPG_UNEXPECTED_TABLE_VALUE
+  JPG_UNEXPECTED_TABLE_VALUE,
+  JPG_TOO_MANY_POLICY_GRANTS,
+  JPG_TOO_MANY_POLICY_GRANT_TABLES
 } json_policy_grants_semantic_state;
 
 typedef struct {

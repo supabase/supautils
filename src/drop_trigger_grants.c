@@ -3,6 +3,26 @@
 #include "drop_trigger_grants.h"
 #include "utils.h"
 
+// Avoid writing past the bounds of the dtgs array
+#define DTGS_BOUNDS_CHECK                                                      \
+  do {                                                                         \
+    if (parse->total_dtgs >= MAX_DROP_TRIGGER_GRANTS) {                        \
+      parse->state     = JDTG_TOO_MANY_DROP_TRIGGER_GRANTS;                    \
+      parse->error_msg = "too many drop trigger grants specified";             \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
+// Avoid writing past the bounds of the table_names array
+#define TABLES_BOUNDS_CHECK                                                    \
+  do {                                                                         \
+    if (x->total_tables >= MAX_DROP_TRIGGER_GRANT_TABLES) {                    \
+      parse->state     = JDTG_TOO_MANY_DROP_TRIGGER_GRANT_TABLES;              \
+      parse->error_msg = "too many drop trigger grant tables specified";       \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
 static JSON_ACTION_RETURN_TYPE json_array_start(void *state) {
   json_drop_trigger_grants_parse_state *parse = state;
 
@@ -65,13 +85,15 @@ static JSON_ACTION_RETURN_TYPE
 json_object_field_start(void *state, char *fname,
                         __attribute__((unused)) bool isnull) {
   json_drop_trigger_grants_parse_state *parse = state;
-  drop_trigger_grants                  *x     = &parse->dtgs[parse->total_dtgs];
 
   switch (parse->state) {
-  case JDTG_EXPECT_TOPLEVEL_FIELD:
-    x->role_name = MemoryContextStrdup(TopMemoryContext, fname);
-    parse->state = JDTG_EXPECT_TABLES_START;
+  case JDTG_EXPECT_TOPLEVEL_FIELD: {
+    DTGS_BOUNDS_CHECK;
+    drop_trigger_grants *x = &parse->dtgs[parse->total_dtgs];
+    x->role_name           = MemoryContextStrdup(TopMemoryContext, fname);
+    parse->state           = JDTG_EXPECT_TABLES_START;
     break;
+  }
 
   default: break;
   }
@@ -81,11 +103,13 @@ json_object_field_start(void *state, char *fname,
 static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
                                            JsonTokenType tokentype) {
   json_drop_trigger_grants_parse_state *parse = state;
-  drop_trigger_grants                  *x     = &parse->dtgs[parse->total_dtgs];
 
   switch (parse->state) {
   case JDTG_EXPECT_TABLE:
     if (tokentype == JSON_TOKEN_STRING) {
+      DTGS_BOUNDS_CHECK;
+      drop_trigger_grants *x = &parse->dtgs[parse->total_dtgs];
+      TABLES_BOUNDS_CHECK;
       x->table_names[x->total_tables] =
           MemoryContextStrdup(TopMemoryContext, token);
       x->total_tables++;

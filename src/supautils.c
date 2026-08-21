@@ -30,11 +30,6 @@
                          "identifiers",                                        \
                          name)));
 
-#define MAX_CONSTRAINED_EXTENSIONS 100
-#define MAX_EXTENSIONS_PARAMETER_OVERRIDES 100
-#define MAX_DROP_TRIGGER_GRANTS 100
-#define MAX_POLICY_GRANTS 100
-
 #if PG_VERSION_NUM >= 180000
 PG_MODULE_MAGIC_EXT(.name = "supautils", .version = MODVERSION);
 #else

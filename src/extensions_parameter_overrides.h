@@ -3,6 +3,8 @@
 
 #include "pg_prelude.h"
 
+#define MAX_EXTENSIONS_PARAMETER_OVERRIDES 100
+
 typedef struct {
   char *name;
   char *schema;
@@ -17,7 +19,8 @@ typedef enum {
   JEPO_UNEXPECTED_ARRAY,
   JEPO_UNEXPECTED_SCALAR,
   JEPO_UNEXPECTED_OBJECT,
-  JEPO_UNEXPECTED_SCHEMA_VALUE
+  JEPO_UNEXPECTED_SCHEMA_VALUE,
+  JEPO_TOO_MANY_PAREMETER_OVERRIDES
 } json_extension_parameter_overrides_semantic_state;
 
 typedef struct {

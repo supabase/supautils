@@ -9,6 +9,16 @@
 #include "constrained_extensions.h"
 #include "utils.h"
 
+// Avoid writing past the bounds of the cexts array
+#define BOUNDS_CHECK                                                           \
+  do {                                                                         \
+    if (parse->total_cexts >= MAX_CONSTRAINED_EXTENSIONS) {                    \
+      parse->state     = JCE_TOO_MANY_EXTENSIONS;                              \
+      parse->error_msg = "too many extensions specified";                      \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
 static JSON_ACTION_RETURN_TYPE json_array_start(void *state) {
   json_constrained_extension_parse_state *parse = state;
 
@@ -53,13 +63,15 @@ static JSON_ACTION_RETURN_TYPE
 json_object_field_start(void *state, char *fname,
                         __attribute__((unused)) bool isnull) {
   json_constrained_extension_parse_state *parse = state;
-  constrained_extension                  *x = &parse->cexts[parse->total_cexts];
 
   switch (parse->state) {
-  case JCE_EXPECT_TOPLEVEL_FIELD:
-    x->name      = MemoryContextStrdup(TopMemoryContext, fname);
-    parse->state = JCE_EXPECT_CONSTRAINTS_START;
+  case JCE_EXPECT_TOPLEVEL_FIELD: {
+    BOUNDS_CHECK;
+    constrained_extension *x = &parse->cexts[parse->total_cexts];
+    x->name                  = MemoryContextStrdup(TopMemoryContext, fname);
+    parse->state             = JCE_EXPECT_CONSTRAINTS_START;
     break;
+  }
 
   case JCE_EXPECT_CONSTRAINTS_START:
     if (strcmp(fname, "cpu") == 0)
@@ -82,13 +94,14 @@ json_object_field_start(void *state, char *fname,
 static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
                                            JsonTokenType tokentype) {
   json_constrained_extension_parse_state *parse = state;
-  constrained_extension                  *x = &parse->cexts[parse->total_cexts];
 
   switch (parse->state) {
   case JCE_EXPECT_CPU:
     if (tokentype == JSON_TOKEN_NUMBER) {
-      x->cpu       = atoi(token);
-      parse->state = JCE_EXPECT_CONSTRAINTS_START;
+      BOUNDS_CHECK;
+      constrained_extension *x = &parse->cexts[parse->total_cexts];
+      x->cpu                   = atoi(token);
+      parse->state             = JCE_EXPECT_CONSTRAINTS_START;
     } else {
       parse->state     = JCE_UNEXPECTED_CPU_VALUE;
       parse->error_msg = "unexpected cpu value, expected a number";
@@ -97,7 +110,9 @@ static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
 
   case JCE_EXPECT_MEM:
     if (tokentype == JSON_TOKEN_STRING) {
-      x->mem = DatumGetInt64(
+      BOUNDS_CHECK;
+      constrained_extension *x = &parse->cexts[parse->total_cexts];
+      x->mem                   = DatumGetInt64(
           DirectFunctionCall1(pg_size_bytes, CStringGetTextDatum(token)));
       parse->state = JCE_EXPECT_CONSTRAINTS_START;
     } else {
@@ -110,7 +125,9 @@ static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
 
   case JCE_EXPECT_DISK:
     if (tokentype == JSON_TOKEN_STRING) {
-      x->disk = DatumGetInt64(
+      BOUNDS_CHECK;
+      constrained_extension *x = &parse->cexts[parse->total_cexts];
+      x->disk                  = DatumGetInt64(
           DirectFunctionCall1(pg_size_bytes, CStringGetTextDatum(token)));
       parse->state = JCE_EXPECT_CONSTRAINTS_START;
     } else {

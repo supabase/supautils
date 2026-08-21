@@ -3,6 +3,8 @@
 
 #include <postgres.h>
 
+#define MAX_CONSTRAINED_EXTENSIONS 100
+
 typedef struct {
   char  *name;
   int    cpu;
@@ -23,7 +25,8 @@ typedef enum {
   JCE_UNEXPECTED_OBJECT,
   JCE_UNEXPECTED_CPU_VALUE,
   JCE_UNEXPECTED_MEM_VALUE,
-  JCE_UNEXPECTED_DISK_VALUE
+  JCE_UNEXPECTED_DISK_VALUE,
+  JCE_TOO_MANY_EXTENSIONS
 } json_constrained_extension_semantic_state;
 
 typedef struct {

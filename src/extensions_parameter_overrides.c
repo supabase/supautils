@@ -2,6 +2,16 @@
 #include "pg_prelude.h"
 #include "utils.h"
 
+// Avoid writing past the bounds of the epos array
+#define BOUNDS_CHECK                                                           \
+  do {                                                                         \
+    if (parse->total_epos >= MAX_EXTENSIONS_PARAMETER_OVERRIDES) {             \
+      parse->state     = JEPO_TOO_MANY_PAREMETER_OVERRIDES;                    \
+      parse->error_msg = "too many extensions parameter overrides specified";  \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
 static JSON_ACTION_RETURN_TYPE json_array_start(void *state) {
   json_extension_parameter_overrides_parse_state *parse = state;
 
@@ -43,13 +53,15 @@ static JSON_ACTION_RETURN_TYPE
 json_object_field_start(void *state, char *fname,
                         __attribute__((unused)) bool isnull) {
   json_extension_parameter_overrides_parse_state *parse = state;
-  extension_parameter_overrides *x = &parse->epos[parse->total_epos];
 
   switch (parse->state) {
-  case JEPO_EXPECT_TOPLEVEL_FIELD:
+  case JEPO_EXPECT_TOPLEVEL_FIELD: {
+    BOUNDS_CHECK;
+    extension_parameter_overrides *x = &parse->epos[parse->total_epos];
     x->name      = MemoryContextStrdup(TopMemoryContext, fname);
     parse->state = JEPO_EXPECT_PARAMETER_OVERRIDES_START;
     break;
+  }
 
   case JEPO_EXPECT_PARAMETER_OVERRIDES_START:
     if (strcmp(fname, "schema") == 0)
@@ -68,11 +80,12 @@ json_object_field_start(void *state, char *fname,
 static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
                                            JsonTokenType tokentype) {
   json_extension_parameter_overrides_parse_state *parse = state;
-  extension_parameter_overrides *x = &parse->epos[parse->total_epos];
 
   switch (parse->state) {
   case JEPO_EXPECT_SCHEMA:
     if (tokentype == JSON_TOKEN_STRING) {
+      BOUNDS_CHECK;
+      extension_parameter_overrides *x = &parse->epos[parse->total_epos];
       x->schema    = MemoryContextStrdup(TopMemoryContext, token);
       parse->state = JEPO_EXPECT_PARAMETER_OVERRIDES_START;
     } else {

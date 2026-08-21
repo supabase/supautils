@@ -3,6 +3,26 @@
 #include "policy_grants.h"
 #include "utils.h"
 
+// Avoid writing past the bounds of the pgs array
+#define PGS_BOUNDS_CHECK                                                       \
+  do {                                                                         \
+    if (parse->total_pgs >= MAX_POLICY_GRANTS) {                               \
+      parse->state     = JPG_TOO_MANY_POLICY_GRANTS;                           \
+      parse->error_msg = "too many policy grants specified";                   \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
+// Avoid writing past the bounds of the table_names array
+#define TABLES_BOUNDS_CHECK                                                    \
+  do {                                                                         \
+    if (x->total_tables >= MAX_POLICY_GRANT_TABLES) {                          \
+      parse->state     = JPG_TOO_MANY_POLICY_GRANT_TABLES;                     \
+      parse->error_msg = "too many policy grant tables specified";             \
+      JSON_ACTION_RETURN;                                                      \
+    }                                                                          \
+  } while (0)
+
 static JSON_ACTION_RETURN_TYPE json_array_start(void *state) {
   json_policy_grants_parse_state *parse = state;
 
@@ -65,13 +85,15 @@ static JSON_ACTION_RETURN_TYPE
 json_object_field_start(void *state, char *fname,
                         __attribute__((unused)) bool isnull) {
   json_policy_grants_parse_state *parse = state;
-  policy_grants                  *x     = &parse->pgs[parse->total_pgs];
 
   switch (parse->state) {
-  case JPG_EXPECT_TOPLEVEL_FIELD:
-    x->role_name = MemoryContextStrdup(TopMemoryContext, fname);
-    parse->state = JPG_EXPECT_TABLES_START;
+  case JPG_EXPECT_TOPLEVEL_FIELD: {
+    PGS_BOUNDS_CHECK;
+    policy_grants *x = &parse->pgs[parse->total_pgs];
+    x->role_name     = MemoryContextStrdup(TopMemoryContext, fname);
+    parse->state     = JPG_EXPECT_TABLES_START;
     break;
+  }
 
   default: break;
   }
@@ -81,11 +103,14 @@ json_object_field_start(void *state, char *fname,
 static JSON_ACTION_RETURN_TYPE json_scalar(void *state, char *token,
                                            JsonTokenType tokentype) {
   json_policy_grants_parse_state *parse = state;
-  policy_grants                  *x     = &parse->pgs[parse->total_pgs];
 
   switch (parse->state) {
   case JPG_EXPECT_TABLE:
     if (tokentype == JSON_TOKEN_STRING) {
+      PGS_BOUNDS_CHECK;
+      policy_grants *x = &parse->pgs[parse->total_pgs];
+
+      TABLES_BOUNDS_CHECK;
       x->table_names[x->total_tables] =
           MemoryContextStrdup(TopMemoryContext, token);
       x->total_tables++;
