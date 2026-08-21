@@ -59,7 +59,7 @@ static char *read_whole_file(const char *filename, int *length) {
 /*
  * Read an SQL script file into a string, and convert to database encoding.
  * Returns NULL if the file does not exist.
- * 
+ *
  * Disable inlining to avoid gcc's -Wclobbered warnings on the PG_TRY()
  * clause in this function's caller.
  */
