@@ -99,7 +99,11 @@ select pgtle.install_extension(
 create extension validator_owning_pg_tle_extension;
 -- Try to run the exploit
 create foreign data wrapper fdw_pg_tle validator public.pg_tle_make_superuser;
+<<<<<<< HEAD
+ERROR:  A handler must be specified when creating a foreign data wrapper
+=======
 ERROR:  "public.pg_tle_make_superuser" must be a function owned by an extension which is not a Trusted Language Extension, to use in foreign-data wrapper's validator option
+>>>>>>> master
 \echo
 
 -- Check whether the elevation worked or not
@@ -179,6 +183,10 @@ set search_path = "$user", public;
 -- Try to run the exploit. Reference the validator function unqualified so
 -- that the search_path trick works.
 create foreign data wrapper fdw_reresolution validator postgres_fdw_validator;
+<<<<<<< HEAD
+ERROR:  A handler must be specified when creating a foreign data wrapper
+=======
+>>>>>>> master
 \echo
 
 -- Check whether the elevation worked or not
@@ -196,6 +204,10 @@ reset role;
 reset search_path;
 revoke create on database contrib_regression from privileged_role;
 drop foreign data wrapper if exists fdw_reresolution;
+<<<<<<< HEAD
+NOTICE:  foreign-data wrapper "fdw_reresolution" does not exist, skipping
+=======
+>>>>>>> master
 drop extension if exists postgres_fdw cascade;
 drop schema if exists postgres cascade;
 NOTICE:  drop cascades to function postgres_fdw_validator(text[],oid)

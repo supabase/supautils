@@ -1,0 +1,87 @@
+-- When creating a foreign data wrapper, supautils allowed a user to omit
+-- the validator function. This let an attacker create a postgres_fdw foreign
+-- data wrapper without the postgres_fdw_validator. Since a validator runs
+-- when creating a user mapping and postgres_fdw_validator checks that
+-- the option password_required can only be set by a superuser, omitting
+-- a validator allowed the attacker to bypass this superuser requirement
+-- check leading to a privilege escalation to superuser by:
+--
+-- a) Creating a foreign table pointed at a local table in the database
+-- b) Creating an insert trigger on the local table which esclated the
+--    user to superuser.
+-- c) Inserting into the foreign table, which connected to the database
+--    as a superuser without a password, inserted in the local table via
+--    that connection, and called the trigger function as superuser.
+
+-- Capture unix socket dir to connect to in a psql variable
+select setting as unix_socket_dir
+from pg_settings
+where name = 'unix_socket_directories' \gset
+
+-- Create a new role which the attacker will try to elevate to superuser
+create role not_superuser nosuperuser nologin;
+set role not_superuser;
+\echo 
+
+-- Confirm that the user is not currently superuser
+select current_user, rolsuper
+from pg_roles
+where rolname = current_user;
+
+set role privileged_role;
+\echo
+
+create extension if not exists postgres_fdw;
+\echo
+
+create foreign data wrapper fdw handler public.postgres_fdw_handler;
+\echo
+
+create server srv foreign data wrapper fdw
+  options (host :'unix_socket_dir', dbname 'contrib_regression');
+\echo
+
+create user mapping for privileged_role server srv
+  options (user 'postgres', password_required 'false');
+\echo
+
+create table public.local_table(id int);
+\echo
+
+create or replace function public.make_superuser()
+returns trigger
+language plpgsql
+as
+$$
+begin
+  alter role not_superuser superuser;
+  return NEW;
+END
+$$;
+\echo
+
+create trigger local_table_trigger
+  before insert on public.local_table
+  for each row execute function public.make_superuser();
+\echo
+
+create foreign table public.foreign_table(id int)
+  server srv
+  options (schema_name 'public', table_name 'local_table');
+\echo
+
+insert into public.foreign_table values (1);
+\echo
+
+-- Confirm that the user is not currently superuser
+set role not_superuser;
+select current_user, rolsuper
+from pg_roles
+where rolname = current_user;
+
+-- Cleanup
+reset role;
+drop role if exists not_superuser;
+drop extension if exists postgres_fdw cascade;
+drop table public.local_table cascade;
+drop function public.make_superuser();

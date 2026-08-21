@@ -74,13 +74,13 @@ create table super_stuff();
 -- creating extensions will not fire evtrigs
 set role privileged_role;
 create extension postgres_fdw;
-drop extension postgres_fdw;
 \echo
 
 -- creating fdws will not fire evtrigs
-create foreign data wrapper new_fdw;
+create foreign data wrapper new_fdw handler postgres_fdw_handler validator postgres_fdw_validator;
 -- TODO: while correct, this is inconsistent as dropping the fdw does fire the evtrig for the privileged_role
 drop foreign data wrapper new_fdw;
+drop extension postgres_fdw;
 \echo
 
 -- creating pubs will not fire evtrigs

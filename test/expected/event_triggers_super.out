@@ -99,15 +99,15 @@ NOTICE:  Executing superuser event trigger: current_user is supabase_storage_adm
 set role privileged_role;
 create extension postgres_fdw;
 NOTICE:  Executing superuser event trigger: current_user is postgres
-drop extension postgres_fdw;
-NOTICE:  Executing superuser event trigger: current_user is postgres
 \echo
 
 -- creating fdws will fire superuser evtrigs
-create foreign data wrapper new_fdw;
+create foreign data wrapper new_fdw handler postgres_fdw_handler validator postgres_fdw_validator;
 NOTICE:  Executing superuser event trigger: current_user is postgres
 drop foreign data wrapper new_fdw;
 NOTICE:  Executing superuser event trigger: current_user is privileged_role
+drop extension postgres_fdw;
+NOTICE:  Executing superuser event trigger: current_user is postgres
 \echo
 
 -- creating publications will fire superuser evtrigs

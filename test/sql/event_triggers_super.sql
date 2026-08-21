@@ -79,12 +79,12 @@ drop table storage_stuff;
 -- creating extensions will fire superuser evtrigs
 set role privileged_role;
 create extension postgres_fdw;
-drop extension postgres_fdw;
 \echo
 
 -- creating fdws will fire superuser evtrigs
-create foreign data wrapper new_fdw;
+create foreign data wrapper new_fdw handler postgres_fdw_handler validator postgres_fdw_validator;
 drop foreign data wrapper new_fdw;
+drop extension postgres_fdw;
 \echo
 
 -- creating publications will fire superuser evtrigs

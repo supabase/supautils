@@ -110,14 +110,25 @@ static Node *get_qualified_func(Oid funcOid) {
 }
 
 /*
- * Verifies that the handler and validator functions in the
- *`create foreign data wrapper ...` sql command are owned by
- * a non-pg_tle extension to make sure these functions are
- * not controlled by an attacker trying to run their code as
- * superuser.
+ * Validates options given to the `create foreign data wrapper ...` sql command
+ * by ensuring that:
+ *
+ * 1. The command specified both the validator and the handler functions.
+ * 2. The validator and the handler functions are both owned by the same
+ * extension.
+ * 3. The owning extension is not a pg_tle extension.
  *
  * Also rewrites handler and validator names to be fully schema-qualified
  * so that Postgres does not re-resolve them to a different function later.
+ *
+ * All of the above measures ensure that an attacker cannot fool supautils or
+ * Postgres into running their code as superuser.
+ *
+ * Forcing users to specify both validator and handler functions looks like
+ * an onerous condition but it's backwards compatible on the Supabase
+ * platform because we only have postgres_fdw, file_fdw or the wrappers
+ * framework wrappers on our hosted projects. All three of them always needed
+ * both handler and validator function to be specified.
  */
 void verify_fdw_functions_ownership(List *func_options) {
   Oid      fdw_handler_oid;
