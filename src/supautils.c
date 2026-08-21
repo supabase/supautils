@@ -732,7 +732,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
-    verify_fdw_functions_ownership(stmt->func_options);
+    validate_func_options(stmt->func_options);
 
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
