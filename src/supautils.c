@@ -5,6 +5,7 @@
 #include "event_triggers.h"
 #include "extension_custom_scripts.h"
 #include "extensions_parameter_overrides.h"
+#include "fdw.h"
 #include "permission_hints.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
@@ -734,12 +735,14 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
+    CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
+
+    verify_fdw_functions_ownership(stmt->func_options);
+
     switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
 
     run_process_utility_hook_with_cleanup(
         prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-    CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
 
     // Change FDW owner to the current role (which is a privileged role)
     alter_owner(stmt->fdwname, current_user_id, ALT_FDW);
