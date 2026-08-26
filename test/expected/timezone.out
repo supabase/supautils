@@ -1,0 +1,229 @@
+-- Short timezones remain valid
+set timezone = 'America/New_York';
+show timezone;
+     TimeZone     
+------------------
+ America/New_York
+(1 row)
+
+\echo
+
+-- Timezones longer than 24 are also accepted as long as they have
+-- a resolved abbreviation which is still shorter than 24 chars.
+set timezone = 'posix/America/Argentina/ComodRivadavia';
+show timezone;
+                TimeZone                
+----------------------------------------
+ posix/America/Argentina/ComodRivadavia
+(1 row)
+
+\echo
+
+-- In fact, every timezone name postgres considers valid is allowed to be set,
+-- even when some of them are longer than 24 chars. This is because only the
+-- abbreviations should be prevented from overflowing 24 chars not the
+-- timezones themselves and every abbreviation of a timezone accepted
+-- by postgres is shorter than 24 chars.
+do $$
+declare
+  tz record;
+begin
+  for tz in select name from pg_timezone_names loop
+    begin
+      execute format('set timezone = %L', tz.name);
+    end;
+  end loop;
+end;
+$$;
+\echo
+
+-- Confirm every timezone abbreviation recognized by postgres is shorter
+-- than 24 chars
+select count(*)
+from pg_timezone_names
+where length(abbrev) > 24;
+ count 
+-------
+     0
+(1 row)
+
+-- Valid posix timezone value are also allowed.
+-- List of unique timezones taken from https://github.com/nayarsystems/posix_tz_db
+do $$
+declare
+  tz text;
+begin
+  for tz in select * from (values
+    ('<-01>1'),
+    ('<-01>1<+00>,M3.5.0/0,M10.5.0/1'),
+    ('<-02>2'),
+    ('<-02>2<-01>,M3.5.0/-1,M10.5.0/0'),
+    ('<-03>3'),
+    ('<-03>3<-02>,M3.2.0,M11.1.0'),
+    ('<-04>4'),
+    ('<-04>4<-03>,M9.1.6/24,M4.1.6/24'),
+    ('<-05>5'),
+    ('<-06>6'),
+    ('<-06>6<-05>,M9.1.6/22,M4.1.6/22'),
+    ('<-07>7'),
+    ('<-08>8'),
+    ('<-09>9'),
+    ('<-0930>9:30'),
+    ('<-10>10'),
+    ('<-11>11'),
+    ('<-12>12'),
+    ('<+00>0<+02>-2,M3.5.0/1,M10.5.0/3'),
+    ('<+01>-1'),
+    ('<+02>-2'),
+    ('<+03>-3'),
+    ('<+0330>-3:30'),
+    ('<+04>-4'),
+    ('<+0430>-4:30'),
+    ('<+05>-5'),
+    ('<+0530>-5:30'),
+    ('<+0545>-5:45'),
+    ('<+06>-6'),
+    ('<+0630>-6:30'),
+    ('<+07>-7'),
+    ('<+08>-8'),
+    ('<+0845>-8:45'),
+    ('<+09>-9'),
+    ('<+10>-10'),
+    ('<+1030>-10:30<+11>-11,M10.1.0,M4.1.0'),
+    ('<+11>-11'),
+    ('<+11>-11<+12>,M10.1.0,M4.1.0/3'),
+    ('<+12>-12'),
+    ('<+1245>-12:45<+1345>,M9.5.0/2:45,M4.1.0/3:45'),
+    ('<+13>-13'),
+    ('<+14>-14'),
+    ('ACST-9:30'),
+    ('ACST-9:30ACDT,M10.1.0,M4.1.0/3'),
+    ('AEST-10'),
+    ('AEST-10AEDT,M10.1.0,M4.1.0/3'),
+    ('AKST9AKDT,M3.2.0,M11.1.0'),
+    ('AST4'),
+    ('AST4ADT,M3.2.0,M11.1.0'),
+    ('AWST-8'),
+    ('CAT-2'),
+    ('CET-1'),
+    ('CET-1CEST,M3.5.0,M10.5.0/3'),
+    ('ChST-10'),
+    ('CST-8'),
+    ('CST5CDT,M3.2.0/0,M11.1.0/1'),
+    ('CST6'),
+    ('CST6CDT,M3.2.0,M11.1.0'),
+    ('EAT-3'),
+    ('EET-2'),
+    ('EET-2EEST,M3.4.4/50,M10.4.4/50'),
+    ('EET-2EEST,M3.5.0,M10.5.0/3'),
+    ('EET-2EEST,M3.5.0/0,M10.5.0/0'),
+    ('EET-2EEST,M3.5.0/3,M10.5.0/4'),
+    ('EET-2EEST,M4.5.5/0,M10.5.4/24'),
+    ('EST5'),
+    ('EST5EDT,M3.2.0,M11.1.0'),
+    ('GMT0'),
+    ('GMT0BST,M3.5.0/1,M10.5.0'),
+    ('HKT-8'),
+    ('HST10'),
+    ('HST10HDT,M3.2.0,M11.1.0'),
+    ('IST-1GMT0,M10.5.0,M3.5.0/1'),
+    ('IST-2IDT,M3.4.4/26,M10.5.0'),
+    ('IST-5:30'),
+    ('JST-9'),
+    ('KST-9'),
+    ('MSK-3'),
+    ('MST7'),
+    ('MST7MDT,M3.2.0,M11.1.0'),
+    ('NST3:30NDT,M3.2.0,M11.1.0'),
+    ('NZST-12NZDT,M9.5.0,M4.1.0/3'),
+    ('PKT-5'),
+    ('PST-8'),
+    ('PST8PDT,M3.2.0,M11.1.0'),
+    ('SAST-2'),
+    ('SST11'),
+    ('UTC0'),
+    ('WAT-1'),
+    ('WET0WEST,M3.5.0/1,M10.5.0'),
+    ('WIB-7'),
+    ('WIT-9'),
+    ('WITA-8')
+  ) as t(tz) loop
+    begin
+      execute format('set timezone = %L', tz);
+    end;
+  end loop;
+end;
+$$;
+reset timezone;
+\echo
+
+-- You can still set arbitrary timezones, but since their abbreviations
+-- will resolve to the timezone name itself, they are valid as long
+-- as they are below the threshold of 24 chars.
+-- The X's make the abbreviation part, trailing zero is the offset.
+-- So with 24 X's the timezone is accepted
+set timezone = 'XXXXXXXXXXXXXXXXXXXXXXXX0';
+\echo
+
+-- Anything longer is rejected
+set timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+-- The part in the < and > is the abbreviation
+set timezone = '<1234567890123456789012345>-5';
+ERROR:  time zone abbreviation "1234567890123456789012345" is too long
+\echo
+
+-- Multiple abbreviations are also checked
+set timezone = '<STD>0<XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX>0,J335,J365';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+set timezone = '<XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX>0<STD>0,J335,J365';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+-- Other forms of setting the timezone are also protected, since they all
+-- funnel through the same check hook on the "timezone" GUC.
+set time zone 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+begin;
+set local timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+commit;
+\echo
+
+set session timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+select set_config('timezone', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0', false);
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+begin;
+select set_config('timezone', 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0', true);
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+commit;
+\echo
+
+alter role rolecreator set timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+alter database contrib_regression set timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+alter system set timezone = 'XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0';
+ERROR:  time zone abbreviation "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" is too long
+\echo
+
+-- Cleanup
+alter role rolecreator reset timezone;
+alter database contrib_regression reset timezone;
+alter system reset timezone;
+reset timezone;

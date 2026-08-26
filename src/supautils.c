@@ -9,6 +9,7 @@
 #include "permission_hints.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
+#include "timezone.h"
 
 #define EREPORT_RESERVED_MEMBERSHIP(name)                                      \
   ereport(ERROR,                                                               \
@@ -1521,6 +1522,9 @@ void _PG_init(void) {
 
   prev_executor_start_hook = ExecutorStart_hook;
   ExecutorStart_hook       = supautils_executor_start;
+
+  hook_timezone_check();
+  check_timezone_at_startup();
 
   DefineCustomStringVariable("supautils.extensions_parameter_overrides",
                              "Overrides for CREATE EXTENSION parameters", NULL,

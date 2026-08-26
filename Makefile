@@ -192,6 +192,11 @@ $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 test-core: $(CORE_STAGEDIR)/parallel_schedule
 	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression
 
+.PHONY: test-startup
+test-startup:
+	bash test/startup.sh
+
 .PHONY: test
 test:
 	make installcheck
+	make test-startup
