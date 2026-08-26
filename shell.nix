@@ -44,12 +44,12 @@ let
   style = pkgs.writeShellScriptBin "supautils-style" ''
     set -euo pipefail
 
-    ${pkgs.clang-tools}/bin/clang-format -i src/*
+    ${pkgs.clang-tools}/bin/clang-format -i src/*.c src/*.h
   '';
   styleCheck = pkgs.writeShellScriptBin "supautils-style-check" ''
     set -euo pipefail
 
-    ${pkgs.clang-tools}/bin/clang-format -i src/*
+    ${pkgs.clang-tools}/bin/clang-format -i src/*.c src/*.h
     ${pkgs.git}/bin/git diff-index --exit-code HEAD -- '*.c'
   '';
   loadtestUtility = pkgs.writeShellScriptBin "supautils-loadtest-utility" ''
