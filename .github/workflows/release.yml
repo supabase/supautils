@@ -37,8 +37,21 @@ jobs:
           - { runner: ubuntu-22.04-arm, arch: arm64 }
           - { runner: ubuntu-22.04, arch: amd64 }
     runs-on: ${{ matrix.box.runner }}
+    env:
+      # Build image points to ubuntu 20.04 via digest instead of tag.
+      BUILD_IMAGE: public.ecr.aws/docker/library/ubuntu@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: pull build image
+        run: |
+          for i in 1 2 3 4 5; do
+            if docker pull "$BUILD_IMAGE"; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo "could not pull $BUILD_IMAGE after 5 attempts" >&2
+          exit 1
+
       - name: build release artifacts
         run: |
           # Build inside a pinned ubuntu 20.04 container because GH has no
@@ -55,7 +68,7 @@ jobs:
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
             -w /workspace \
-            ubuntu:20.04 \
+            "$BUILD_IMAGE" \
             bash -c '
               set -euo pipefail
               export DEBIAN_FRONTEND=noninteractive
