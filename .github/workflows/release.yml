@@ -4,7 +4,7 @@ on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
 
 permissions:
   id-token: write # This is required for requesting the JWT from AWS
@@ -37,28 +37,117 @@ jobs:
           - { runner: ubuntu-22.04-arm, arch: arm64 }
           - { runner: ubuntu-22.04, arch: amd64 }
     runs-on: ${{ matrix.box.runner }}
+    env:
+      # Build image points to ubuntu 20.04 via digest instead of tag.
+      BUILD_IMAGE: public.ecr.aws/docker/library/ubuntu@sha256:8feb4d8ca5354def3d8fce243717141ce31e2c428701f6682bd2fafe15388214
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: pull build image
+        run: |
+          for i in 1 2 3 4 5; do
+            if docker pull "$BUILD_IMAGE"; then exit 0; fi
+            sleep $((i * 5))
+          done
+          echo "could not pull $BUILD_IMAGE after 5 attempts" >&2
+          exit 1
+
       - name: build release artifacts
         run: |
-          # Add postgres package repo
-          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
+          # Build inside a pinned ubuntu 20.04 container because GH has no
+          # runner available for that version. We build on that old version
+          # because we still have customers running production databases on
+          # 20.04. Building on this version helps us pin glibc version and
+          # guard against accidental bumps when we start using a new symbol.
+          # This happened recently when we started using the `stat` function
+          # to fix some security bugs but ended up accidentally bumping glibc
+          # version to 2.33.
+          #
+          # The workspace is bind-mounted, not copied, so the .so written by
+          # `make` inside the container lands directly on the runner's disk.
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace \
+            "$BUILD_IMAGE" \
+            bash -c '
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
 
-          sudo apt-get update
+              apt-get update
+              apt-get install -y --no-install-recommends wget gnupg ca-certificates lsb-release
 
-          # Install requested postgres version
-          sudo apt-get install -y --no-install-recommends postgresql-${{ matrix.postgres }} postgresql-server-dev-${{ matrix.postgres }}
+              # Add postgres package repo. ubuntu 20.04 (focal) is EOL on
+              # apt.postgresql.org, so pull from the permanent archive host.
+              echo "deb https://apt-archive.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+              wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | tee /etc/apt/trusted.gpg.d/pgdg.asc >/dev/null
 
-          # Ensure installed pg_config is first on path
-          export PATH="/usr/lib/postgresql/${{ matrix.postgres }}/bin:$PATH"
+              apt-get update
 
-          # Install supautils dependencies
-          sudo apt-get install -y --no-install-recommends libicu-dev
+              # Install requested postgres version
+              apt-get install -y --no-install-recommends postgresql-${{ matrix.postgres }} postgresql-server-dev-${{ matrix.postgres }}
 
-          # Build supautils
-          make
+              # Ensure installed pg_config is first on path
+              export PATH="/usr/lib/postgresql/${{ matrix.postgres }}/bin:$PATH"
+
+              # Install supautils dependencies
+              apt-get install -y --no-install-recommends libicu-dev build-essential
+
+              # Build supautils
+              make
+            '
+
+      - name: check glibc symbol versions
+        run: |
+          # Compare the maximum glibc version used by all symbols against 
+          # the pinned glibc version and fail if they don't match.
+
+          sudo apt-get install -y --no-install-recommends binutils
+
+          case "${{ matrix.box.arch }}" in
+            amd64) pinned_glibc_version="GLIBC_2.4" ;;
+            arm64) pinned_glibc_version="GLIBC_2.17" ;;
+            *)
+              echo "Unknown arch '${{ matrix.box.arch }}'." >&2
+              exit 1
+              ;;
+          esac
+
+          # We pick the largest glibc version as the actual one, since only
+          # that risks bumping the version accidentally.
+          actual_glibc_version=$(objdump -T ./${{ matrix.extension_name }}.so \
+            | grep -oE 'GLIBC_[0-9.]+' \
+            | sort -V | tail -1)
+
+
+          if [ "$actual_glibc_version" != "$pinned_glibc_version" ]; then
+            echo "Expected glibc version $pinned_glibc_version, but found $actual_glibc_version"
+            exit 1
+          fi
+
+      - name: check dynamic library dependencies
+        run: |
+          # Compare the dynamic libraries supautils actually dynamically links
+          # against with expected libraries and fail if there is a mismatch.
+          case "${{ matrix.box.arch }}" in
+            amd64)
+              pinned_libraries="libc.so.6"
+              ;;
+            arm64)
+              pinned_libraries="libc.so.6
+          ld-linux-aarch64.so.1"
+              ;;
+            *)
+              echo "Unknown arch '${{ matrix.box.arch }}'." >&2
+              exit 1
+              ;;
+          esac
+
+          actual_libraries=$(objdump -p ./${{ matrix.extension_name }}.so | awk '/NEEDED/ {print $2}')
+
+          if [ "$(echo "$actual_libraries" | sort)" != "$(echo "$pinned_libraries" | sort)" ]; then
+            echo "Expected dynamic libraries $pinned_libraries, but found $actual_libraries"
+            exit 1
+          fi
 
       - name: Get asset name
         run: |
@@ -92,7 +181,7 @@ jobs:
       - name: Download build artifacts for bundling
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
-          pattern: '*.so'
+          pattern: "*.so"
           merge-multiple: true
 
       - name: Bundle build artifacts
