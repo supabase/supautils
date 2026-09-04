@@ -4,7 +4,6 @@
    "description": "Loadable library that securely allows creating event triggers, publications, extensions to non-superusers",
    "version": "2.9.1",
    "maintainer": [
-      "Steve Chavez <steve@supabase.io>",
       "Bobbie Soedirgo <bobbie@supabase.io>"
    ],
    "license": "apache",
@@ -33,7 +32,6 @@
         "type": "git"
       }
    },
-   "generated_by": "Steve Chavez",
    "meta-spec": {
       "version": "1.0.0",
       "url": "https://pgxn.org/meta/spec.txt"
