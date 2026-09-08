@@ -140,6 +140,16 @@ parse_extensions_parameter_overrides(const char                    *str,
   return state;
 }
 
+const char *get_ext_schema_override(const char  *extname,
+                                    const size_t total_epos,
+                                    const extension_parameter_overrides *epos) {
+  for (size_t i = 0; i < total_epos; i++) {
+    if (strcmp(epos[i].name, extname) == 0) return epos[i].schema;
+  }
+
+  return NULL;
+}
+
 List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
                            List *options, const size_t total_epos,
                            const extension_parameter_overrides *epos) {
@@ -150,7 +160,11 @@ List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
       DefElem                             *schema_override_option = NULL;
       ListCell                            *option_cell;
 
-      // The schema override is not applied for alter statements
+      // The schema override is not applied for alter statements.
+      // ALTER EXTENSION only accepts the "new_version" option, so injecting a
+      // "schema" one here would make postgres fail with "unrecognized option".
+      // ALTER EXTENSION ... SET SCHEMA is a different statement
+      // (AlterObjectSchemaStmt) and is pinned to the override separately.
       if (stmt_kind == EXT_ALTER) continue;
 
       // TODO for observability it would be good to log a warning here,

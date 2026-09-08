@@ -42,3 +42,80 @@ select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
 (1 row)
 
 drop extension sslinfo;
+\echo
+
+-- the schema override cannot be bypassed with ALTER EXTENSION ... SET SCHEMA
+create schema other_schema;
+grant all on schema other_schema to extensions_role, nonsuper;
+\echo
+
+-- as a non-superuser, for an extension in supautils.privileged_extensions
+set role extensions_role;
+create extension sslinfo schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
+alter extension sslinfo set schema other_schema;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
+-- the extension is still usable
+select ssl_is_used();
+ ssl_is_used 
+-------------
+ f
+(1 row)
+
+\echo
+
+-- an extension without an override is not pinned
+create extension hstore schema public;
+alter extension hstore set schema other_schema;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ other_schema
+(1 row)
+
+drop extension hstore;
+reset role;
+drop extension sslinfo;
+\echo
+
+-- as a superuser, since the override also applies to superusers on create
+create extension sslinfo schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
+alter extension sslinfo set schema other_schema;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
+drop extension sslinfo;
+\echo
+
+-- non-extension objects can still be moved between schemas
+set role nonsuper;
+create table public.override_tbl();
+alter table public.override_tbl set schema other_schema;
+select relnamespace::regnamespace from pg_class where relname = 'override_tbl';
+ relnamespace 
+--------------
+ other_schema
+(1 row)
+
+drop table other_schema.override_tbl;
+reset role;
+drop schema other_schema;

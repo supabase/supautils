@@ -41,4 +41,10 @@ extern List *override_ext_options(extension_stmt_kind stmt_kind,
                                   const size_t total_epos,
                                   const extension_parameter_overrides *epos);
 
+// Returns the configured schema override for extname, or NULL when the
+// extension has no override or its override doesn't set a schema.
+extern const char *
+get_ext_schema_override(const char *extname, const size_t total_epos,
+                        const extension_parameter_overrides *epos);
+
 #endif
