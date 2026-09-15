@@ -816,7 +816,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
+    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
+                                             AccessExclusiveLock)) {
       bool already_switched_to_superuser = false;
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
@@ -844,7 +845,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs)) {
+    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
+                                             AccessExclusiveLock)) {
       bool already_switched_to_superuser = false;
 
       switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
@@ -906,8 +908,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
       bool      already_switched_to_superuser = false;
 
-      if (!is_current_role_granted_table_policy(table_range_var, pgs,
-                                                total_pgs)) {
+      if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
+                                                AccessExclusiveLock)) {
         break;
       }
 
@@ -979,8 +981,8 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
       bool      already_switched_to_superuser = false;
 
-      if (!is_current_role_granted_table_policy(table_range_var, pgs,
-                                                total_pgs)) {
+      if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
+                                                AccessShareLock)) {
         break;
       }
 

@@ -167,10 +167,11 @@ json_policy_grants_parse_state parse_policy_grants(const char    *str,
 
 bool is_current_role_granted_table_policy(const RangeVar      *table_range_var,
                                           const policy_grants *pgs,
-                                          const size_t         total_pgs) {
+                                          const size_t         total_pgs,
+                                          LOCKMODE target_lockmode) {
 
   Oid target_table_id =
-      RangeVarGetRelid(table_range_var, AccessExclusiveLock, false);
+      RangeVarGetRelid(table_range_var, target_lockmode, false);
   char *current_role_name = GetUserNameFromId(GetUserId(), false);
 
   for (size_t i = 0; i < total_pgs; i++) {
