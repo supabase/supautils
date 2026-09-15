@@ -211,6 +211,38 @@ NOTICE:  drop cascades to table allow_policies.my_table
 set role privileged_role;
 \echo
 
+-- privileged_role policy checks do not lock unrelated tables in the allowlist
+set role postgres;
+create schema allow_policies;
+create table allow_policies.my_table ();
+create schema allow_policies_other;
+create table allow_policies_other.other_table ();
+grant usage on schema allow_policies to privileged_role;
+grant usage on schema allow_policies_other to privileged_role;
+set role privileged_role;
+begin;
+create policy p on allow_policies.my_table for select using (true);
+-- allow_policies_other.other_table is in the allowlist but is not the policy
+-- target; the allowlist scan must not take an ACCESS EXCLUSIVE lock on it
+do $$
+declare n int;
+begin
+  select count(*) into n from pg_locks
+    where relation = 'allow_policies_other.other_table'::regclass
+      and mode = 'AccessExclusiveLock';
+  raise notice 'unrelated ACCESS EXCLUSIVE locks: %', n;
+end $$;
+NOTICE:  unrelated ACCESS EXCLUSIVE locks: 0
+drop policy p on allow_policies.my_table;
+commit;
+set role postgres;
+drop schema allow_policies cascade;
+NOTICE:  drop cascades to table allow_policies.my_table
+drop schema allow_policies_other cascade;
+NOTICE:  drop cascades to table allow_policies_other.other_table
+set role privileged_role;
+\echo
+
 -- privileged_role cannot manage policies on tables not in allowlist
 set role postgres;
 create schema deny_policies;

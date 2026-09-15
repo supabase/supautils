@@ -31,6 +31,9 @@ extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
 
 extern bool remove_ending_wildcard(char *);
 
+extern bool is_table_in_grant_list(char *const *table_names,
+                                   size_t total_tables, Oid target_table_id);
+
 typedef enum { ALT_FDW, ALT_PUB, ALT_EVTRIG } altered_obj_type;
 
 extern void alter_owner(const char *obj_name, Oid role_oid,
