@@ -161,8 +161,8 @@ bool is_table_in_grant_list(char *const *table_names, size_t total_tables,
     }
 
     range_var = makeRangeVarFromNameList(qual_name_list);
-    // the resolved oid is only compared against target_table_id, which the
-    // caller already holds under AccessExclusiveLock, so no lock is needed here
+    // we only compare the oid against target_table_id, which the caller has
+    // already locked, so there's no need to lock it again here
     table_id = RangeVarGetRelid(range_var, NoLock, true);
 
     if (OidIsValid(table_id) && table_id == target_table_id) {
