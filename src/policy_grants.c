@@ -167,10 +167,11 @@ json_policy_grants_parse_state parse_policy_grants(const char    *str,
 
 bool is_current_role_granted_table_policy(const RangeVar      *table_range_var,
                                           const policy_grants *pgs,
-                                          const size_t         total_pgs) {
+                                          const size_t         total_pgs,
+                                          LOCKMODE target_lockmode) {
 
   Oid target_table_id =
-      RangeVarGetRelid(table_range_var, AccessExclusiveLock, false);
+      RangeVarGetRelid(table_range_var, target_lockmode, false);
   char *current_role_name = GetUserNameFromId(GetUserId(), false);
 
   for (size_t i = 0; i < total_pgs; i++) {
@@ -180,30 +181,9 @@ bool is_current_role_granted_table_policy(const RangeVar      *table_range_var,
       continue;
     }
 
-    for (size_t j = 0; j < pg->total_tables; j++) {
-      const char *table_name = pg->table_names[j];
-      List       *qual_name_list;
-      RangeVar   *range_var;
-      Oid         table_id;
-#if PG16_GTE
-      qual_name_list = stringToQualifiedNameList(table_name, NULL);
-#else
-      qual_name_list = stringToQualifiedNameList(table_name);
-#endif
-      if (qual_name_list == NULL) {
-        list_free(qual_name_list);
-        continue;
-      }
-
-      range_var = makeRangeVarFromNameList(qual_name_list);
-      table_id  = RangeVarGetRelid(range_var, AccessExclusiveLock, true);
-      if (!OidIsValid(table_id)) {
-        continue;
-      }
-
-      if (table_id == target_table_id) {
-        return true;
-      }
+    if (is_table_in_grant_list(pg->table_names, pg->total_tables,
+                               target_table_id)) {
+      return true;
     }
   }
 

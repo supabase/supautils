@@ -144,6 +144,35 @@ void alter_owner(const char *obj_name, Oid role_oid,
   }
 }
 
+bool is_table_in_grant_list(char *const *table_names, size_t total_tables,
+                            Oid target_table_id) {
+  for (size_t i = 0; i < total_tables; i++) {
+    List     *qual_name_list;
+    RangeVar *range_var;
+    Oid       table_id;
+
+#if PG16_GTE
+    qual_name_list = stringToQualifiedNameList(table_names[i], NULL);
+#else
+    qual_name_list = stringToQualifiedNameList(table_names[i]);
+#endif
+    if (qual_name_list == NULL) {
+      continue;
+    }
+
+    range_var = makeRangeVarFromNameList(qual_name_list);
+    // we only compare the oid against target_table_id, which the caller has
+    // already locked, so there's no need to lock it again here
+    table_id = RangeVarGetRelid(range_var, NoLock, true);
+
+    if (OidIsValid(table_id) && table_id == target_table_id) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 #if PG17_LT
 // Polyfill for pg < 17
 // https://github.com/postgres/postgres/blob/3c4e26a62c31ebe296e3aedb13ac51a7a35103bd/src/common/stringinfo.c#L402-L416
