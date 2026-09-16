@@ -2,38 +2,15 @@
 
 #include "utils.h"
 
-static Oid prev_role_oid         = 0;
-static int prev_role_sec_context = 0;
-
-// Prevent nested switch_to_superuser() calls from corrupting prev_role_*
-static bool is_switched_to_superuser = false;
-
 static bool strstarts(const char *str, const char *prefix) {
   return strncmp(str, prefix, strlen(prefix)) == 0;
 }
 
-void switch_to_superuser(const char *supauser, bool *already_switched) {
-  Oid superuser_oid = BOOTSTRAP_SUPERUSERID;
-  *already_switched = is_switched_to_superuser;
-
-  if (*already_switched) {
-    return;
+Oid superuser_oid(const char *superuser) {
+  if (superuser != NULL) {
+    return get_role_oid(superuser, false);
   }
-  is_switched_to_superuser = true;
-
-  if (supauser != NULL) {
-    superuser_oid = get_role_oid(supauser, false);
-  }
-
-  GetUserIdAndSecContext(&prev_role_oid, &prev_role_sec_context);
-  SetUserIdAndSecContext(superuser_oid, prev_role_sec_context |
-                                            SECURITY_LOCAL_USERID_CHANGE |
-                                            SECURITY_RESTRICTED_OPERATION);
-}
-
-void switch_to_original_role(void) {
-  SetUserIdAndSecContext(prev_role_oid, prev_role_sec_context);
-  is_switched_to_superuser = false;
+  return BOOTSTRAP_SUPERUSERID;
 }
 
 bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {

@@ -13,16 +13,53 @@
 #include <utils/queryenvironment.h>
 
 /**
- * Switch to a superuser and save the original role. Caller is responsible for
- * calling switch_to_original_role() afterwards.
+ * Oid of the role used for elevation: `supautils.superuser` when set,
+ * otherwise the bootstrap superuser.
  */
-extern void switch_to_superuser(const char *superuser, bool *already_switched);
+extern Oid superuser_oid(const char *superuser);
 
 /**
- * Restore the saved original role. Caller is responsible for ensuring
- * switch_to_superuser() was called.
+ * Run the statements in `...` with the current user and security context set
+ * to `uid` and `sec_context`, then restore the caller's, whether the body
+ * completes or errors. The saved state lives on the stack. Don't nest one
+ * call inside another's body (PG_TRY can't be nested in one scope before
+ * PG14), and don't `return` or `break` out of the body.
  */
-extern void switch_to_original_role(void);
+// clang-format off
+#define run_as(uid, sec_context, ...)                                          \
+  do {                                                                         \
+    Oid _prev_uid;                                                             \
+    int _prev_sec_context;                                                     \
+    GetUserIdAndSecContext(&_prev_uid, &_prev_sec_context);                    \
+    SetUserIdAndSecContext((uid), (sec_context));                              \
+    PG_TRY();                                                                  \
+    {                                                                          \
+      __VA_ARGS__                                                              \
+    }                                                                          \
+    PG_CATCH();                                                                \
+    {                                                                          \
+      SetUserIdAndSecContext(_prev_uid, _prev_sec_context);                    \
+      PG_RE_THROW();                                                           \
+    }                                                                          \
+    PG_END_TRY();                                                              \
+    SetUserIdAndSecContext(_prev_uid, _prev_sec_context);                      \
+  } while (0)
+// clang-format on
+
+/**
+ * Run the statements in `...` as the elevation role, in a restricted security
+ * context, then restore the caller's role.
+ */
+#define run_elevated(superuser, ...)                                           \
+  do {                                                                         \
+    Oid _uid;                                                                  \
+    int _sec_context;                                                          \
+    GetUserIdAndSecContext(&_uid, &_sec_context);                              \
+    run_as(superuser_oid(superuser),                                           \
+           _sec_context | SECURITY_LOCAL_USERID_CHANGE |                       \
+               SECURITY_RESTRICTED_OPERATION,                                  \
+           __VA_ARGS__);                                                       \
+  } while (0)
 
 /**
  * Returns `false` if either s1 or s2 is NULL.

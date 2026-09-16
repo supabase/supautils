@@ -314,7 +314,26 @@ static List *restrict_version_specification(extension_stmt_kind stmt_kind,
   return options;
 }
 
+static void supautils_hook_internal(PROCESS_UTILITY_PARAMS);
+
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
+  // A `return` or `break` out of a run_as() body would skip its PG_END_TRY and
+  // leave a dangling entry on the exception stack. Catch that in assert builds,
+  // naming the statement so the offending arm is obvious.
+  sigjmp_buf *exception_stack_at_entry PG_USED_FOR_ASSERTS_ONLY =
+      PG_exception_stack;
+
+  supautils_hook_internal(PROCESS_UTILITY_ARGS);
+
+#ifdef USE_ASSERT_CHECKING
+  if (PG_exception_stack != exception_stack_at_entry) {
+    elog(PANIC, "supautils: exception stack leaked while processing %s",
+         GetCommandTagName(CreateCommandTag(pstmt->utilityStmt)));
+  }
+#endif
+}
+
+static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
   /* Get the utility statement from the planned statement */
   Node *utility_stmt = pstmt->utilityStmt;
 
@@ -325,7 +344,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
   case T_AlterRoleStmt: {
     AlterRoleStmt *stmt        = (AlterRoleStmt *)utility_stmt;
     ListCell      *option_cell = NULL;
-    bool           already_switched_to_superuser = false;
 
     if (!IsTransactionState()) {
       break;
@@ -362,14 +380,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     // Allow setting bypassrls & replication.
-    switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-    if (!already_switched_to_superuser) {
-      switch_to_original_role();
-    }
+    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
     return;
   }
@@ -413,15 +424,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      bool already_switched_to_superuser = false;
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -499,19 +502,9 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       run_process_utility_hook(prev_hook);
 #else
       if (is_current_role_privileged()) {
-        bool already_switched_to_superuser = false;
-
         // Allow `privileged_role` (in addition to superusers) to
         // set bypassrls & replication attributes.
-        switch_to_superuser(supautils_superuser,
-                            &already_switched_to_superuser);
-
-        run_process_utility_hook_with_cleanup(
-            prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-        if (!already_switched_to_superuser) {
-          switch_to_original_role();
-        }
+        run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
       } else {
         run_process_utility_hook(prev_hook);
       }
@@ -613,38 +606,28 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     constrain_extension(stmt->extname, cexts, total_cexts);
 
-    bool already_switched_to_superuser = false;
+    run_elevated(supautils_superuser,
 
-    switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+                 run_global_before_create_script(stmt->extname, stmt->options,
+                                                 extension_custom_scripts_path);
 
-    run_global_before_create_script(stmt->extname, stmt->options,
-                                    extension_custom_scripts_path);
+                 run_ext_before_create_script(stmt->extname, stmt->options,
+                                              extension_custom_scripts_path);
 
-    run_ext_before_create_script(stmt->extname, stmt->options,
-                                 extension_custom_scripts_path);
-
-    stmt->options = override_ext_options(EXT_CREATE, stmt->extname,
-                                         stmt->options, total_epos, epos);
+                 stmt->options =
+                     override_ext_options(EXT_CREATE, stmt->extname,
+                                          stmt->options, total_epos, epos););
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
     } else {
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
-
+      // non-privileged extensions are created as the caller
       run_process_utility_hook(prev_hook);
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
     }
 
-    run_ext_after_create_script(stmt->extname, stmt->options,
-                                extension_custom_scripts_path);
-
-    if (!already_switched_to_superuser) {
-      switch_to_original_role();
-    }
+    run_elevated(supautils_superuser,
+                 run_ext_after_create_script(stmt->extname, stmt->options,
+                                             extension_custom_scripts_path););
 
     return;
   }
@@ -666,16 +649,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                                          stmt->options, total_epos, epos);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      bool already_switched_to_superuser = false;
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
     }
 
     break;
@@ -693,16 +667,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     if (stmt->objectType == OBJECT_EXTENSION &&
         is_extension_privileged(strVal(stmt->object), privileged_extensions)) {
-      bool already_switched_to_superuser = false;
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -721,8 +686,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * CREATE FOREIGN DATA WRAPPER <fdw>
    */
   case T_CreateFdwStmt             : {
-    const Oid current_user_id               = GetUserId();
-    bool      already_switched_to_superuser = false;
+    const Oid current_user_id = GetUserId();
 
     if (superuser()) {
       break;
@@ -735,17 +699,11 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     validate_func_options(stmt->func_options);
 
-    switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook);
 
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-    // Change FDW owner to the current role (which is a privileged role)
-    alter_owner(stmt->fdwname, current_user_id, ALT_FDW);
-
-    if (!already_switched_to_superuser) {
-      switch_to_original_role();
-    }
+                 // Change FDW owner to the current role (which is a privileged
+                 // role)
+                 alter_owner(stmt->fdwname, current_user_id, ALT_FDW););
 
     return;
   }
@@ -754,8 +712,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * CREATE PUBLICATION
    */
   case T_CreatePublicationStmt: {
-    const Oid current_user_id               = GetUserId();
-    bool      already_switched_to_superuser = false;
+    const Oid current_user_id = GetUserId();
 
     if (superuser()) {
       break;
@@ -764,19 +721,13 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
-
     CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
 
-    // Change publication owner to the current role (which is a privileged role)
-    alter_owner(stmt->pubname, current_user_id, ALT_PUB);
+    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook);
 
-    if (!already_switched_to_superuser) {
-      switch_to_original_role();
-    }
+                 // Change publication owner to the current role (which is a
+                 // privileged role)
+                 alter_owner(stmt->pubname, current_user_id, ALT_PUB););
 
     return;
   }
@@ -785,8 +736,6 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * ALTER PUBLICATION <name> ADD TABLES IN SCHEMA ...
    */
   case T_AlterPublicationStmt: {
-    bool already_switched_to_superuser = false;
-
     if (superuser()) {
       break;
     }
@@ -794,14 +743,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-    run_process_utility_hook_with_cleanup(
-        prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-    if (!already_switched_to_superuser) {
-      switch_to_original_role();
-    }
+    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
     return;
   }
@@ -818,16 +760,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
                                              AccessExclusiveLock)) {
-      bool already_switched_to_superuser = false;
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -847,16 +780,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
 
     if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
                                              AccessExclusiveLock)) {
-      bool already_switched_to_superuser = false;
-
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -877,16 +801,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
      */
     case OBJECT_EXTENSION: {
       if (all_extensions_are_privileged(stmt->objects, privileged_extensions)) {
-        bool already_switched_to_superuser = false;
-        switch_to_superuser(supautils_superuser,
-                            &already_switched_to_superuser);
-
-        run_process_utility_hook_with_cleanup(
-            prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-        if (!already_switched_to_superuser) {
-          switch_to_original_role();
-        }
+        run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
         return;
       }
@@ -906,21 +821,13 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       List *table_name_list =
           list_truncate(list_copy(object), list_length(object) - 1);
       RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-      bool      already_switched_to_superuser = false;
 
       if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
                                                 AccessExclusiveLock)) {
         break;
       }
 
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -937,21 +844,13 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       List *table_name_list =
           list_truncate(list_copy(object), list_length(object) - 1);
       RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-      bool      already_switched_to_superuser = false;
 
       if (!is_current_role_granted_table_drop_trigger(table_range_var, dtgs,
                                                       total_dtgs)) {
         break;
       }
 
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -979,21 +878,13 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
       List        *table_name_list =
           list_truncate(list_copy(object), list_length(object) - 1);
       RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-      bool      already_switched_to_superuser = false;
 
       if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
                                                 AccessShareLock)) {
         break;
       }
 
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -1006,15 +897,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      bool already_switched_to_superuser = false;
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -1044,15 +927,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      bool already_switched_to_superuser = false;
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
-
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -1068,8 +943,7 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      bool      already_switched_to_superuser = false;
-      const Oid current_user_id               = GetUserId();
+      const Oid current_user_id = GetUserId();
 
       CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
 
@@ -1098,19 +972,14 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
                                   NameListToString(stmt->funcname))));
       }
 
-      switch_to_superuser(supautils_superuser, &already_switched_to_superuser);
+      run_elevated(
+          supautils_superuser, run_process_utility_hook(prev_hook);
 
-      run_process_utility_hook_with_cleanup(
-          prev_hook, already_switched_to_superuser, switch_to_original_role);
-
-      if (!current_user_is_super)
-        // Change event trigger owner to the current role (which is a privileged
-        // role)
-        alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
-
-      if (!already_switched_to_superuser) {
-        switch_to_original_role();
-      }
+          if (!current_user_is_super) {
+            // Change event trigger owner to the current role (which is a
+            // privileged role)
+            alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
+          });
 
       return;
     }
