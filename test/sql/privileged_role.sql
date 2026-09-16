@@ -301,3 +301,24 @@ end $$;
 create publication p for all tables;
 drop publication p;
 \echo
+
+-- case 6: a successful alter publication also restores the role
+set role postgres;
+create table pub_table ();
+set role privileged_role;
+create publication p;
+alter publication p add table pub_table;
+select current_user;
+drop publication p;
+set role postgres;
+drop table pub_table;
+set role privileged_role;
+\echo
+
+-- comment on a privileged extension is elevated
+create extension hstore;
+comment on extension hstore is 'commented by privileged_role';
+select obj_description(oid, 'pg_extension') from pg_extension where extname = 'hstore';
+select current_user;
+drop extension hstore;
+\echo
