@@ -208,30 +208,35 @@ static void run_custom_script(const char *filename, const char *extname,
   running_custom_script = false;
 }
 
-void run_global_before_create_script(
-    char *extname, List *options,
-    const char *privileged_extensions_custom_scripts_path) {
-  DefElem *d_schema = NULL, *d_new_version = NULL, *d_cascade = NULL;
-  char    *extschema = NULL, *extversion = NULL;
-  bool     extcascade = false;
-  char     filename[MAXPGPATH];
+/*
+ * Parses options from `create extension ...` command
+ */
+static void parse_statement_options(List *stmt_options, char **extschema,
+                                    char **extversion, bool *extcascade) {
+  ListCell *cell = NULL;
 
-  ListCell *option_cell = NULL;
-
-  foreach (option_cell, options) {
-    DefElem *defel = lfirst_node(DefElem, option_cell);
+  foreach (cell, stmt_options) {
+    DefElem *defel = lfirst_node(DefElem, cell);
 
     if (strcmp(defel->defname, "schema") == 0) {
-      d_schema  = defel;
-      extschema = defGetString(d_schema);
+      *extschema = defGetString(defel);
     } else if (strcmp(defel->defname, "new_version") == 0) {
-      d_new_version = defel;
-      extversion    = defGetString(d_new_version);
+      *extversion = defGetString(defel);
     } else if (strcmp(defel->defname, "cascade") == 0) {
-      d_cascade  = defel;
-      extcascade = defGetBoolean(d_cascade);
+      *extcascade = defGetBoolean(defel);
     }
   }
+}
+
+void run_global_before_create_script(
+    char *extname, List *stmt_options,
+    const char *privileged_extensions_custom_scripts_path) {
+  char *extschema  = NULL;
+  char *extversion = NULL;
+  bool  extcascade = false;
+  char  filename[MAXPGPATH];
+
+  parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/before-create.sql",
            privileged_extensions_custom_scripts_path);
@@ -239,31 +244,14 @@ void run_global_before_create_script(
 }
 
 void run_ext_before_create_script(
-    char *extname, List *options,
+    char *extname, List *stmt_options,
     const char *privileged_extensions_custom_scripts_path) {
-  DefElem  *d_schema      = NULL;
-  DefElem  *d_new_version = NULL;
-  DefElem  *d_cascade     = NULL;
-  char     *extschema     = NULL;
-  char     *extversion    = NULL;
-  bool      extcascade    = false;
-  ListCell *option_cell   = NULL;
-  char      filename[MAXPGPATH];
+  char *extschema  = NULL;
+  char *extversion = NULL;
+  bool  extcascade = false;
+  char  filename[MAXPGPATH];
 
-  foreach (option_cell, options) {
-    DefElem *defel = lfirst_node(DefElem, option_cell);
-
-    if (strcmp(defel->defname, "schema") == 0) {
-      d_schema  = defel;
-      extschema = defGetString(d_schema);
-    } else if (strcmp(defel->defname, "new_version") == 0) {
-      d_new_version = defel;
-      extversion    = defGetString(d_new_version);
-    } else if (strcmp(defel->defname, "cascade") == 0) {
-      d_cascade  = defel;
-      extcascade = defGetBoolean(d_cascade);
-    }
-  }
+  parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
            privileged_extensions_custom_scripts_path, extname);
@@ -271,31 +259,14 @@ void run_ext_before_create_script(
 }
 
 void run_ext_after_create_script(
-    char *extname, List *options,
+    char *extname, List *stmt_options,
     const char *privileged_extensions_custom_scripts_path) {
-  DefElem  *d_schema      = NULL;
-  DefElem  *d_new_version = NULL;
-  DefElem  *d_cascade     = NULL;
-  char     *extschema     = NULL;
-  char     *extversion    = NULL;
-  bool      extcascade    = false;
-  ListCell *option_cell   = NULL;
-  char      filename[MAXPGPATH];
+  char *extschema  = NULL;
+  char *extversion = NULL;
+  bool  extcascade = false;
+  char  filename[MAXPGPATH];
 
-  foreach (option_cell, options) {
-    DefElem *defel = lfirst_node(DefElem, option_cell);
-
-    if (strcmp(defel->defname, "schema") == 0) {
-      d_schema  = defel;
-      extschema = defGetString(d_schema);
-    } else if (strcmp(defel->defname, "new_version") == 0) {
-      d_new_version = defel;
-      extversion    = defGetString(d_new_version);
-    } else if (strcmp(defel->defname, "cascade") == 0) {
-      d_cascade  = defel;
-      extcascade = defGetBoolean(d_cascade);
-    }
-  }
+  parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
            privileged_extensions_custom_scripts_path, extname);
