@@ -685,11 +685,28 @@ static void supautils_hook(PROCESS_UTILITY_PARAMS) {
    * ALTER EXTENSION <extension> SET SCHEMA
    */
   case T_AlterObjectSchemaStmt: {
+    AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
+
+    /*
+     * Keep the extension pinned to its configured schema override. Force the
+     * destination back instead of erroring out, mirroring how CREATE EXTENSION
+     * silently overrides a conflicting SCHEMA clause. Since the extension
+     * already is in that schema, postgres turns this into a no-op.
+     *
+     * This is done before the privilege checks below because an override can
+     * be configured for an extension that is not in privileged_extensions,
+     * and because CREATE EXTENSION applies overrides to superusers too.
+     */
+    if (stmt->objectType == OBJECT_EXTENSION) {
+      const char *schema_override =
+          get_ext_schema_override(strVal(stmt->object), total_epos, epos);
+
+      if (schema_override != NULL) stmt->newschema = pstrdup(schema_override);
+    }
+
     if (superuser()) {
       break;
     }
-
-    AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
 
     if (stmt->objectType == OBJECT_EXTENSION &&
         is_extension_privileged(strVal(stmt->object), privileged_extensions)) {
