@@ -317,7 +317,7 @@ static List *restrict_version_specification(extension_stmt_kind stmt_kind,
 static void supautils_hook_internal(PROCESS_UTILITY_PARAMS);
 
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
-  // A `return` or `break` out of a run_as() body would skip its PG_END_TRY and
+  // A `return` or `break` out of a RUN_AS() body would skip its PG_END_TRY and
   // leave a dangling entry on the exception stack. Catch that in assert builds,
   // naming the statement so the offending arm is obvious.
   sigjmp_buf *exception_stack_at_entry PG_USED_FOR_ASSERTS_ONLY =
@@ -380,7 +380,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     }
 
     // Allow setting bypassrls & replication.
-    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
     return;
   }
@@ -424,7 +424,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -504,7 +504,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
       if (is_current_role_privileged()) {
         // Allow `privileged_role` (in addition to superusers) to
         // set bypassrls & replication attributes.
-        run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+        RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
       } else {
         run_process_utility_hook(prev_hook);
       }
@@ -606,7 +606,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     constrain_extension(stmt->extname, cexts, total_cexts);
 
-    run_elevated(supautils_superuser,
+    RUN_ELEVATED(supautils_superuser,
 
                  run_global_before_create_script(stmt->extname, stmt->options,
                                                  extension_custom_scripts_path);
@@ -619,13 +619,13 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
                                           stmt->options, total_epos, epos););
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
     } else {
       // non-privileged extensions are created as the caller
       run_process_utility_hook(prev_hook);
     }
 
-    run_elevated(supautils_superuser,
+    RUN_ELEVATED(supautils_superuser,
                  run_ext_after_create_script(stmt->extname, stmt->options,
                                              extension_custom_scripts_path););
 
@@ -649,7 +649,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
                                          stmt->options, total_epos, epos);
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
     }
 
     break;
@@ -667,7 +667,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     if (stmt->objectType == OBJECT_EXTENSION &&
         is_extension_privileged(strVal(stmt->object), privileged_extensions)) {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -699,7 +699,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     validate_func_options(stmt->func_options);
 
-    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook);
+    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook);
 
                  // Change FDW owner to the current role (which is a privileged
                  // role)
@@ -723,7 +723,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
 
-    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook);
+    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook);
 
                  // Change publication owner to the current role (which is a
                  // privileged role)
@@ -743,7 +743,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
       break;
     }
 
-    run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
     return;
   }
@@ -760,7 +760,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
                                              AccessExclusiveLock)) {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -780,7 +780,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
                                              AccessExclusiveLock)) {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -801,7 +801,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
      */
     case OBJECT_EXTENSION: {
       if (all_extensions_are_privileged(stmt->objects, privileged_extensions)) {
-        run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+        RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
         return;
       }
@@ -827,7 +827,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
         break;
       }
 
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -850,7 +850,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
         break;
       }
 
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -884,7 +884,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
         break;
       }
 
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -897,7 +897,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -927,7 +927,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     }
 
     {
-      run_elevated(supautils_superuser, run_process_utility_hook(prev_hook));
+      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
 
       return;
     }
@@ -972,7 +972,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
                                   NameListToString(stmt->funcname))));
       }
 
-      run_elevated(
+      RUN_ELEVATED(
           supautils_superuser, run_process_utility_hook(prev_hook);
 
           if (!current_user_is_super) {

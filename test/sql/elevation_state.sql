@@ -1,6 +1,10 @@
 set role extensions_role;
 \echo
 
+-- Each case below makes a `create extension` fail while supautils is elevated.
+-- Afterwards `select current_user` checks the role was restored, and creating
+-- pageinspect (privileged, needs superuser) checks that elevation still works.
+
 -- an error in a before-create script must not leave the session elevated
 -- or stop later statements from elevating
 create extension ltree;

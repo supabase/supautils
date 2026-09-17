@@ -26,7 +26,7 @@ extern Oid superuser_oid(const char *superuser);
  * PG14), and don't `return` or `break` out of the body.
  */
 // clang-format off
-#define run_as(uid, sec_context, ...)                                          \
+#define RUN_AS(uid, sec_context, ...)                                          \
   do {                                                                         \
     Oid _prev_uid;                                                             \
     int _prev_sec_context;                                                     \
@@ -50,12 +50,12 @@ extern Oid superuser_oid(const char *superuser);
  * Run the statements in `...` as the elevation role, in a restricted security
  * context, then restore the caller's role.
  */
-#define run_elevated(superuser, ...)                                           \
+#define RUN_ELEVATED(superuser, ...)                                           \
   do {                                                                         \
     Oid _uid;                                                                  \
     int _sec_context;                                                          \
     GetUserIdAndSecContext(&_uid, &_sec_context);                              \
-    run_as(superuser_oid(superuser),                                           \
+    RUN_AS(superuser_oid(superuser),                                           \
            _sec_context | SECURITY_LOCAL_USERID_CHANGE |                       \
                SECURITY_RESTRICTED_OPERATION,                                  \
            __VA_ARGS__);                                                       \
