@@ -103,12 +103,43 @@
 
 #endif
 
-#define run_process_utility_hook(process_utility_hook)                         \
-  if (process_utility_hook != NULL) {                                          \
-    process_utility_hook(PROCESS_UTILITY_ARGS);                                \
-  } else {                                                                     \
-    standard_ProcessUtility(PROCESS_UTILITY_ARGS);                             \
+// The arguments of one ProcessUtility call, so code outside the hook function
+// can chain to the previous hook.
+typedef struct {
+  ProcessUtility_hook_type prev_hook;
+  PlannedStmt             *pstmt;
+  const char              *queryString;
+#if PG14_GTE
+  bool readOnlyTree;
+#endif
+  ProcessUtilityContext context;
+  ParamListInfo         params;
+  QueryEnvironment     *queryEnv;
+  DestReceiver         *dest;
+  QueryCompletion      *qc;
+} utility_hook_args;
+
+// Builds a utility_hook_args from the PROCESS_UTILITY_PARAMS in scope.
+#define UTILITY_HOOK_ARGS(prev_hook)                                           \
+  ((utility_hook_args){prev_hook, PROCESS_UTILITY_ARGS})
+
+static inline void run_prev_utility_hook(const utility_hook_args *args) {
+  if (args->prev_hook != NULL) {
+    args->prev_hook(args->pstmt, args->queryString,
+#if PG14_GTE
+                    args->readOnlyTree,
+#endif
+                    args->context, args->params, args->queryEnv, args->dest,
+                    args->qc);
+  } else {
+    standard_ProcessUtility(args->pstmt, args->queryString,
+#if PG14_GTE
+                            args->readOnlyTree,
+#endif
+                            args->context, args->params, args->queryEnv,
+                            args->dest, args->qc);
   }
+}
 
 // polyfill
 #if PG17_LT

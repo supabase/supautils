@@ -13,6 +13,26 @@ Oid superuser_oid(const char *superuser) {
   return BOOTSTRAP_SUPERUSERID;
 }
 
+static bool role_oid_is_privileged(Oid role_oid, const char *privileged_role) {
+  Oid privileged_role_oid;
+
+  if (privileged_role == NULL || !OidIsValid(role_oid)) {
+    return false;
+  }
+  privileged_role_oid = get_role_oid(privileged_role, true);
+
+  return OidIsValid(privileged_role_oid) &&
+         has_privs_of_role(role_oid, privileged_role_oid);
+}
+
+bool is_current_role_privileged(const char *privileged_role) {
+  return role_oid_is_privileged(GetUserId(), privileged_role);
+}
+
+bool is_role_privileged(const char *role, const char *privileged_role) {
+  return role_oid_is_privileged(get_role_oid(role, true), privileged_role);
+}
+
 bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
   bool      s1_is_in_s2 = false;
   char     *s2_tmp;

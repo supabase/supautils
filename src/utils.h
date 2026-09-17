@@ -34,7 +34,7 @@ extern Oid superuser_oid(const char *superuser);
     SetUserIdAndSecContext((uid), (sec_context));                              \
     PG_TRY();                                                                  \
     {                                                                          \
-      __VA_ARGS__                                                              \
+      __VA_ARGS__;                                                             \
     }                                                                          \
     PG_CATCH();                                                                \
     {                                                                          \
@@ -60,6 +60,13 @@ extern Oid superuser_oid(const char *superuser);
                SECURITY_RESTRICTED_OPERATION,                                  \
            __VA_ARGS__);                                                       \
   } while (0)
+
+/**
+ * Whether the current role, or a named role, has the privileges of
+ * `privileged_role`. Both return false when no privileged role is configured.
+ */
+extern bool is_current_role_privileged(const char *privileged_role);
+extern bool is_role_privileged(const char *role, const char *privileged_role);
 
 /**
  * Returns `false` if either s1 or s2 is NULL.

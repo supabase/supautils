@@ -77,12 +77,10 @@ select extversion = default_version as installed_default
   from pg_extension, pg_available_extensions
  where extname = name and extname = 'hstore';
 
--- warns and strips the TO clause; the subsequent "must be owner" error is
--- pre-existing behavior for non-superuser ALTER EXTENSION UPDATE on privileged
--- extensions (see supabase/supautils#118), unrelated to the version restriction
+-- warns and strips the TO clause, then updates to the default version
 alter extension hstore update to '1.4';
 
--- the failed alter left the version unchanged
+-- the version is still the default
 select extversion = default_version as installed_default
   from pg_extension, pg_available_extensions
  where extname = name and extname = 'hstore';
@@ -95,8 +93,7 @@ select extversion = default_version as installed_default
   from pg_extension, pg_available_extensions
  where extname = name and extname = 'hstore';
 
--- duplicate TO clauses are also all stripped (the trailing error is the same
--- pre-existing supabase/supautils#118 behavior as above)
+-- duplicate TO clauses are also all stripped
 alter extension hstore update to '1.8' to '1.4';
 
 drop extension hstore;

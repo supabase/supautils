@@ -4,26 +4,16 @@
 #include "drop_trigger_grants.h"
 #include "event_triggers.h"
 #include "extension_custom_scripts.h"
+#include "extensions.h"
 #include "extensions_parameter_overrides.h"
 #include "fdw.h"
 #include "permission_hints.h"
 #include "policy_grants.h"
 #include "privileged_extensions.h"
+#include "privileged_role.h"
+#include "roles.h"
+#include "table_grants.h"
 #include "timezone.h"
-
-#define EREPORT_RESERVED_MEMBERSHIP(name)                                      \
-  ereport(ERROR,                                                               \
-          (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),                            \
-           errmsg("\"%s\" role memberships are reserved, only superusers "     \
-                  "can grant them",                                            \
-                  name)))
-
-#define EREPORT_RESERVED_ROLE(name)                                            \
-  ereport(ERROR,                                                               \
-          (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),                            \
-           errmsg("\"%s\" is a reserved role, only superusers can modify "     \
-                  "it",                                                        \
-                  name)))
 
 #define EREPORT_INVALID_PARAMETER(name)                                        \
   ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),                    \
@@ -75,12 +65,6 @@ static size_t              total_dtgs                    = 0;
 static bool log_skipped_evtrigs = false;
 static bool disable_program     = false;
 
-typedef enum {
-  RESTRICT_EXTENSION_VERSIONS_OFF,
-  RESTRICT_EXTENSION_VERSIONS_WARN,
-  RESTRICT_EXTENSION_VERSIONS_ERROR
-} restrict_extension_versions_mode;
-
 static const struct config_enum_entry restrict_extension_versions_options[] = {
   {"off", RESTRICT_EXTENSION_VERSIONS_OFF, false},
   {"warn", RESTRICT_EXTENSION_VERSIONS_WARN, false},
@@ -92,16 +76,9 @@ static int restrict_extension_versions = RESTRICT_EXTENSION_VERSIONS_OFF;
 void _PG_init(void);
 void _PG_fini(void);
 
-static bool is_reserved_role(const char *target, bool allow_configurable_roles);
 static bool is_hint_role(const char *target);
 
-static void confirm_reserved_memberships(const char *target);
-
 static void check_parameter(char *val, char *name);
-
-static bool is_current_role_privileged(void);
-
-static bool is_role_privileged(const char *role);
 
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 
@@ -157,8 +134,9 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
               : GetUserId();
       const char *current_role_name =
           GetUserNameFromId(current_role_oid, false);
-      const bool  role_is_super    = superuser_arg(current_role_oid);
-      const bool  role_is_reserved = is_reserved_role(current_role_name, false);
+      const bool role_is_super = superuser_arg(current_role_oid);
+      const bool role_is_reserved =
+          is_reserved_role(current_role_name, false, reserved_roles);
       const bool  function_is_owned_by_super = superuser_arg(fattrs.owner);
       const bool  role_is_function_owner     = current_role_oid == fattrs.owner;
       const char *func_name                  = get_func_name(flinfo->fn_oid);
@@ -260,60 +238,6 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
   }
 }
 
-static List *restrict_version_specification(extension_stmt_kind stmt_kind,
-                                            List               *options,
-                                            const char *supautils_superuser) {
-  ListCell *lc;
-
-  if (restrict_extension_versions == RESTRICT_EXTENSION_VERSIONS_OFF)
-    return options;
-
-  if (superuser()) return options;
-
-  if (supautils_superuser != NULL && supautils_superuser[0] != '\0') {
-    const char *current_user = GetUserNameFromId(GetUserId(), false);
-    if (strcmp(current_user, supautils_superuser) == 0) return options;
-  }
-
-  foreach (lc, options) {
-    DefElem *defel = (DefElem *)lfirst(lc);
-
-    if (strcmp(defel->defname, "new_version") != 0) continue;
-
-    if (restrict_extension_versions == RESTRICT_EXTENSION_VERSIONS_ERROR) {
-      if (stmt_kind == EXT_CREATE)
-        ereport(ERROR,
-                (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                 errmsg("permission denied: only superusers can specify "
-                        "extension versions. Use CREATE EXTENSION <name> "
-                        "without a VERSION clause.")));
-      else
-        ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                        errmsg("permission denied: only superusers can specify "
-                               "extension versions. Use ALTER EXTENSION <name> "
-                               "UPDATE without a TO clause.")));
-    }
-
-    // warn mode: drop the version option so the default version is used
-    if (stmt_kind == EXT_CREATE)
-      ereport(WARNING,
-              (errmsg("only superusers can specify extension versions, "
-                      "ignoring version \"%s\" and installing the default "
-                      "version",
-                      strVal(defel->arg))));
-    else
-      ereport(WARNING,
-              (errmsg("only superusers can specify extension versions, "
-                      "ignoring version \"%s\" and updating to the default "
-                      "version",
-                      strVal(defel->arg))));
-
-    options = foreach_delete_current(options, lc);
-  }
-
-  return options;
-}
-
 static void supautils_hook_internal(PROCESS_UTILITY_PARAMS);
 
 static void supautils_hook(PROCESS_UTILITY_PARAMS) {
@@ -337,659 +261,49 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
   /* Get the utility statement from the planned statement */
   Node *utility_stmt = pstmt->utilityStmt;
 
-  switch (utility_stmt->type) {
-  /*
-   * ALTER ROLE <role> NOLOGIN NOINHERIT..
-   */
-  case T_AlterRoleStmt: {
-    AlterRoleStmt *stmt        = (AlterRoleStmt *)utility_stmt;
-    ListCell      *option_cell = NULL;
-
-    if (!IsTransactionState()) {
-      break;
-    }
-    if (superuser()) {
-      break;
-    }
-
-    char *role_name = get_rolespec_name(stmt->role);
-
-    if (is_reserved_role(role_name, false)) EREPORT_RESERVED_ROLE(role_name);
-
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    if (is_role_privileged(role_name)) {
-      ereport(ERROR,
-              (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-               errmsg("permission denied to alter role"),
-               errdetail("Only superusers can alter privileged roles.")));
-    }
-
-    // Setting the superuser attribute is not allowed.
-    foreach (option_cell, stmt->options) {
-      DefElem *defel = lfirst_node(DefElem, option_cell);
-      if (strcmp(defel->defname, "superuser") == 0) {
-        ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                        errmsg("permission denied to alter role"),
-                        errdetail("Only roles with the %s attribute may alter "
-                                  "roles with the %s attribute.",
-                                  "SUPERUSER", "SUPERUSER")));
-      }
-    }
-
-    // Allow setting bypassrls & replication.
-    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-    return;
-  }
-
-  /*
-   * ALTER ROLE <role> SET search_path TO ...
-   */
-  case T_AlterRoleSetStmt: {
-    AlterRoleSetStmt *stmt               = (AlterRoleSetStmt *)utility_stmt;
-    bool              role_is_privileged = false;
-
-    if (!IsTransactionState()) {
-      break;
-    }
-    if (superuser()) {
-      break;
-    }
-
-    role_is_privileged = is_current_role_privileged();
-
-    char *role_name = get_rolespec_name(stmt->role);
-
-    if (is_reserved_role(role_name, role_is_privileged))
-      EREPORT_RESERVED_ROLE(role_name);
-
-    if (!role_is_privileged) {
-      break;
-    }
-
-    if (privileged_role_allowed_configs == NULL) {
-      break;
-    } else {
-      bool is_privileged_role_allowed_config =
-          is_string_in_comma_delimited_string(
-              ((VariableSetStmt *)stmt->setstmt)->name,
-              privileged_role_allowed_configs);
-
-      if (!is_privileged_role_allowed_config) {
-        break;
-      }
-    }
-
-    {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    return;
-  }
-
-  /*
-   * CREATE ROLE
-   */
-  case T_CreateRoleStmt: {
-    if (IsTransactionState() && !superuser()) {
-      CreateRoleStmt *stmt         = (CreateRoleStmt *)utility_stmt;
-      const char     *created_role = stmt->role;
-      List           *addroleto    = NIL; /* roles to make this a member of */
-      bool hasrolemembers = false; /* has roles to be members of this role */
-      ListCell *option_cell;
-
-      /* if role already exists, bypass the hook to let it fail with the usual
-       * error */
-      if (OidIsValid(get_role_oid(created_role, true))) break;
-
-      /* CREATE ROLE <reserved_role> */
-      if (is_reserved_role(created_role, false))
-        EREPORT_RESERVED_ROLE(created_role);
-
-      /* Check to see if there are any descriptions related to membership. */
-      foreach (option_cell, stmt->options) {
-        DefElem *defel = lfirst_node(DefElem, option_cell);
-        if (strcmp(defel->defname, "addroleto") == 0)
-          addroleto = (List *)defel->arg;
-
-        if (strcmp(defel->defname, "rolemembers") == 0 ||
-            strcmp(defel->defname, "adminmembers") == 0)
-          hasrolemembers = true;
-
-        // Setting the superuser attribute is not allowed.
-        if (strcmp(defel->defname, "superuser") == 0 && defGetBoolean(defel)) {
-          ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                          errmsg("permission denied to create role"),
-                          errdetail("Only roles with the %s attribute may "
-                                    "create roles with the %s attribute.",
-                                    "SUPERUSER", "SUPERUSER")));
-        }
-      }
-
-      /* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
-      if (addroleto) {
-        ListCell *role_cell;
-        foreach (role_cell, addroleto) {
-          RoleSpec *rolemember = lfirst_node(RoleSpec, role_cell);
-          confirm_reserved_memberships(get_rolespec_name(rolemember));
-        }
-      }
-
-      /*
-       * CREATE ROLE <role_with_reserved_membership> ROLE/ADMIN/USER <any_role>
-       *
-       * This is a contrived case because the "role_with_reserved_membership"
-       * should already exist, but handle it anyway.
-       */
-      if (hasrolemembers) confirm_reserved_memberships(created_role);
-
-      // We don't want to switch to superuser on PG16+ because the
-      // creating role is implicitly granted ADMIN on the new
-      // role:
-      // https://www.postgresql.org/docs/16/runtime-config-client.html#GUC-CREATEROLE-SELF-GRANT
-      //
-      // This ADMIN will be missing if we switch to superuser
-      // since the creating role becomes the superuser.
-      //
-      // We also no longer need superuser to grant BYPASSRLS &
-      // REPLICATION anyway.
-#if PG16_GTE
-      run_process_utility_hook(prev_hook);
-#else
-      if (is_current_role_privileged()) {
-        // Allow `privileged_role` (in addition to superusers) to
-        // set bypassrls & replication attributes.
-        RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-      } else {
-        run_process_utility_hook(prev_hook);
-      }
-#endif
-
-      return;
-    }
-    break;
-  }
-
-  /*
-   * DROP ROLE
-   */
-  case T_DropRoleStmt: {
-    if (IsTransactionState() && !superuser()) {
-      DropRoleStmt *stmt = (DropRoleStmt *)utility_stmt;
-      ListCell     *item;
-
-      foreach (item, stmt->roles) {
-        RoleSpec *role = lfirst_node(RoleSpec, item);
-
-        /*
-         * We check only for a named role being dropped; we ignore
-         * the special values like PUBLIC, CURRENT_USER, and
-         * SESSION_USER. We let Postgres throw its usual error messages
-         * for those special values.
-         */
-        if (role->roletype != ROLESPEC_CSTRING) break;
-
-        if (is_reserved_role(role->rolename, false))
-          EREPORT_RESERVED_ROLE(role->rolename);
-      }
-    }
-    break;
-  }
-
-  /*
-   * GRANT <role> and REVOKE <role>
-   */
-  case T_GrantRoleStmt: {
-    if (IsTransactionState() && !superuser()) {
-      GrantRoleStmt *stmt = (GrantRoleStmt *)utility_stmt;
-      ListCell      *grantee_role_cell;
-      ListCell      *role_cell;
-      bool           role_is_privileged = false;
-
-      /* GRANT <reserved_role> TO <role> */
-      if (stmt->is_grant) {
-        foreach (role_cell, stmt->granted_roles) {
-          AccessPriv *priv = lfirst_node(AccessPriv, role_cell);
-          confirm_reserved_memberships(priv->priv_name);
-        }
-      }
-
-      role_is_privileged = is_current_role_privileged();
-
-      /*
-       * GRANT <role> TO <reserved_roles>
-       * REVOKE <role> FROM <reserved_roles>
-       */
-      foreach (grantee_role_cell, stmt->grantee_roles) {
-        RoleSpec *spec      = lfirst_node(RoleSpec, grantee_role_cell);
-        char     *role_name = get_rolespec_name(spec);
-        // privileged_role can do GRANT <role> to <reserved_role>
-        if (is_reserved_role(role_name, role_is_privileged))
-          EREPORT_RESERVED_ROLE(role_name);
-      }
-    }
-    break;
-  }
-
-  /*
-   * All RENAME statements are caught here
-   */
-  case T_RenameStmt: {
-    if (IsTransactionState() && !superuser()) {
-      RenameStmt *stmt = (RenameStmt *)utility_stmt;
-
-      /* Make sure we only catch "ALTER ROLE <role> RENAME TO" */
-      if (stmt->renameType != OBJECT_ROLE) break;
-
-      if (is_reserved_role(stmt->subname, false))
-        EREPORT_RESERVED_ROLE(stmt->subname);
-
-      if (is_reserved_role(stmt->newname, false))
-        EREPORT_RESERVED_ROLE(stmt->newname);
-    }
-    break;
-  }
-
-  /*
-   * CREATE EXTENSION <extension>
-   */
-  case T_CreateExtensionStmt: {
-    CreateExtensionStmt *volatile stmt = (CreateExtensionStmt *)utility_stmt;
-
-    stmt->options = restrict_version_specification(EXT_CREATE, stmt->options,
-                                                   supautils_superuser);
-
-    constrain_extension(stmt->extname, cexts, total_cexts);
-
-    RUN_ELEVATED(supautils_superuser,
-
-                 run_global_before_create_script(stmt->extname, stmt->options,
-                                                 extension_custom_scripts_path);
-
-                 run_ext_before_create_script(stmt->extname, stmt->options,
-                                              extension_custom_scripts_path);
-
-                 stmt->options =
-                     override_ext_options(EXT_CREATE, stmt->extname,
-                                          stmt->options, total_epos, epos););
-
-    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-    } else {
-      // non-privileged extensions are created as the caller
-      run_process_utility_hook(prev_hook);
-    }
-
-    RUN_ELEVATED(supautils_superuser,
-                 run_ext_after_create_script(stmt->extname, stmt->options,
-                                             extension_custom_scripts_path););
-
-    return;
-  }
-
-  /*
-   * ALTER EXTENSION <extension> [ ADD | DROP | UPDATE ]
-   */
-  case T_AlterExtensionStmt: {
-    if (superuser()) {
-      break;
-    }
-
-    AlterExtensionStmt *stmt = (AlterExtensionStmt *)pstmt->utilityStmt;
-
-    stmt->options = restrict_version_specification(EXT_ALTER, stmt->options,
-                                                   supautils_superuser);
-
-    stmt->options = override_ext_options(EXT_ALTER, stmt->extname,
-                                         stmt->options, total_epos, epos);
-
-    if (is_extension_privileged(stmt->extname, privileged_extensions)) {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-    }
-
-    break;
-  }
-
-  /*
-   * ALTER EXTENSION <extension> SET SCHEMA
-   */
-  case T_AlterObjectSchemaStmt: {
-    if (superuser()) {
-      break;
-    }
-
-    AlterObjectSchemaStmt *stmt = (AlterObjectSchemaStmt *)pstmt->utilityStmt;
-
-    if (stmt->objectType == OBJECT_EXTENSION &&
-        is_extension_privileged(strVal(stmt->object), privileged_extensions)) {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    break;
-  }
-
-  /*
-   * ALTER EXTENSION <extension> [ ADD | DROP ]
-   *
-   * Not supported. Fall back to normal behavior.
-   */
-  case T_AlterExtensionContentsStmt: break;
-
-  /**
-   * CREATE FOREIGN DATA WRAPPER <fdw>
-   */
-  case T_CreateFdwStmt             : {
-    const Oid current_user_id = GetUserId();
-
-    if (superuser()) {
-      break;
-    }
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    CreateFdwStmt *stmt = (CreateFdwStmt *)utility_stmt;
-
-    validate_func_options(stmt->func_options);
-
-    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook);
-
-                 // Change FDW owner to the current role (which is a privileged
-                 // role)
-                 alter_owner(stmt->fdwname, current_user_id, ALT_FDW););
-
-    return;
-  }
-
-  /**
-   * CREATE PUBLICATION
-   */
-  case T_CreatePublicationStmt: {
-    const Oid current_user_id = GetUserId();
-
-    if (superuser()) {
-      break;
-    }
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    CreatePublicationStmt *stmt = (CreatePublicationStmt *)utility_stmt;
-
-    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook);
-
-                 // Change publication owner to the current role (which is a
-                 // privileged role)
-                 alter_owner(stmt->pubname, current_user_id, ALT_PUB););
-
-    return;
-  }
-
-  /**
-   * ALTER PUBLICATION <name> ADD TABLES IN SCHEMA ...
-   */
-  case T_AlterPublicationStmt: {
-    if (superuser()) {
-      break;
-    }
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-    return;
-  }
-
-  /**
-   * CREATE POLICY
-   */
-  case T_CreatePolicyStmt: {
-    CreatePolicyStmt *stmt = (CreatePolicyStmt *)utility_stmt;
-
-    if (superuser()) {
-      break;
-    }
-
-    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
-                                             AccessExclusiveLock)) {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    break;
-  }
-
-  /**
-   * ALTER POLICY
-   */
-  case T_AlterPolicyStmt: {
-    AlterPolicyStmt *stmt = (AlterPolicyStmt *)utility_stmt;
-
-    if (superuser()) {
-      break;
-    }
-
-    if (is_current_role_granted_table_policy(stmt->table, pgs, total_pgs,
-                                             AccessExclusiveLock)) {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    break;
-  }
-
-  case T_DropStmt: {
-    DropStmt *stmt = (DropStmt *)utility_stmt;
-
-    if (superuser()) {
-      break;
-    }
-
-    switch (stmt->removeType) {
-    /*
-     * DROP EXTENSION <extension>
-     */
-    case OBJECT_EXTENSION: {
-      if (all_extensions_are_privileged(stmt->objects, privileged_extensions)) {
-        RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-        return;
-      }
-
-      break;
-    }
-
-    /*
-     * DROP POLICY
-     */
-    case OBJECT_POLICY: {
-      // DROP POLICY always has one object.
-      ListCell *object_cell = list_head(stmt->objects);
-      List     *object      = castNode(List, lfirst(object_cell));
-      // Last element is the policy name, the rest is the table name.
-      // Take everything but the last.
-      List *table_name_list =
-          list_truncate(list_copy(object), list_length(object) - 1);
-      RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-
-      if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
-                                                AccessExclusiveLock)) {
-        break;
-      }
-
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    /*
-     * DROP TRIGGER
-     */
-    case OBJECT_TRIGGER: {
-      // DROP TRIGGER always has one object.
-      ListCell *object_cell = list_head(stmt->objects);
-      List     *object      = castNode(List, lfirst(object_cell));
-      // Last element is the trigger name, the rest is the table name.
-      // Take everything but the last.
-      List *table_name_list =
-          list_truncate(list_copy(object), list_length(object) - 1);
-      RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-
-      if (!is_current_role_granted_table_drop_trigger(table_range_var, dtgs,
-                                                      total_dtgs)) {
-        break;
-      }
-
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    default: break;
-    }
-
-    break;
-  }
-
-  case T_CommentStmt: {
-    if (!IsTransactionState()) {
-      break;
-    }
-    if (superuser()) {
-      break;
-    }
-
-    /**
-     * COMMENT ON POLICY
-     */
-    if (((CommentStmt *)utility_stmt)->objtype == OBJECT_POLICY) {
-      CommentStmt *stmt   = (CommentStmt *)utility_stmt;
-      List        *object = castNode(List, stmt->object);
-      List        *table_name_list =
-          list_truncate(list_copy(object), list_length(object) - 1);
-      RangeVar *table_range_var = makeRangeVarFromNameList(table_name_list);
-
-      if (!is_current_role_granted_table_policy(table_range_var, pgs, total_pgs,
-                                                AccessShareLock)) {
-        break;
-      }
-
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-
-    if (((CommentStmt *)utility_stmt)->objtype != OBJECT_EXTENSION) {
-      break;
-    }
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-  }
-
-  case T_VariableSetStmt: {
-    if (!IsTransactionState()) {
-      break;
-    }
-    if (superuser()) {
-      break;
-    }
-    if (privileged_role_allowed_configs == NULL) {
-      break;
-    } else {
-      bool is_privileged_role_allowed_config =
-          is_string_in_comma_delimited_string(
-              ((VariableSetStmt *)utility_stmt)->name,
-              privileged_role_allowed_configs);
-
-      if (!is_privileged_role_allowed_config) {
-        break;
-      }
-    }
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    {
-      RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
-
-      return;
-    }
-  }
-
-  case T_CreateEventTrigStmt: {
-    if (!IsTransactionState()) {
-      break;
-    }
-
-    if (!is_current_role_privileged()) {
-      break;
-    }
-
-    {
-      const Oid current_user_id = GetUserId();
-
-      CreateEventTrigStmt *stmt = (CreateEventTrigStmt *)utility_stmt;
-
-      bool       current_user_is_super = superuser_arg(current_user_id);
-      func_attrs fattrs =
-          get_function_attrs((func_search){FO_SEARCH_NAME, {stmt->funcname}});
-      bool function_is_owned_by_super = superuser_arg(fattrs.owner);
-
-      if (!current_user_is_super && function_is_owned_by_super) {
-        ereport(ERROR, (errmsg("Non-superuser owned event trigger must execute "
-                               "a non-superuser owned function"),
-                        errdetail("The current user \"%s\" is not a superuser "
-                                  "and the function \"%s\" is "
-                                  "owned by a superuser",
-                                  GetUserNameFromId(current_user_id, false),
-                                  NameListToString(stmt->funcname))));
-      }
-
-      if (current_user_is_super && !function_is_owned_by_super) {
-        ereport(ERROR, (errmsg("Superuser owned event trigger must execute a "
-                               "superuser owned function"),
-                        errdetail("The current user \"%s\" is a superuser and "
-                                  "the function \"%s\" is "
-                                  "owned by a non-superuser",
-                                  GetUserNameFromId(current_user_id, false),
-                                  NameListToString(stmt->funcname))));
-      }
-
-      RUN_ELEVATED(
-          supautils_superuser, run_process_utility_hook(prev_hook);
-
-          if (!current_user_is_super) {
-            // Change event trigger owner to the current role (which is a
-            // privileged role)
-            alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
-          });
-
-      return;
-    }
-  }
-
-  default: break;
-  }
+  const utility_hook_args args = UTILITY_HOOK_ARGS(prev_hook);
+
+  const extension_policy ext_policy = {
+    .superuser             = supautils_superuser,
+    .privileged_role       = privileged_role,
+    .privileged_extensions = privileged_extensions,
+    .custom_scripts_path   = extension_custom_scripts_path,
+    .constrained           = cexts,
+    .total_constrained     = total_cexts,
+    .overrides             = epos,
+    .total_overrides       = total_epos,
+    .restrict_versions     = restrict_extension_versions,
+  };
+
+  const role_policy roles = {
+    .superuser                       = supautils_superuser,
+    .privileged_role                 = privileged_role,
+    .reserved_roles                  = reserved_roles,
+    .reserved_memberships            = reserved_memberships,
+    .privileged_role_allowed_configs = privileged_role_allowed_configs,
+  };
+
+  const table_grant_policy table_grants = {
+    .superuser                 = supautils_superuser,
+    .policy_grants             = pgs,
+    .total_policy_grants       = total_pgs,
+    .drop_trigger_grants       = dtgs,
+    .total_drop_trigger_grants = total_dtgs,
+  };
+
+  const privileged_role_policy privileged = {
+    .superuser       = supautils_superuser,
+    .privileged_role = privileged_role,
+    .allowed_configs = privileged_role_allowed_configs,
+  };
+
+  if (handle_extension_stmt(utility_stmt, &args, &ext_policy)) return;
+  if (handle_role_stmt(utility_stmt, &args, &roles)) return;
+  if (handle_table_grant_stmt(utility_stmt, &args, &table_grants)) return;
+  if (handle_privileged_role_stmt(utility_stmt, &args, &privileged)) return;
 
   /* Chain to previously defined hooks */
-  run_process_utility_hook(prev_hook);
+  run_prev_utility_hook(&args);
 }
 
 static void clear_extensions_parameter_overrides_array(
@@ -1213,35 +527,6 @@ constrained_extensions_assign_hook(const char                   *newval,
   }
 }
 
-static bool is_reserved_role(const char *target,
-                             bool        allow_configurable_roles) {
-  List     *reserved_roles_list;
-  ListCell *role;
-
-  if (reserved_roles) {
-    SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
-
-    foreach (role, reserved_roles_list) {
-      char *reserved_role        = (char *)lfirst(role);
-      bool  is_configurable_role = remove_ending_wildcard(reserved_role);
-      bool  should_modify_role =
-          is_configurable_role && allow_configurable_roles;
-
-      if (strcmp(target, reserved_role) == 0) {
-        if (should_modify_role) {
-          continue;
-        } else {
-          list_free(reserved_roles_list);
-          return true;
-        }
-      }
-    }
-    list_free(reserved_roles_list);
-  }
-
-  return false;
-}
-
 static bool is_hint_role(const char *target) {
   List     *hint_roles_list;
   ListCell *role;
@@ -1268,26 +553,6 @@ static bool is_hint_role(const char *target) {
   list_free(hint_roles_list);
 
   return false;
-}
-
-static void confirm_reserved_memberships(const char *target) {
-  List     *reserved_memberships_list;
-  ListCell *membership;
-
-  if (reserved_memberships) {
-    SplitIdentifierString(pstrdup(reserved_memberships), ',',
-                          &reserved_memberships_list);
-
-    foreach (membership, reserved_memberships_list) {
-      char *reserved_membership = (char *)lfirst(membership);
-
-      if (strcmp(target, reserved_membership) == 0) {
-        list_free(reserved_memberships_list);
-        EREPORT_RESERVED_MEMBERSHIP(reserved_membership);
-      }
-    }
-    list_free(reserved_memberships_list);
-  }
 }
 
 static bool placeholders_check_hook(char                            **newval,
@@ -1350,32 +615,6 @@ restrict_placeholders_check_hook(char                            **newval,
   }
 
   return true;
-}
-
-static bool is_current_role_privileged(void) {
-  Oid current_role_oid = GetUserId();
-  Oid privileged_role_oid;
-
-  if (privileged_role == NULL) {
-    return false;
-  }
-  privileged_role_oid = get_role_oid(privileged_role, true);
-
-  return OidIsValid(privileged_role_oid) &&
-         has_privs_of_role(current_role_oid, privileged_role_oid);
-}
-
-static bool is_role_privileged(const char *role) {
-  Oid role_oid = get_role_oid(role, true);
-  Oid privileged_role_oid;
-
-  if (privileged_role == NULL) {
-    return false;
-  }
-  privileged_role_oid = get_role_oid(privileged_role, true);
-
-  return OidIsValid(role_oid) && OidIsValid(privileged_role_oid) &&
-         has_privs_of_role(role_oid, privileged_role_oid);
 }
 
 void _PG_init(void) {
