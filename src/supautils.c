@@ -650,6 +650,8 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
 
     if (is_extension_privileged(stmt->extname, privileged_extensions)) {
       RUN_ELEVATED(supautils_superuser, run_process_utility_hook(prev_hook));
+
+      return;
     }
 
     break;
