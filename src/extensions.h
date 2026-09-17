@@ -34,7 +34,7 @@ typedef struct {
  * should carry on with its normal processing; the statement's options may
  * have been rewritten in that case too.
  */
-extern bool handle_extension_stmt(Node *stmt, const utility_call *call,
+extern bool handle_extension_stmt(Node *stmt, const utility_hook_args *args,
                                   const extension_policy *policy);
 
 #endif

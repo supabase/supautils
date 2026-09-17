@@ -69,7 +69,7 @@ static void confirm_reserved_memberships(const char *target,
 /*
  * ALTER ROLE <role> NOLOGIN NOINHERIT..
  */
-static bool alter_role(AlterRoleStmt *stmt, const utility_call *call,
+static bool alter_role(AlterRoleStmt *stmt, const utility_hook_args *args,
                        const role_policy *policy) {
   ListCell *option_cell = NULL;
 
@@ -108,7 +108,7 @@ static bool alter_role(AlterRoleStmt *stmt, const utility_call *call,
   }
 
   // Allow setting bypassrls & replication.
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -116,8 +116,9 @@ static bool alter_role(AlterRoleStmt *stmt, const utility_call *call,
 /*
  * ALTER ROLE <role> SET search_path TO ...
  */
-static bool alter_role_set(AlterRoleSetStmt *stmt, const utility_call *call,
-                           const role_policy *policy) {
+static bool alter_role_set(AlterRoleSetStmt        *stmt,
+                           const utility_hook_args *args,
+                           const role_policy       *policy) {
   bool role_is_privileged = false;
 
   if (!IsTransactionState()) {
@@ -147,7 +148,7 @@ static bool alter_role_set(AlterRoleSetStmt *stmt, const utility_call *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -155,7 +156,7 @@ static bool alter_role_set(AlterRoleSetStmt *stmt, const utility_call *call,
 /*
  * CREATE ROLE
  */
-static bool create_role(CreateRoleStmt *stmt, const utility_call *call,
+static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
                         const role_policy *policy) {
   const char *created_role   = stmt->role;
   List       *addroleto      = NIL;   /* roles to make this a member of */
@@ -224,14 +225,14 @@ static bool create_role(CreateRoleStmt *stmt, const utility_call *call,
   // We also no longer need superuser to grant BYPASSRLS &
   // REPLICATION anyway.
 #if PG16_GTE
-  run_prev_utility_hook(call);
+  run_prev_utility_hook(args);
 #else
   if (is_current_role_privileged(policy->privileged_role)) {
     // Allow `privileged_role` (in addition to superusers) to
     // set bypassrls & replication attributes.
-    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
   } else {
-    run_prev_utility_hook(call);
+    run_prev_utility_hook(args);
   }
 #endif
 
@@ -318,14 +319,14 @@ static void check_rename_role(RenameStmt *stmt, const role_policy *policy) {
     EREPORT_RESERVED_ROLE(stmt->newname);
 }
 
-bool handle_role_stmt(Node *stmt, const utility_call *call,
+bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
                       const role_policy *policy) {
   switch (nodeTag(stmt)) {
-  case T_AlterRoleStmt: return alter_role((AlterRoleStmt *)stmt, call, policy);
+  case T_AlterRoleStmt: return alter_role((AlterRoleStmt *)stmt, args, policy);
   case T_AlterRoleSetStmt:
-    return alter_role_set((AlterRoleSetStmt *)stmt, call, policy);
+    return alter_role_set((AlterRoleSetStmt *)stmt, args, policy);
   case T_CreateRoleStmt:
-    return create_role((CreateRoleStmt *)stmt, call, policy);
+    return create_role((CreateRoleStmt *)stmt, args, policy);
   case T_DropRoleStmt:
     check_drop_role((DropRoleStmt *)stmt, policy);
     return false;

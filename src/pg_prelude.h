@@ -117,27 +117,27 @@ typedef struct {
   QueryEnvironment     *queryEnv;
   DestReceiver         *dest;
   QueryCompletion      *qc;
-} utility_call;
+} utility_hook_args;
 
-// Builds a utility_call from the PROCESS_UTILITY_PARAMS in scope.
-#define UTILITY_CALL(prev_hook)                                                \
-  ((utility_call){prev_hook, PROCESS_UTILITY_ARGS})
+// Builds a utility_hook_args from the PROCESS_UTILITY_PARAMS in scope.
+#define UTILITY_HOOK_ARGS(prev_hook)                                           \
+  ((utility_hook_args){prev_hook, PROCESS_UTILITY_ARGS})
 
-static inline void run_prev_utility_hook(const utility_call *call) {
-  if (call->prev_hook != NULL) {
-    call->prev_hook(call->pstmt, call->queryString,
+static inline void run_prev_utility_hook(const utility_hook_args *args) {
+  if (args->prev_hook != NULL) {
+    args->prev_hook(args->pstmt, args->queryString,
 #if PG14_GTE
-                    call->readOnlyTree,
+                    args->readOnlyTree,
 #endif
-                    call->context, call->params, call->queryEnv, call->dest,
-                    call->qc);
+                    args->context, args->params, args->queryEnv, args->dest,
+                    args->qc);
   } else {
-    standard_ProcessUtility(call->pstmt, call->queryString,
+    standard_ProcessUtility(args->pstmt, args->queryString,
 #if PG14_GTE
-                            call->readOnlyTree,
+                            args->readOnlyTree,
 #endif
-                            call->context, call->params, call->queryEnv,
-                            call->dest, call->qc);
+                            args->context, args->params, args->queryEnv,
+                            args->dest, args->qc);
   }
 }
 

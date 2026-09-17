@@ -7,7 +7,7 @@
 /*
  * CREATE FOREIGN DATA WRAPPER <fdw>
  */
-static bool create_fdw(CreateFdwStmt *stmt, const utility_call *call,
+static bool create_fdw(CreateFdwStmt *stmt, const utility_hook_args *args,
                        const privileged_role_policy *policy) {
   const Oid current_user_id = GetUserId();
 
@@ -20,7 +20,7 @@ static bool create_fdw(CreateFdwStmt *stmt, const utility_call *call,
 
   validate_func_options(stmt->func_options);
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call);
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args);
 
                // Change FDW owner to the current role (which is a privileged
                // role)
@@ -33,7 +33,7 @@ static bool create_fdw(CreateFdwStmt *stmt, const utility_call *call,
  * CREATE PUBLICATION
  */
 static bool create_publication(CreatePublicationStmt        *stmt,
-                               const utility_call           *call,
+                               const utility_hook_args      *args,
                                const privileged_role_policy *policy) {
   const Oid current_user_id = GetUserId();
 
@@ -44,7 +44,7 @@ static bool create_publication(CreatePublicationStmt        *stmt,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call);
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args);
 
                // Change publication owner to the current role (which is a
                // privileged role)
@@ -56,7 +56,7 @@ static bool create_publication(CreatePublicationStmt        *stmt,
 /*
  * ALTER PUBLICATION <name> ADD TABLES IN SCHEMA ...
  */
-static bool alter_publication(const utility_call           *call,
+static bool alter_publication(const utility_hook_args      *args,
                               const privileged_role_policy *policy) {
   if (superuser()) {
     return false;
@@ -65,7 +65,7 @@ static bool alter_publication(const utility_call           *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -73,7 +73,8 @@ static bool alter_publication(const utility_call           *call,
 /*
  * SET <allowed config> ...
  */
-static bool set_allowed_config(VariableSetStmt *stmt, const utility_call *call,
+static bool set_allowed_config(VariableSetStmt              *stmt,
+                               const utility_hook_args      *args,
                                const privileged_role_policy *policy) {
   if (!IsTransactionState()) {
     return false;
@@ -92,7 +93,7 @@ static bool set_allowed_config(VariableSetStmt *stmt, const utility_call *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -101,7 +102,7 @@ static bool set_allowed_config(VariableSetStmt *stmt, const utility_call *call,
  * CREATE EVENT TRIGGER
  */
 static bool create_event_trigger(CreateEventTrigStmt          *stmt,
-                                 const utility_call           *call,
+                                 const utility_hook_args      *args,
                                  const privileged_role_policy *policy) {
   if (!IsTransactionState()) {
     return false;
@@ -138,7 +139,7 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
   }
 
   RUN_ELEVATED(
-      policy->superuser, run_prev_utility_hook(call);
+      policy->superuser, run_prev_utility_hook(args);
 
       if (!current_user_is_super) {
         // Change event trigger owner to the current role (which is a
@@ -149,17 +150,17 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
   return true;
 }
 
-bool handle_privileged_role_stmt(Node *stmt, const utility_call *call,
+bool handle_privileged_role_stmt(Node *stmt, const utility_hook_args *args,
                                  const privileged_role_policy *policy) {
   switch (nodeTag(stmt)) {
-  case T_CreateFdwStmt: return create_fdw((CreateFdwStmt *)stmt, call, policy);
+  case T_CreateFdwStmt: return create_fdw((CreateFdwStmt *)stmt, args, policy);
   case T_CreatePublicationStmt:
-    return create_publication((CreatePublicationStmt *)stmt, call, policy);
-  case T_AlterPublicationStmt: return alter_publication(call, policy);
+    return create_publication((CreatePublicationStmt *)stmt, args, policy);
+  case T_AlterPublicationStmt: return alter_publication(args, policy);
   case T_VariableSetStmt:
-    return set_allowed_config((VariableSetStmt *)stmt, call, policy);
+    return set_allowed_config((VariableSetStmt *)stmt, args, policy);
   case T_CreateEventTrigStmt:
-    return create_event_trigger((CreateEventTrigStmt *)stmt, call, policy);
+    return create_event_trigger((CreateEventTrigStmt *)stmt, args, policy);
   default: return false;
   }
 }

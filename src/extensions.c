@@ -61,9 +61,9 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 /*
  * CREATE EXTENSION <extension>
  */
-static bool create_extension(CreateExtensionStmt *volatile stmt,
-                             const utility_call     *call,
-                             const extension_policy *policy) {
+static bool create_extension(CreateExtensionStmt     *stmt,
+                             const utility_hook_args *args,
+                             const extension_policy  *policy) {
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
@@ -83,10 +83,10 @@ static bool create_extension(CreateExtensionStmt *volatile stmt,
                    policy->total_overrides, policy->overrides));
 
   if (is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
-    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
   } else {
     // non-privileged extensions are created as the caller
-    run_prev_utility_hook(call);
+    run_prev_utility_hook(args);
   }
 
   RUN_ELEVATED(policy->superuser,
@@ -99,8 +99,9 @@ static bool create_extension(CreateExtensionStmt *volatile stmt,
 /*
  * ALTER EXTENSION <extension> [ UPDATE ]
  */
-static bool alter_extension(AlterExtensionStmt *stmt, const utility_call *call,
-                            const extension_policy *policy) {
+static bool alter_extension(AlterExtensionStmt      *stmt,
+                            const utility_hook_args *args,
+                            const extension_policy  *policy) {
   if (superuser()) {
     return false;
   }
@@ -116,7 +117,7 @@ static bool alter_extension(AlterExtensionStmt *stmt, const utility_call *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -124,9 +125,9 @@ static bool alter_extension(AlterExtensionStmt *stmt, const utility_call *call,
 /*
  * ALTER EXTENSION <extension> SET SCHEMA
  */
-static bool alter_extension_schema(AlterObjectSchemaStmt  *stmt,
-                                   const utility_call     *call,
-                                   const extension_policy *policy) {
+static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
+                                   const utility_hook_args *args,
+                                   const extension_policy  *policy) {
   if (stmt->objectType != OBJECT_EXTENSION) {
     return false;
   }
@@ -138,7 +139,7 @@ static bool alter_extension_schema(AlterObjectSchemaStmt  *stmt,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -146,7 +147,7 @@ static bool alter_extension_schema(AlterObjectSchemaStmt  *stmt,
 /*
  * DROP EXTENSION <extension>
  */
-static bool drop_extension(DropStmt *stmt, const utility_call *call,
+static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
                            const extension_policy *policy) {
   if (stmt->removeType != OBJECT_EXTENSION) {
     return false;
@@ -159,7 +160,7 @@ static bool drop_extension(DropStmt *stmt, const utility_call *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
@@ -167,8 +168,9 @@ static bool drop_extension(DropStmt *stmt, const utility_call *call,
 /*
  * COMMENT ON EXTENSION <extension>
  */
-static bool comment_on_extension(CommentStmt *stmt, const utility_call *call,
-                                 const extension_policy *policy) {
+static bool comment_on_extension(CommentStmt             *stmt,
+                                 const utility_hook_args *args,
+                                 const extension_policy  *policy) {
   if (stmt->objtype != OBJECT_EXTENSION) {
     return false;
   }
@@ -182,23 +184,23 @@ static bool comment_on_extension(CommentStmt *stmt, const utility_call *call,
     return false;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(call));
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
   return true;
 }
 
-bool handle_extension_stmt(Node *stmt, const utility_call *call,
+bool handle_extension_stmt(Node *stmt, const utility_hook_args *args,
                            const extension_policy *policy) {
   switch (nodeTag(stmt)) {
   case T_CreateExtensionStmt:
-    return create_extension((CreateExtensionStmt *)stmt, call, policy);
+    return create_extension((CreateExtensionStmt *)stmt, args, policy);
   case T_AlterExtensionStmt:
-    return alter_extension((AlterExtensionStmt *)stmt, call, policy);
+    return alter_extension((AlterExtensionStmt *)stmt, args, policy);
   case T_AlterObjectSchemaStmt:
-    return alter_extension_schema((AlterObjectSchemaStmt *)stmt, call, policy);
-  case T_DropStmt: return drop_extension((DropStmt *)stmt, call, policy);
+    return alter_extension_schema((AlterObjectSchemaStmt *)stmt, args, policy);
+  case T_DropStmt: return drop_extension((DropStmt *)stmt, args, policy);
   case T_CommentStmt:
-    return comment_on_extension((CommentStmt *)stmt, call, policy);
+    return comment_on_extension((CommentStmt *)stmt, args, policy);
   default: return false;
   }
 }

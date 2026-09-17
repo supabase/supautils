@@ -28,7 +28,7 @@ extern bool is_reserved_role(const char *target, bool allow_configurable_roles,
  * on with its normal processing. Reserved roles and memberships raise an error
  * in either case.
  */
-extern bool handle_role_stmt(Node *stmt, const utility_call *call,
+extern bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
                              const role_policy *policy);
 
 #endif

@@ -261,7 +261,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
   /* Get the utility statement from the planned statement */
   Node *utility_stmt = pstmt->utilityStmt;
 
-  const utility_call call = UTILITY_CALL(prev_hook);
+  const utility_hook_args args = UTILITY_HOOK_ARGS(prev_hook);
 
   const extension_policy ext_policy = {
     .superuser             = supautils_superuser,
@@ -297,13 +297,13 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     .allowed_configs = privileged_role_allowed_configs,
   };
 
-  if (handle_extension_stmt(utility_stmt, &call, &ext_policy)) return;
-  if (handle_role_stmt(utility_stmt, &call, &roles)) return;
-  if (handle_table_grant_stmt(utility_stmt, &call, &table_grants)) return;
-  if (handle_privileged_role_stmt(utility_stmt, &call, &privileged)) return;
+  if (handle_extension_stmt(utility_stmt, &args, &ext_policy)) return;
+  if (handle_role_stmt(utility_stmt, &args, &roles)) return;
+  if (handle_table_grant_stmt(utility_stmt, &args, &table_grants)) return;
+  if (handle_privileged_role_stmt(utility_stmt, &args, &privileged)) return;
 
   /* Chain to previously defined hooks */
-  run_prev_utility_hook(&call);
+  run_prev_utility_hook(&args);
 }
 
 static void clear_extensions_parameter_overrides_array(

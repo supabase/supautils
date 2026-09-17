@@ -18,7 +18,8 @@ typedef struct {
  * Returns true when the statement was run, false when the hook should carry
  * on with its normal processing.
  */
-extern bool handle_privileged_role_stmt(Node *stmt, const utility_call *call,
+extern bool handle_privileged_role_stmt(Node                         *stmt,
+                                        const utility_hook_args      *args,
                                         const privileged_role_policy *policy);
 
 #endif
