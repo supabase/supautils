@@ -19,3 +19,13 @@ echo 'create extension citext;' > "$TMPDIR/extension-custom-scripts/autoinc/afte
 mkdir -p "$TMPDIR/extension-custom-scripts/fuzzystrmatch"
 echo 'create table t1();' > "$TMPDIR/extension-custom-scripts/fuzzystrmatch/before-create.sql"
 echo 'drop table t1; create table t2 as values (1);' > "$TMPDIR/extension-custom-scripts/fuzzystrmatch/after-create.sql"
+
+# scripts that error while the backend is elevated, and one that handles its own error
+mkdir -p "$TMPDIR/extension-custom-scripts/ltree"
+echo 'select 1/0;' > "$TMPDIR/extension-custom-scripts/ltree/before-create.sql"
+mkdir -p "$TMPDIR/extension-custom-scripts/unaccent"
+echo 'select 1/0;' > "$TMPDIR/extension-custom-scripts/unaccent/after-create.sql"
+mkdir -p "$TMPDIR/extension-custom-scripts/tablefunc"
+echo "do \$\$ begin perform 1/0; exception when division_by_zero then raise notice 'handled in script'; end \$\$;" > "$TMPDIR/extension-custom-scripts/tablefunc/before-create.sql"
+mkdir -p "$TMPDIR/extension-custom-scripts/tcn"
+echo 'select pg_sleep(5);' > "$TMPDIR/extension-custom-scripts/tcn/before-create.sql"

@@ -1,0 +1,94 @@
+set role extensions_role;
+\echo
+
+-- Each case below makes a `create extension` fail while supautils is elevated.
+-- Afterwards `select current_user` checks the role was restored, and creating
+-- pageinspect (privileged, needs superuser) checks that elevation still works.
+-- an error in a before-create script must not leave the session elevated
+-- or stop later statements from elevating
+create extension ltree;
+ERROR:  division by zero
+CONTEXT:  SQL statement "select 1/0;
+"
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+create extension pageinspect;
+drop extension pageinspect;
+\echo
+
+-- same for an error in an after-create script
+create extension unaccent;
+ERROR:  division by zero
+CONTEXT:  SQL statement "select 1/0;
+"
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+create extension pageinspect;
+drop extension pageinspect;
+\echo
+
+-- a script that handles its own error keeps working
+create extension tablefunc;
+NOTICE:  handled in script
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+drop extension tablefunc;
+create extension pageinspect;
+drop extension pageinspect;
+\echo
+
+-- an error inside create extension itself, while elevated
+create extension pageinspect schema no_such_schema;
+ERROR:  schema "no_such_schema" does not exist
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+create extension pageinspect;
+drop extension pageinspect;
+\echo
+
+-- a statement timeout while a custom script is running
+set statement_timeout = '200ms';
+create extension tcn;
+ERROR:  canceling statement due to statement timeout
+CONTEXT:  SQL statement "select pg_sleep(5);
+"
+reset statement_timeout;
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+create extension pageinspect;
+drop extension pageinspect;
+\echo
+
+-- a custom script that itself creates a privileged extension (nested elevation)
+drop extension if exists citext;
+NOTICE:  extension "citext" does not exist, skipping
+create extension autoinc;
+select current_user;
+  current_user   
+-----------------
+ extensions_role
+(1 row)
+
+drop extension citext;
+drop extension autoinc;
+reset role;
