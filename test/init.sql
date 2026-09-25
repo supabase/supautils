@@ -22,6 +22,7 @@ grant all on database postgres to privileged_role;
 
 -- non-superuser extensions role
 create role extensions_role login nosuperuser;
+grant privileged_role to extensions_role with admin option;
 grant all on database contrib_regression, postgres to extensions_role;
 alter default privileges for role postgres in schema public grant all on tables to extensions_role;
 

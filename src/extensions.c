@@ -64,6 +64,11 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
+
+  if (!is_current_role_privileged(policy->privileged_role) && !superuser()) {
+    return false;
+  }
+
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
@@ -105,6 +110,9 @@ static bool alter_extension(AlterExtensionStmt      *stmt,
   if (superuser()) {
     return false;
   }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
 
   stmt->options =
       restrict_version_specification(EXT_ALTER, stmt->options, policy);
@@ -134,6 +142,9 @@ static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
   if (superuser()) {
     return false;
   }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
   if (!is_extension_privileged(strVal(stmt->object),
                                policy->privileged_extensions)) {
     return false;
@@ -153,6 +164,9 @@ static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
     return false;
   }
   if (superuser()) {
+    return false;
+  }
+  if (!is_current_role_privileged(policy->privileged_role)) {
     return false;
   }
   if (!all_extensions_are_privileged(stmt->objects,
