@@ -160,6 +160,9 @@ static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
   if (superuser()) {
     return false;
   }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
   if (!all_extensions_are_privileged(stmt->objects,
                                      policy->privileged_extensions)) {
     return false;

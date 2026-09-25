@@ -90,5 +90,7 @@ set role unpermissioned_user;
 create extension sslinfo;
 ERROR:  permission denied to create extension "sslinfo"
 HINT:  Must be superuser to create this extension.
+drop extension pageinspect;
+ERROR:  must be owner of extension pageinspect
 reset role;
 drop role unpermissioned_user;
