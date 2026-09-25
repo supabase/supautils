@@ -64,6 +64,11 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
+
+  if (!is_current_role_privileged(policy->privileged_role) && !superuser()) {
+    return false;
+  }
+
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
