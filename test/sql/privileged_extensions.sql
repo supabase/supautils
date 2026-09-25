@@ -67,6 +67,7 @@ create role unpermissioned_user;
 set role unpermissioned_user;
 create extension sslinfo;
 drop extension pageinspect;
+comment on extension pageinspect IS 'THIS SHOULD FAIL';
 
 reset role;
 drop role unpermissioned_user;
