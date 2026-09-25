@@ -4,7 +4,7 @@ GREP ?= grep
 PG_CONFIG = pg_config
 
 # the `-Wno`s quiet C90 warnings
-PG_CFLAGS = -std=c11 -Wextra -Wall -Werror \
+PG_CFLAGS = -std=gnu11 -Wextra -Wall -Werror \
 	-Wno-declaration-after-statement \
 	-Wno-vla \
 	-Wno-long-long
