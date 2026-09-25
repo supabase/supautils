@@ -110,6 +110,9 @@ static bool alter_extension(AlterExtensionStmt      *stmt,
   if (superuser()) {
     return false;
   }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
 
   stmt->options =
       restrict_version_specification(EXT_ALTER, stmt->options, policy);
@@ -137,6 +140,9 @@ static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
     return false;
   }
   if (superuser()) {
+    return false;
+  }
+  if (!is_current_role_privileged(policy->privileged_role)) {
     return false;
   }
   if (!is_extension_privileged(strVal(stmt->object),

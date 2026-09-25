@@ -63,11 +63,15 @@ select * from baz.qux;
 
 -- test non authorized access
 reset role;
+create schema xtens2;
 create role unpermissioned_user;
+grant all on schema xtens2 to public;
 set role unpermissioned_user;
 create extension sslinfo;
 drop extension pageinspect;
 comment on extension pageinspect IS 'THIS SHOULD FAIL';
+alter extension pageinspect SET SCHEMA xtens2;
 
+alter extension pageinspect UPDATE;
 reset role;
 drop role unpermissioned_user;
