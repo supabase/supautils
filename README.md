@@ -173,6 +173,18 @@ This also works for updating and dropping privileged extensions.
 
 If you don't want to enable this functionality, simply leave `supautils.privileged_extensions` empty. Extensions **not** in `supautils.privileged_extensions` would behave normally, i.e. created using the current role.
 
+### Protected Extensions
+
+Some extensions are part of the platform rather than the user's schema, and dropping them takes the platform down with them. You can list those in:
+
+```
+supautils.protected_extensions = 'supabase_vault, pgsodium'
+```
+
+Non-superusers, including members of the [privileged role](#privileged-role), get an error when they try to drop a protected extension or move it to another schema. `DROP EXTENSION ... CASCADE` on an extension that a protected extension depends on is refused too, so a protected extension can't be removed through its dependencies. Superusers are not restricted.
+
+This is independent of `supautils.privileged_extensions`: an extension can be protected whether or not its creation is delegated to the superuser.
+
 ### Extension Custom Scripts
 
 supautils also lets you set custom scripts per extension that gets run at certain events. Currently supported scripts are `before-create` and `after-create`.

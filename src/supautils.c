@@ -33,6 +33,7 @@ static char *placeholders                   = NULL;
 static char *placeholders_disallowed_values = NULL;
 static char *empty_placeholder              = NULL;
 static char *privileged_extensions          = NULL;
+static char *protected_extensions           = NULL;
 static char *supautils_superuser            = NULL;
 static char *extension_custom_scripts_path  = NULL;
 static char *privileged_role = NULL; // the privileged_role is a proxy role for
@@ -267,6 +268,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     .superuser             = supautils_superuser,
     .privileged_role       = privileged_role,
     .privileged_extensions = privileged_extensions,
+    .protected_extensions  = protected_extensions,
     .custom_scripts_path   = extension_custom_scripts_path,
     .constrained           = cexts,
     .total_constrained     = total_cexts,
@@ -445,6 +447,15 @@ privileged_extensions_check_hook(char                            **newval,
                                  __attribute__((unused)) void    **extra,
                                  __attribute__((unused)) GucSource source) {
   check_parameter(*newval, "supautils.privileged_extensions");
+
+  return true;
+}
+
+static bool
+protected_extensions_check_hook(char                            **newval,
+                                __attribute__((unused)) void    **extra,
+                                __attribute__((unused)) GucSource source) {
+  check_parameter(*newval, "supautils.protected_extensions");
 
   return true;
 }
@@ -674,6 +685,13 @@ void _PG_init(void) {
                              "installed using supautils.superuser",
                              NULL, &privileged_extensions, NULL, PGC_SIGHUP, 0,
                              privileged_extensions_check_hook, NULL, NULL);
+
+  DefineCustomStringVariable(
+      "supautils.protected_extensions",
+      "Comma-separated list of extensions which "
+      "non-superusers cannot drop or move to another schema",
+      NULL, &protected_extensions, NULL, PGC_SIGHUP, 0,
+      protected_extensions_check_hook, NULL, NULL);
 
   DefineCustomStringVariable(
       "supautils.privileged_extensions_custom_scripts_path",

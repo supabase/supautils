@@ -2,6 +2,7 @@
 
 #include "extension_custom_scripts.h"
 #include "privileged_extensions.h"
+#include "protected_extensions.h"
 #include "utils.h"
 
 static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
@@ -134,6 +135,15 @@ static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
   if (superuser()) {
     return false;
   }
+  if (is_extension_protected(strVal(stmt->object),
+                             policy->protected_extensions)) {
+    ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                    errmsg("extension \"%s\" is protected and cannot be moved "
+                           "to another schema",
+                           strVal(stmt->object)),
+                    errhint("Protected extensions are listed in "
+                            "supautils.protected_extensions.")));
+  }
   if (!is_extension_privileged(strVal(stmt->object),
                                policy->privileged_extensions)) {
     return false;
@@ -155,6 +165,34 @@ static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
   if (superuser()) {
     return false;
   }
+
+  const char *protected_ext =
+      first_protected_extension(stmt->objects, policy->protected_extensions);
+  if (protected_ext) {
+    ereport(ERROR,
+            (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+             errmsg("extension \"%s\" is protected and cannot be dropped",
+                    protected_ext),
+             errhint("Protected extensions are listed in "
+                     "supautils.protected_extensions.")));
+  }
+
+  // without CASCADE Postgres refuses to drop an extension that others depend on
+  if (stmt->behavior == DROP_CASCADE) {
+    const char *required;
+    protected_ext = protected_dependent_extension(
+        stmt->objects, policy->protected_extensions, &required);
+    if (protected_ext) {
+      ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                      errmsg("cannot drop extension \"%s\" because protected "
+                             "extension \"%s\" "
+                             "depends on it",
+                             required, protected_ext),
+                      errhint("Protected extensions are listed in "
+                              "supautils.protected_extensions.")));
+    }
+  }
+
   if (!all_extensions_are_privileged(stmt->objects,
                                      policy->privileged_extensions)) {
     return false;
