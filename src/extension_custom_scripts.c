@@ -1,5 +1,6 @@
 #include "extension_custom_scripts.h"
 #include <errno.h>
+#include <storage/fd.h>
 #include <sys/stat.h>
 
 // Prevent recursively running custom scripts
