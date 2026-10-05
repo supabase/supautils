@@ -141,7 +141,11 @@ void hook_timezone_check(void) {
     ereport(ERROR,
             (errmsg("supautils: \"TimeZone\" GUC is not a string variable")));
 
+#if PG19_GTE
+  struct config_string *timezone_guc = &guc->_string;
+#else
   struct config_string *timezone_guc = (struct config_string *)guc;
+#endif
 
   prev_check_timezone_hook = timezone_guc->check_hook;
   timezone_guc->check_hook = check_timezone;

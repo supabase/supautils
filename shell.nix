@@ -41,6 +41,18 @@ let
   pgtle18 = pkgs.callPackage ./nix/pg_tle {
     postgresql = xpgPkgs.postgresql_18;
   };
+  # PG19 support doesn't have release yet. Remove once there is official release.
+  pgtle19 = (pkgs.callPackage ./nix/pg_tle {
+    postgresql = xpgPkgs.postgresql_19;
+  }).overrideAttrs (_: {
+    version = "main-2f4b7b3";
+    src = pkgs.fetchFromGitHub {
+      owner = "aws";
+      repo = "pg_tle";
+      rev = "2f4b7b34ac3e65a4c4ec358765839d5f24a910bd";
+      hash = "sha256-8H0xDtNy5tV20GUZxSS5rm365u+BEYs/sVO506Vprdc=";
+    };
+  });
   style = pkgs.writeShellScriptBin "supautils-style" ''
     set -euo pipefail
 
@@ -122,6 +134,7 @@ pkgs.mkShell {
         "16" = [ pgtle16 ];
         "17" = [ pgtle17 ];
         "18" = [ pgtle18 ];
+        "19" = [ pgtle19 ];
       };
     })
     style
