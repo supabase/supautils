@@ -4,7 +4,7 @@ GREP ?= grep
 PG_CONFIG = pg_config
 
 # the `-Wno`s quiet C90 warnings
-PG_CFLAGS = -std=c11 -Wextra -Wall -Werror \
+PG_CFLAGS = -std=gnu11 -Wextra -Wall -Werror \
 	-Wno-declaration-after-statement \
 	-Wno-vla \
 	-Wno-long-long
@@ -173,7 +173,7 @@ endif
 installcheck: $(GENERATED_OUT)
 
 CORE_STAGEDIR = $(BUILD_DIR)/$(notdir $(PG_REGRESS_TESTS))
-CORE_VERSION_PATCH_DIR = $(if $(filter 15 16 17 18,$(PG_VERSION)),test/core_patches/$(PG_VERSION))
+CORE_VERSION_PATCH_DIR = $(if $(filter 15 16 17 18 19,$(PG_VERSION)),test/core_patches/$(PG_VERSION))
 CORE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/*.patch)
 
 $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
