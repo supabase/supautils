@@ -6,6 +6,7 @@ regression.*
 venv/
 site/
 results/*.out
+output_iso/
 .history
 result*
 tags

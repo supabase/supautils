@@ -1,0 +1,43 @@
+Parsed test spec with 3 sessions
+
+starting permutation: s1_begin s1_evtrig s2_evtrig s1_commit s2_owners
+step s1_begin: begin;
+step s1_evtrig: create event trigger iso_evtrig_1 on ddl_command_end execute procedure iso_noop();
+step s2_evtrig: create event trigger iso_evtrig_2 on ddl_command_end execute procedure iso_noop();
+step s1_commit: commit;
+step s2_owners: 
+  select evtname as name, evtowner::regrole as owner from pg_event_trigger where evtname like 'iso_evtrig_%'
+  union all
+  select fdwname, fdwowner::regrole from pg_foreign_data_wrapper where fdwname = 'iso_fdw'
+  order by 1;
+
+name        |owner          
+------------+---------------
+iso_evtrig_1|privileged_role
+iso_evtrig_2|privileged_role
+(2 rows)
+
+
+starting permutation: s1_begin s1_evtrig s2_fdw s1_commit s2_owners
+step s1_begin: begin;
+step s1_evtrig: create event trigger iso_evtrig_1 on ddl_command_end execute procedure iso_noop();
+step s2_fdw: create foreign data wrapper iso_fdw handler postgres_fdw_handler validator postgres_fdw_validator;
+step s1_commit: commit;
+step s2_owners: 
+  select evtname as name, evtowner::regrole as owner from pg_event_trigger where evtname like 'iso_evtrig_%'
+  union all
+  select fdwname, fdwowner::regrole from pg_foreign_data_wrapper where fdwname = 'iso_fdw'
+  order by 1;
+
+name        |owner          
+------------+---------------
+iso_evtrig_1|privileged_role
+iso_fdw     |privileged_role
+(2 rows)
+
+
+starting permutation: s1_begin s1_evtrig s3_alter_role s1_commit
+step s1_begin: begin;
+step s1_evtrig: create event trigger iso_evtrig_1 on ddl_command_end execute procedure iso_noop();
+step s3_alter_role: alter role privileged_role connection limit -1;
+step s1_commit: commit;

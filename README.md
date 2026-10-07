@@ -441,6 +441,10 @@ its name in the `REGRESS` variable via `MAKEFLAGS`. For example, to run just the
 $ MAKEFLAGS="REGRESS=permission_hints" xpg -v 15 test
 ```
 
+Tests that need more than one session are isolation specs under `test/specs`.
+On pg 14 and later `xpg test` runs them with `pg_isolation_regress` after the
+regression tests.
+
 ### Regress testing against PostgreSQL core
 
 Since supautils modifies default postgres behavior with hooks, we need to test exactly what it changes and see if we don't break existing functionality.
