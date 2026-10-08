@@ -8,7 +8,12 @@
     };
   };
 
-  outputs = { self, nixpkgs, xpg }:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      xpg,
+    }:
     let
       systems = [
         "x86_64-linux"
@@ -19,7 +24,8 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
     in
     {
-      devShells = forAllSystems (system:
+      devShells = forAllSystems (
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
           xpgPkgs = xpg.packages.${system};
@@ -28,6 +34,7 @@
           default = import ./shell.nix {
             inherit pkgs xpgPkgs;
           };
-        });
+        }
+      );
     };
 }
