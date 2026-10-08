@@ -54,9 +54,10 @@ static extension_parameter_overrides epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] =
     {0};
 static size_t total_epos = 0;
 
-static char         *policy_grants_str      = NULL;
-static policy_grants pgs[MAX_POLICY_GRANTS] = {0};
-static size_t        total_pgs              = 0;
+static char         *policy_grants_str                = NULL;
+static char         *default_extension_install_schema = NULL;
+static policy_grants pgs[MAX_POLICY_GRANTS]           = {0};
+static size_t        total_pgs                        = 0;
 
 static char               *drop_trigger_grants_str       = NULL;
 static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
@@ -264,15 +265,16 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
   const utility_hook_args args = UTILITY_HOOK_ARGS(prev_hook);
 
   const extension_policy ext_policy = {
-    .superuser             = supautils_superuser,
-    .privileged_role       = privileged_role,
-    .privileged_extensions = privileged_extensions,
-    .custom_scripts_path   = extension_custom_scripts_path,
-    .constrained           = cexts,
-    .total_constrained     = total_cexts,
-    .overrides             = epos,
-    .total_overrides       = total_epos,
-    .restrict_versions     = restrict_extension_versions,
+    .superuser                        = supautils_superuser,
+    .privileged_role                  = privileged_role,
+    .privileged_extensions            = privileged_extensions,
+    .custom_scripts_path              = extension_custom_scripts_path,
+    .constrained                      = cexts,
+    .total_constrained                = total_cexts,
+    .overrides                        = epos,
+    .total_overrides                  = total_epos,
+    .restrict_versions                = restrict_extension_versions,
+    .default_extension_install_schema = default_extension_install_schema,
   };
 
   const role_policy roles = {
@@ -750,6 +752,11 @@ void _PG_init(void) {
   DefineCustomBoolVariable("supautils.disable_program", NULL, NULL,
                            &disable_program, false, PGC_SIGHUP,
                            GUC_SUPERUSER_ONLY, NULL, NULL, NULL);
+
+  DefineCustomStringVariable(
+      "supautils.default_extension_install_schema",
+      "Defines a customer defualt extension install schema", NULL,
+      &default_extension_install_schema, NULL, PGC_SIGHUP, 0, NULL, NULL, NULL);
 
   if (placeholders) {
     List     *comma_separated_list;
