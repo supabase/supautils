@@ -57,12 +57,14 @@ let
     set -euo pipefail
 
     ${pkgs.clang-tools}/bin/clang-format -i src/*.c src/*.h
+    ${pkgs.findutils}/bin/find . -name '*.nix' -exec ${pkgs.nixfmt}/bin/nixfmt {} \+
   '';
   styleCheck = pkgs.writeShellScriptBin "supautils-style-check" ''
     set -euo pipefail
 
     ${pkgs.clang-tools}/bin/clang-format -i src/*.c src/*.h
     ${pkgs.git}/bin/git diff-index --exit-code HEAD -- '*.c'
+    ${pkgs.findutils}/bin/find . -name '*.nix' -exec ${pkgs.nixfmt}/bin/nixfmt --check {} \+
   '';
   loadtestUtility = pkgs.writeShellScriptBin "supautils-loadtest-utility" ''
     set -euo pipefail
