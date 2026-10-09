@@ -3,7 +3,6 @@
 
 #include "pg_prelude.h"
 
-#include "constrained_extensions.h"
 #include "extensions_parameter_overrides.h"
 
 typedef enum {
@@ -18,8 +17,6 @@ typedef struct {
   const char                          *privileged_role;
   const char                          *privileged_extensions;
   const char                          *custom_scripts_path;
-  constrained_extension               *constrained;
-  size_t                               total_constrained;
   const extension_parameter_overrides *overrides;
   size_t                               total_overrides;
   restrict_extension_versions_mode     restrict_versions;
