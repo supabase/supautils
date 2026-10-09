@@ -1,6 +1,5 @@
 #include "pg_prelude.h"
 
-#include "constrained_extensions.h"
 #include "drop_trigger_grants.h"
 #include "event_triggers.h"
 #include "extension_custom_scripts.h"
@@ -44,10 +43,6 @@ static ProcessUtility_hook_type prev_hook                = NULL;
 static fmgr_hook_type           next_fmgr_hook           = NULL;
 static needs_fmgr_hook_type     next_needs_fmgr_hook     = NULL;
 static ExecutorStart_hook_type  prev_executor_start_hook = NULL;
-
-static char                 *constrained_extensions_str        = NULL;
-static constrained_extension cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
-static size_t                total_cexts                       = 0;
 
 static char                         *extensions_parameter_overrides_str = NULL;
 static extension_parameter_overrides epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] =
@@ -268,8 +263,6 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     .privileged_role       = privileged_role,
     .privileged_extensions = privileged_extensions,
     .custom_scripts_path   = extension_custom_scripts_path,
-    .constrained           = cexts,
-    .total_constrained     = total_cexts,
     .overrides             = epos,
     .total_overrides       = total_epos,
     .restrict_versions     = restrict_extension_versions,
@@ -476,57 +469,6 @@ static void check_parameter(char *val, char *name) {
   }
 }
 
-static void clear_constrained_extensions(void) {
-  if (total_cexts > 0) {
-    for (size_t i = 0; i < total_cexts; i++) {
-      pfree(cexts[i].name);
-    }
-  }
-  memset(cexts, 0, sizeof(cexts));
-  total_cexts = 0;
-}
-
-static bool
-constrained_extensions_check_hook(char                            **newval,
-                                  __attribute__((unused)) void    **extra,
-                                  __attribute__((unused)) GucSource source) {
-  constrained_extension tmp_cexts[MAX_CONSTRAINED_EXTENSIONS] = {0};
-
-  if (*newval) {
-    json_constrained_extension_parse_state state =
-        parse_constrained_extensions(*newval, tmp_cexts);
-
-    for (int i = 0; i < state.total_cexts; i++) {
-      pfree(tmp_cexts[i].name);
-    }
-
-    if (state.error_msg) {
-      ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                      errmsg("supautils.constrained_extensions: %s",
-                             state.error_msg)));
-    }
-  }
-
-  return true;
-}
-
-static void
-constrained_extensions_assign_hook(const char                   *newval,
-                                   __attribute__((unused)) void *extra) {
-  clear_constrained_extensions();
-
-  if (newval) {
-    json_constrained_extension_parse_state state =
-        parse_constrained_extensions(newval, cexts);
-    if (state.error_msg) {
-      ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-                      errmsg("supautils.constrained_extensions: %s",
-                             state.error_msg)));
-    }
-    total_cexts = state.total_cexts;
-  }
-}
-
 static bool is_hint_role(const char *target) {
   List     *hint_roles_list;
   ListCell *role;
@@ -715,13 +657,6 @@ void _PG_init(void) {
       "Comma-separated list of roles that receive enhanced permission hints",
       NULL, &hint_roles, NULL, PGC_SIGHUP, 0, hint_roles_check_hook, NULL,
       NULL);
-
-  DefineCustomStringVariable("supautils.constrained_extensions",
-                             "Extensions that require a minimum amount of "
-                             "CPUs, memory and free disk to be installed",
-                             NULL, &constrained_extensions_str, NULL,
-                             PGC_SIGHUP, 0, constrained_extensions_check_hook,
-                             constrained_extensions_assign_hook, NULL);
 
   DefineCustomStringVariable("supautils.drop_trigger_grants",
                              "Allow non-owners to drop triggers on tables",
