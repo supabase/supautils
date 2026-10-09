@@ -67,9 +67,6 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
-  constrain_extension(stmt->extname, policy->constrained,
-                      policy->total_constrained);
-
   RUN_ELEVATED(policy->superuser,
 
                run_global_before_create_script(stmt->extname, stmt->options,
