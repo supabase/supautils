@@ -175,7 +175,12 @@ If you don't want to enable this functionality, simply leave `supautils.privileg
 
 ### Extension Custom Scripts
 
-supautils also lets you set custom scripts per extension that gets run at certain events. Currently supported scripts are `before-create` and `after-create`.
+supautils also lets you set custom scripts per extension and globally that gets run before and after 
+extension creation. The order that these scripts are executed is:
+1. before create global
+2. before create extension
+3. after create extension
+4. after create global
 
 To make this work, configure the setting below:
 
@@ -186,11 +191,50 @@ supautils.extension_custom_scripts_path = '/some/path/extension-custom-scripts'
 Then put the scripts inside the path, e.g.:
 
 ```sql
--- /some/path/extension-custom-scripts/hstore/after-create.sql
-grant all on type hstore to non_superuser_role;
+-- /some/path/extension-custom-scripts/before-create.sql
+do $$
+      begin
+      CREATE SCHEMA IF NOT EXISTS extensions;
+      PERFORM set_config('search_path', 'extensions, ' || current_setting('search_path'), false);
+      end 
+$$;
 ```
 
-This is useful for things like creating a dedicated role per extension and granting privileges as needed to that role.
+```sql
+-- /some/path/extension-custom-scripts/hstore/before-create.sql
+do $$
+      begin
+      CREATE SCHEMA IF NOT EXISTS hstore;
+      PERFORM set_config('search_path', 'hstore, ' || current_setting('search_path'), false);
+      end 
+$$;
+```
+
+grant all after hstore gets created.
+```sql
+-- /some/path/extension-custom-scripts/hstore/after-create.sql
+do $$
+      begin
+      grant all on type hstore to non_superuser_role;
+      PERFORM set_config('search_path', regexp_replace(current_setting('search_path'), '^hstore , ', ''), false);
+      end 
+$$;
+```
+
+```sql
+-- /some/path/extension-custom-scripts/after-create.sql
+CREATE SCHEMA IF NOT EXISTS hstore;
+do $$
+      begin
+      PERFORM set_config('search_path', regexp_replace(current_setting('search_path'), '^extensions, ', ''), false);
+end $$;
+```
+
+This is useful for things like creating a dedicated role per extension, granting privileges as needed to that role, nudging users towards a specific schema to install extensions, etc.
+
+In this example we are able to encourage extensions get created in the extensions schema by appending 
+extensions in front of public in the search path and backing it out afterwards, though this can still
+be overridden by directly specifying the schema to install an extension. For `hstore` we modify this further by giving it its own default schema. Also for hstore we grant privileges after creation.
 
 ### Constrained Extensions
 

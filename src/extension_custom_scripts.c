@@ -229,6 +229,21 @@ static void parse_statement_options(List *stmt_options, char **extschema,
   }
 }
 
+void run_global_after_create_script(
+    char *extname, List *stmt_options,
+    const char *privileged_extensions_custom_scripts_path) {
+  char *extschema  = NULL;
+  char *extversion = NULL;
+  bool  extcascade = false;
+  char  filename[MAXPGPATH];
+
+  parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
+
+  snprintf(filename, MAXPGPATH, "%s/after-create.sql",
+           privileged_extensions_custom_scripts_path);
+  run_custom_script(filename, extname, extschema, extversion, extcascade);
+}
+
 void run_global_before_create_script(
     char *extname, List *stmt_options,
     const char *privileged_extensions_custom_scripts_path) {

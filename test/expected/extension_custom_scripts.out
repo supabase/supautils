@@ -24,12 +24,39 @@ set role extensions_role;
 \echo
 
 -- global extension custom scripts are run
+create schema extensions;
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
 create extension dict_xsyn;
 NOTICE:  extname: dict_xsyn, extschema: <NULL>, extversion: <NULL>, extcascade: f
+select extnamespace::regnamespace from pg_extension where extname = 'dict_xsyn';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
 reset role;
 create extension insert_username version "1.0" schema public cascade;
 NOTICE:  extname: insert_username, extschema: public, extversion: 1.0, extcascade: t
+select extnamespace::regnamespace from pg_extension where extname = 'insert_username';
+ extnamespace 
+--------------
+ public
+(1 row)
+
 set role extensions_role;
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop schema extensions CASCADE;
+NOTICE:  drop cascades to extension dict_xsyn
 \echo
 
 -- custom scripts are run even for superusers
@@ -46,3 +73,35 @@ drop table t2;
 set role extensions_role;
 \echo
 
+-- test that pg_visibiliy is placed in visibility schema (test of example in docs)
+reset role;
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+create extension pg_visibility;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_visibility';
+ extnamespace 
+--------------
+ visibility
+(1 row)
+
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension pg_visibility;
+set role extensions_role;
+-- validate script fire order
+reset role;
+create extension btree_gin;
+NOTICE:  global before-create.sql firing
+NOTICE:  btree_gin before-create.sql firing
+NOTICE:  btree_gin after-create.sql firing
+NOTICE:  global after-create.sql firing
+drop extension btree_gin;
+set role extensions_role;
