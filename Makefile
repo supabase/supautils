@@ -58,6 +58,13 @@ endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
+# tests that need more than one session, run with pg_isolation_regress, which
+# postgres installs for extensions starting from pg 14
+ifeq ($(PG_GE14), 0)
+ISOLATION = $(patsubst test/specs/%.spec,%,$(wildcard test/specs/*.spec))
+ISOLATION_OPTS = --use-existing --inputdir=test
+endif
+
 GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
@@ -110,6 +117,9 @@ $(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX): $(MODULE_big).$(DL_SUFFIX)
 	mv $? $@
 
 include $(PGXS)
+
+# the isolation specs use the roles and the database the regression tests use
+ISOLATION_TESTDB = $(CONTRIB_TESTDB)
 
 .PHONY: test/expected/event_triggers.out
 test/expected/event_triggers.out: test/expected/event_triggers.out.in
