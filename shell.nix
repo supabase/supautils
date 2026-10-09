@@ -23,6 +23,9 @@ let
   pgmq15 = pkgs.callPackage ./nix/pgmq.nix {
     postgresql = xpgPkgs.postgresql_15;
   };
+  pgmq17 = pkgs.callPackage ./nix/pgmq.nix {
+    postgresql = xpgPkgs.postgresql_17;
+  };
   pgtle13 = pkgs.callPackage ./nix/pg_tle {
     postgresql = xpgPkgs.postgresql_13;
   };
@@ -120,7 +123,10 @@ pkgs.mkShell {
           pgtle15
         ];
         "16" = [ pgtle16 ];
-        "17" = [ pgtle17 ];
+        "17" = [ 
+	   pgmq17
+	   pgtle17 
+	];
         "18" = [ pgtle18 ];
       };
     })

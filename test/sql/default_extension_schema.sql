@@ -28,6 +28,10 @@ select extnamespace::regnamespace from pg_extension where extname = 'hstore';
 drop extension hstore;
 alter system reset supautils.extensions_parameter_overrides;
 
+create extension pgmq;
+select extnamespace::regnamespace from pg_extension where extname = 'pgmq';
+drop extension pgmq;
+
 drop schema test_default_extension_install_schema_1;
 drop schema test_default_extension_install_schema_2;
 alter system reset supautils.default_extension_install_schema;
