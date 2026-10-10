@@ -37,10 +37,8 @@ typedef struct {
 extern json_policy_grants_parse_state parse_policy_grants(const char    *str,
                                                           policy_grants *pgs);
 
-extern bool
-is_current_role_granted_table_policy(const RangeVar      *table_range_var,
-                                     const policy_grants *pgs,
-                                     const size_t         total_pgs,
-                                     LOCKMODE             target_lockmode);
+extern bool is_current_role_granted_table_policy(
+    const RangeVar *table_range_var, const policy_grants *pgs,
+    const size_t total_pgs, LOCKMODE target_lockmode);
 
 #endif

@@ -91,7 +91,9 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 
   RUN_ELEVATED(policy->superuser,
                run_ext_after_create_script(stmt->extname, stmt->options,
-                                           policy->custom_scripts_path));
+                                           policy->custom_scripts_path);
+               run_global_after_create_script(stmt->extname, stmt->options,
+                                              policy->custom_scripts_path));
 
   return true;
 }
