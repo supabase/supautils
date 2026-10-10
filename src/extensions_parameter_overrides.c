@@ -142,7 +142,9 @@ parse_extensions_parameter_overrides(const char                    *str,
 
 List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
                            List *options, const size_t total_epos,
-                           const extension_parameter_overrides *epos) {
+                           const extension_parameter_overrides *epos,
+                           const char *default_extension_install_schema) {
+
   for (size_t i = 0; i < total_epos; i++) {
     if (strcmp(epos[i].name, extname) == 0) {
       const extension_parameter_overrides *epo                    = &epos[i];
@@ -178,6 +180,28 @@ List *override_ext_options(extension_stmt_kind stmt_kind, const char *extname,
         }
         options = lappend(options, schema_override_option);
       }
+    }
+  }
+
+  // handle default
+  if (default_extension_install_schema != NULL) {
+    DefElem  *schema_option = NULL;
+    ListCell *option_cell;
+
+    schema_option = NULL;
+    foreach (option_cell, options) {
+      DefElem *defel = lfirst_node(DefElem, option_cell);
+
+      if (strcmp(defel->defname, "schema") == 0) {
+        schema_option = defel;
+      }
+    }
+    if (schema_option == NULL) {
+      DefElem *schema_override_option = NULL;
+      Node    *schema_node =
+          (Node *)makeString(pstrdup(default_extension_install_schema));
+      schema_override_option = makeDefElem("schema", schema_node, -1);
+      options                = lappend(options, schema_override_option);
     }
   }
 

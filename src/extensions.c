@@ -80,7 +80,8 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 
                stmt->options = override_ext_options(
                    EXT_CREATE, stmt->extname, stmt->options,
-                   policy->total_overrides, policy->overrides));
+                   policy->total_overrides, policy->overrides,
+                   policy->default_extension_install_schema));
 
   if (is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
     RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
@@ -111,7 +112,7 @@ static bool alter_extension(AlterExtensionStmt      *stmt,
 
   stmt->options =
       override_ext_options(EXT_ALTER, stmt->extname, stmt->options,
-                           policy->total_overrides, policy->overrides);
+                           policy->total_overrides, policy->overrides, NULL);
 
   if (!is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
     return false;

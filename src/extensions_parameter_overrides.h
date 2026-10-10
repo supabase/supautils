@@ -39,6 +39,7 @@ parse_extensions_parameter_overrides(const char                    *str,
 extern List *override_ext_options(extension_stmt_kind stmt_kind,
                                   const char *extname, List *options,
                                   const size_t total_epos,
-                                  const extension_parameter_overrides *epos);
+                                  const extension_parameter_overrides *epos,
+                                  const char *default_extension_install_schema);
 
 #endif

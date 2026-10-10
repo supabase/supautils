@@ -23,6 +23,7 @@ typedef struct {
   const extension_parameter_overrides *overrides;
   size_t                               total_overrides;
   restrict_extension_versions_mode     restrict_versions;
+  const char                          *default_extension_install_schema;
 } extension_policy;
 
 /**
