@@ -36,9 +36,9 @@ execute procedure show_current_user();
 
 -- the event trigger is owned by the privileged_role
 select evtowner::regrole from pg_event_trigger where evtname = 'event_trigger_1';
-    evtowner     
------------------
- privileged_role
+ evtowner 
+----------
+ postgres
 (1 row)
 
 -- The privileged_role should execute the event trigger function

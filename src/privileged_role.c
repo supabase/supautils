@@ -97,6 +97,47 @@ static bool set_allowed_config(VariableSetStmt              *stmt,
 
   return true;
 }
+/*
+ * DROP EVENT TRIGGER <extension>
+ */
+static bool drop_event_trigger(DropStmt *stmt, const utility_hook_args *args,
+                           const privileged_role_policy *policy) {
+  if (stmt->removeType != OBJECT_EVENT_TRIGGER) {
+    return false;
+  }
+  if (superuser()) {
+    return false;
+  }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
+
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
+
+  return true;
+}
+/*
+ * ALTER EVENT TRIGGER
+ */
+static bool alter_event_trigger(
+                                const utility_hook_args      *args,
+                                const privileged_role_policy *policy) {
+  if (!IsTransactionState()) {
+    return false;
+  }
+  if (superuser()) {
+    return false;
+  }
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
+
+  RUN_ELEVATED(
+      policy->superuser, run_prev_utility_hook(args)
+      );
+
+  return true;
+}
 
 /*
  * CREATE EVENT TRIGGER
@@ -137,15 +178,13 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
                               GetUserNameFromId(current_user_id, false),
                               NameListToString(stmt->funcname))));
   }
+  if (superuser()) {
+    return false;
+  }
 
   RUN_ELEVATED(
-      policy->superuser, run_prev_utility_hook(args);
-
-      if (!current_user_is_super) {
-        // Change event trigger owner to the current role (which is a
-        // privileged role)
-        alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
-      });
+      policy->superuser, run_prev_utility_hook(args)
+      );
 
   return true;
 }
@@ -161,6 +200,10 @@ bool handle_privileged_role_stmt(Node *stmt, const utility_hook_args *args,
     return set_allowed_config((VariableSetStmt *)stmt, args, policy);
   case T_CreateEventTrigStmt:
     return create_event_trigger((CreateEventTrigStmt *)stmt, args, policy);
+  case T_AlterEventTrigStmt:
+    return alter_event_trigger(args, policy);
+  case T_DropStmt:
+    return drop_event_trigger((DropStmt *)stmt, args, policy);
   default: return false;
   }
 }
