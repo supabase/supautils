@@ -64,11 +64,33 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
+  // volatile: assigned before the PG_TRY inside RUN_ELEVATED
+  char *volatile saved_search_path = NULL;
+
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
   constrain_extension(stmt->extname, policy->constrained,
                       policy->total_constrained);
+
+  // prepend the default schema to search_path so schema-less creates land
+  // there. pinned control files and explicit SCHEMA clauses still win since
+  // postgres only falls back to search_path. on error the GUC change is
+  // rolled back with the transaction, the restore at the end covers the
+  // success path.
+  if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
+      OidIsValid(get_namespace_oid(policy->default_schema, true))) {
+    const char *current = GetConfigOption("search_path", true, false);
+
+    saved_search_path = pstrdup(current ? current : "");
+    SetConfigOption("search_path",
+                    saved_search_path[0] == '\0'
+                        ? quote_identifier(policy->default_schema)
+                        : psprintf("%s, %s",
+                                   quote_identifier(policy->default_schema),
+                                   saved_search_path),
+                    PGC_USERSET, PGC_S_SESSION);
+  }
 
   RUN_ELEVATED(policy->superuser,
 
@@ -92,6 +114,11 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   RUN_ELEVATED(policy->superuser,
                run_ext_after_create_script(stmt->extname, stmt->options,
                                            policy->custom_scripts_path));
+
+  if (saved_search_path != NULL) {
+    SetConfigOption("search_path", saved_search_path, PGC_USERSET,
+                    PGC_S_SESSION);
+  }
 
   return true;
 }

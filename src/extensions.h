@@ -18,6 +18,7 @@ typedef struct {
   const char                          *privileged_role;
   const char                          *privileged_extensions;
   const char                          *custom_scripts_path;
+  const char                          *default_schema;
   constrained_extension               *constrained;
   size_t                               total_constrained;
   const extension_parameter_overrides *overrides;
