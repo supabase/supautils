@@ -178,6 +178,22 @@ drop schema "Mixed Case";
 set supautils.default_extension_install_schema to 'extensions';
 \echo
 
+-- applies to extensions installed via cascade, which never reach
+-- process utility (earthdistance requires cube)
+create extension earthdistance cascade;
+NOTICE:  installing required extension "cube"
+select extname, extnamespace::regnamespace from pg_extension
+where extname in ('cube', 'earthdistance') order by extname;
+    extname    | extnamespace 
+---------------+--------------
+ cube          | extensions
+ earthdistance | extensions
+(2 rows)
+
+drop extension earthdistance;
+drop extension cube;
+\echo
+
 -- applies to privileged extensions created by non-superusers
 set role extensions_role;
 create extension hstore;
