@@ -65,28 +65,28 @@ static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
   // volatile: assigned before the PG_TRY inside RUN_ELEVATED
-  char *volatile saved_search_path = NULL;
+  volatile int save_nestlevel = 0;
 
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
   // prepend the default schema to search_path so schema-less creates land
   // there. pinned control files and explicit SCHEMA clauses still win since
-  // postgres only falls back to search_path. on error the GUC change is
-  // rolled back with the transaction, the restore at the end covers the
-  // success path.
+  // postgres only falls back to search_path. saved and restored via a GUC
+  // nest level, same as core's execute_extension_script, so on error the
+  // change is rolled back with the transaction.
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
     const char *current = GetConfigOption("search_path", true, false);
 
-    saved_search_path = pstrdup(current ? current : "");
-    SetConfigOption("search_path",
-                    saved_search_path[0] == '\0'
-                        ? quote_identifier(policy->default_schema)
-                        : psprintf("%s, %s",
-                                   quote_identifier(policy->default_schema),
-                                   saved_search_path),
-                    PGC_USERSET, PGC_S_SESSION);
+    save_nestlevel = NewGUCNestLevel();
+    set_config_option(
+        "search_path",
+        (current == NULL || current[0] == '\0')
+            ? quote_identifier(policy->default_schema)
+            : psprintf("%s, %s", quote_identifier(policy->default_schema),
+                       current),
+        PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
   }
 
   RUN_ELEVATED(policy->superuser,
@@ -114,9 +114,8 @@ static bool create_extension(CreateExtensionStmt     *stmt,
                run_global_after_create_script(stmt->extname, stmt->options,
                                               policy->custom_scripts_path));
 
-  if (saved_search_path != NULL) {
-    SetConfigOption("search_path", saved_search_path, PGC_USERSET,
-                    PGC_S_SESSION);
+  if (save_nestlevel > 0) {
+    AtEOXact_GUC(true, save_nestlevel);
   }
 
   return true;

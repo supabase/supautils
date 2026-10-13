@@ -137,6 +137,32 @@ drop table t_default_schema_leak;
 drop extension hstore;
 \echo
 
+-- a set local before create extension still reverts at commit
+begin;
+set local search_path = pg_catalog;
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+ search_path 
+-------------
+ pg_catalog
+(1 row)
+
+commit;
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension hstore;
+\echo
+
 -- schema names that need quoting work
 create schema "Mixed Case";
 set supautils.default_extension_install_schema to 'Mixed Case';
