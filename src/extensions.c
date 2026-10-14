@@ -64,7 +64,10 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
-  int save_nestlevel = 0;
+  // volatile is not needed for correctness: the variable is assigned before
+  // the PG_TRY inside RUN_ELEVATED and never read in the catch path. it only
+  // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
+  volatile int save_nestlevel = 0;
 
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
