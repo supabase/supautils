@@ -59,3 +59,21 @@ mkdir -p "$TMPDIR/extension-custom-scripts/tablefunc"
 echo "do \$\$ begin perform 1/0; exception when division_by_zero then raise notice 'handled in script'; end \$\$;" > "$TMPDIR/extension-custom-scripts/tablefunc/before-create.sql"
 mkdir -p "$TMPDIR/extension-custom-scripts/tcn"
 echo 'select pg_sleep(5);' > "$TMPDIR/extension-custom-scripts/tcn/before-create.sql"
+
+# a script that pins search_path transaction-locally and restores it (the
+# supabase_vault pattern)
+mkdir -p "$TMPDIR/extension-custom-scripts/dict_int"
+echo "do \$\$
+      declare
+        _sp text := current_setting('search_path');
+      begin
+        perform set_config('search_path', 'pg_catalog', true);
+        perform set_config('search_path', _sp, true);
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/dict_int/before-create.sql"
+
+# a script that replaces search_path at session level and never restores it
+mkdir -p "$TMPDIR/extension-custom-scripts/intarray"
+echo "do \$\$
+      begin
+        perform set_config('search_path', 'public', false);
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/intarray/before-create.sql"
