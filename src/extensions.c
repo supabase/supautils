@@ -64,8 +64,7 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 static bool create_extension(CreateExtensionStmt     *stmt,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
-  // volatile: assigned before the PG_TRY inside RUN_ELEVATED
-  volatile int save_nestlevel = 0;
+  int save_nestlevel = 0;
 
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
@@ -83,7 +82,7 @@ static bool create_extension(CreateExtensionStmt     *stmt,
     const char *current = GetConfigOption("search_path", true, false);
 
     save_nestlevel = NewGUCNestLevel();
-    set_config_option(
+    (void)set_config_option(
         "search_path",
         (current == NULL || current[0] == '\0')
             ? quote_identifier(policy->default_schema)
