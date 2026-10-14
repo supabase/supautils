@@ -633,7 +633,9 @@ void _PG_init(void) {
 
   DefineCustomStringVariable(
       "supautils.default_extension_install_schema",
-      "Schema prepended to search_path for the duration of CREATE EXTENSION",
+      "The default schema where extensions will be installed, unless a schema "
+      "is specified in CREATE EXTENSION or pinned by the extension's control "
+      "file",
       NULL, &default_extension_install_schema, NULL, PGC_SUSET, 0, NULL, NULL,
       NULL);
 
