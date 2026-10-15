@@ -3,7 +3,21 @@
 # print notice when creating an extension
 mkdir -p "$TMPDIR/extension-custom-scripts"
 echo "do \$\$
+      declare
+        _sp text;
       begin
+        -- global script that pins search_path transaction-locally and
+        -- restores it (the supabase_vault pattern)
+        if @extname@ = 'pg_trgm' then
+          _sp := current_setting('search_path');
+          perform set_config('search_path', 'pg_catalog', true);
+          perform set_config('search_path', _sp, true);
+        end if;
+        -- global script that replaces search_path at session level and
+        -- never restores it
+        if @extname@ = 'isn' then
+          perform set_config('search_path', 'public', false);
+        end if;
         if not (@extname@ = ANY(ARRAY['dict_xsyn', 'insert_username'])) then
           return;
         end if;

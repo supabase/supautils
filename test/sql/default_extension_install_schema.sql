@@ -120,6 +120,24 @@ drop extension intarray;
 reset search_path;
 \echo
 
+-- same two script behaviors via the global before-create script: the
+-- vault pattern affects neither placement nor the session
+show search_path;
+create extension pg_trgm;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_trgm';
+show search_path;
+drop extension pg_trgm;
+\echo
+
+-- and a global script that replaces search_path at session level wins
+-- over the default, its change persisting for the session
+create extension isn;
+select extnamespace::regnamespace from pg_extension where extname = 'isn';
+show search_path;
+drop extension isn;
+reset search_path;
+\echo
+
 -- applies to pg_tle extensions, including cascades through tle requirements
 create extension pg_tle;
 select pgtle.install_extension('tle_a', '1.0', 'tle dep',
