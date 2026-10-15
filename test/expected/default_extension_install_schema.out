@@ -1,0 +1,381 @@
+-- unset by default, create extension behaves as stock postgres
+show supautils.default_extension_install_schema;
+ supautils.default_extension_install_schema 
+--------------------------------------------
+ 
+(1 row)
+
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ public
+(1 row)
+
+drop extension hstore;
+\echo
+
+-- can be set per session by a superuser
+set supautils.default_extension_install_schema to 'extensions';
+\echo
+
+-- falls back to stock behavior while the target schema does not exist
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ public
+(1 row)
+
+drop extension hstore;
+\echo
+
+create schema extensions;
+\echo
+
+-- schema-less create extension lands in the default schema, search_path is untouched
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension hstore;
+\echo
+
+-- an explicit schema clause wins over the default
+create extension hstore schema public;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ public
+(1 row)
+
+drop extension hstore;
+\echo
+
+-- a control-file pinned schema wins over the default (pg_tle pins pgtle)
+create extension pg_tle;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_tle';
+ extnamespace 
+--------------
+ pgtle
+(1 row)
+
+drop extension pg_tle;
+drop schema pgtle;
+\echo
+
+-- an extensions_parameter_overrides entry wins over the default
+-- (sslinfo is pinned to pg_catalog in init.conf.in)
+create extension sslinfo;
+select extnamespace::regnamespace from pg_extension where extname = 'sslinfo';
+ extnamespace 
+--------------
+ pg_catalog
+(1 row)
+
+drop extension sslinfo;
+\echo
+
+-- works with an empty search_path
+set search_path = '';
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+ search_path 
+-------------
+ ""
+(1 row)
+
+drop extension hstore;
+reset search_path;
+\echo
+
+-- search_path is untouched when create extension errors
+create extension does_not_exist;
+ERROR:  extension "does_not_exist" is not available
+HINT:  The extension must first be installed on the system where PostgreSQL is running.
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+\echo
+
+-- does not leak to later statements of the same transaction
+begin;
+create extension hstore;
+create table t_default_schema_leak();
+commit;
+select schemaname from pg_tables where tablename = 't_default_schema_leak';
+ schemaname 
+------------
+ public
+(1 row)
+
+drop table t_default_schema_leak;
+drop extension hstore;
+\echo
+
+-- a set local before create extension still reverts at commit
+begin;
+set local search_path = pg_catalog;
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+ search_path 
+-------------
+ pg_catalog
+(1 row)
+
+commit;
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension hstore;
+\echo
+
+-- schema names that need quoting work
+create schema "Mixed Case";
+set supautils.default_extension_install_schema to 'Mixed Case';
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ "Mixed Case"
+(1 row)
+
+drop extension hstore;
+drop schema "Mixed Case";
+set supautils.default_extension_install_schema to 'extensions';
+\echo
+
+-- applies to extensions installed via cascade, which never reach
+-- process utility (earthdistance requires cube)
+create extension earthdistance cascade;
+NOTICE:  installing required extension "cube"
+select extname, extnamespace::regnamespace from pg_extension
+where extname in ('cube', 'earthdistance') order by extname;
+    extname    | extnamespace 
+---------------+--------------
+ cube          | extensions
+ earthdistance | extensions
+(2 rows)
+
+drop extension earthdistance;
+drop extension cube;
+\echo
+
+-- a custom script that pins search_path transaction-locally and restores it
+-- (the supabase_vault pattern) affects neither placement nor the session
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+create extension dict_int;
+select extnamespace::regnamespace from pg_extension where extname = 'dict_int';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension dict_int;
+\echo
+
+-- a custom script that replaces search_path at session level wins over the
+-- default: scripts are admin-controlled and run after the default applies.
+-- the script's change persists for the session, as any session-level set
+-- in a script does
+create extension intarray;
+select extnamespace::regnamespace from pg_extension where extname = 'intarray';
+ extnamespace 
+--------------
+ public
+(1 row)
+
+show search_path;
+ search_path 
+-------------
+ public
+(1 row)
+
+drop extension intarray;
+reset search_path;
+\echo
+
+-- same two script behaviors via the global before-create script: the
+-- vault pattern affects neither placement nor the session
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+create extension pg_trgm;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_trgm';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+show search_path;
+   search_path   
+-----------------
+ "$user", public
+(1 row)
+
+drop extension pg_trgm;
+\echo
+
+-- and a global script that replaces search_path at session level wins
+-- over the default, its change persisting for the session
+create extension isn;
+select extnamespace::regnamespace from pg_extension where extname = 'isn';
+ extnamespace 
+--------------
+ public
+(1 row)
+
+show search_path;
+ search_path 
+-------------
+ public
+(1 row)
+
+drop extension isn;
+reset search_path;
+\echo
+
+-- applies to pg_tle extensions, including cascades through tle requirements
+create extension pg_tle;
+select pgtle.install_extension('tle_a', '1.0', 'tle dep',
+  $tle$ create function tle_a_fn() returns int language sql as 'select 1'; $tle$);
+ install_extension 
+-------------------
+ t
+(1 row)
+
+select pgtle.install_extension('tle_b', '1.0', 'tle requiring a tle',
+  $tle$ create function tle_b_fn() returns int language sql as 'select 2'; $tle$,
+  '{tle_a}');
+ install_extension 
+-------------------
+ t
+(1 row)
+
+create extension tle_b cascade;
+NOTICE:  installing required extension "tle_a"
+select extname, extnamespace::regnamespace from pg_extension
+where extname in ('tle_a', 'tle_b') order by extname;
+ extname | extnamespace 
+---------+--------------
+ tle_a   | extensions
+ tle_b   | extensions
+(2 rows)
+
+drop extension tle_b;
+drop extension tle_a;
+\echo
+
+-- mixed chain: a tle requiring both a regular extension and a tle
+select pgtle.install_extension('tle_m', '1.0', 'tle with mixed requires',
+  $tle$ create function tle_m_fn() returns int language sql as 'select 3'; $tle$,
+  '{hstore, tle_a}');
+ install_extension 
+-------------------
+ t
+(1 row)
+
+create extension tle_m cascade;
+NOTICE:  installing required extension "hstore"
+NOTICE:  installing required extension "tle_a"
+select extname, extnamespace::regnamespace from pg_extension
+where extname in ('hstore', 'tle_a', 'tle_m') order by extname;
+ extname | extnamespace 
+---------+--------------
+ hstore  | extensions
+ tle_a   | extensions
+ tle_m   | extensions
+(3 rows)
+
+drop extension tle_m;
+drop extension tle_a;
+drop extension hstore;
+select pgtle.uninstall_extension('tle_m');
+ uninstall_extension 
+---------------------
+ t
+(1 row)
+
+select pgtle.uninstall_extension('tle_b');
+ uninstall_extension 
+---------------------
+ t
+(1 row)
+
+select pgtle.uninstall_extension('tle_a');
+ uninstall_extension 
+---------------------
+ t
+(1 row)
+
+drop extension pg_tle;
+drop schema pgtle;
+\echo
+
+-- applies to privileged extensions created by non-superusers
+set role extensions_role;
+create extension hstore;
+select extnamespace::regnamespace from pg_extension where extname = 'hstore';
+ extnamespace 
+--------------
+ extensions
+(1 row)
+
+drop extension hstore;
+\echo
+
+-- non-superusers cannot change the setting
+set supautils.default_extension_install_schema to 'public';
+ERROR:  permission denied to set parameter "supautils.default_extension_install_schema"
+reset role;
+\echo
+
+-- cleanup
+drop schema extensions;
