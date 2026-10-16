@@ -35,3 +35,9 @@ select * from t2;
 drop table t2;
 set role extensions_role;
 \echo
+
+-- validate script fire order
+reset role;
+create extension btree_gin;
+drop extension btree_gin;
+set role extensions_role;
