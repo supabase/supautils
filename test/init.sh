@@ -4,6 +4,10 @@
 mkdir -p "$TMPDIR/extension-custom-scripts"
 echo "do \$\$
       begin
+
+        if (@extname@ = 'btree_gin') then
+          raise notice 'global before-create.sql firing';
+        end if;
         if not (@extname@ = ANY(ARRAY['dict_xsyn', 'insert_username'])) then
           return;
         end if;
@@ -11,6 +15,32 @@ echo "do \$\$
           raise notice 'extname: %, extschema: %, extversion: %, extcascade: %', @extname@, @extschema@, @extversion@, @extcascade@;
         end if;
       end \$\$;" > "$TMPDIR/extension-custom-scripts/before-create.sql"
+
+echo "do \$\$
+      begin
+
+      if (@extname@ = 'btree_gin') then
+        raise notice 'global after-create.sql firing';
+      end if;
+
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/after-create.sql"
+
+mkdir "$TMPDIR/extension-custom-scripts/btree_gin"
+echo "
+do \$\$
+      begin
+        raise notice 'btree_gin before-create.sql firing';
+
+
+end \$\$;
+" > "$TMPDIR/extension-custom-scripts/btree_gin/before-create.sql"
+
+echo "
+do \$\$
+      begin
+        raise notice 'btree_gin after-create.sql firing';
+end \$\$;
+" > "$TMPDIR/extension-custom-scripts/btree_gin/after-create.sql"
 
 mkdir -p "$TMPDIR/extension-custom-scripts/autoinc"
 echo 'create extension citext;' > "$TMPDIR/extension-custom-scripts/autoinc/after-create.sql"
