@@ -174,7 +174,12 @@ If you don't want to enable this functionality, simply leave `supautils.privileg
 
 ### Extension Custom Scripts
 
-supautils also lets you set custom scripts per extension that gets run at certain events. Currently supported scripts are `before-create` and `after-create`.
+supautils also lets you set custom scripts per extension and globally that gets run before and after 
+extension creation. The order that these scripts are executed is:
+1. before create global
+2. before create extension
+3. after create extension
+4. after create global
 
 To make this work, configure the setting below:
 
@@ -182,14 +187,18 @@ To make this work, configure the setting below:
 supautils.extension_custom_scripts_path = '/some/path/extension-custom-scripts'
 ```
 
-Then put the scripts inside the path, e.g.:
-
-```sql
--- /some/path/extension-custom-scripts/hstore/after-create.sql
-grant all on type hstore to non_superuser_role;
+Then put the scripts inside the path:
+```console
+> tree
+.
+├── after-create.sql
+├── before-create.sql
+└── fuzzystrmatch
+    ├── after-create.sql
+    └── before-create.sql
 ```
 
-This is useful for things like creating a dedicated role per extension and granting privileges as needed to that role.
+This is useful for things like creating a dedicated role per extension, granting privileges as needed to that role, etc.
 
 ### Extensions Parameter Overrides
 
