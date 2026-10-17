@@ -9,11 +9,15 @@
 #include <postgres.h>
 
 #include <access/htup_details.h>
+#include <access/table.h>
 #include <access/xact.h>
 #include <catalog/namespace.h>
 #include <catalog/pg_authid.h>
 #include <catalog/pg_collation_d.h>
+#include <catalog/pg_event_trigger.h>
+#include <catalog/pg_foreign_data_wrapper.h>
 #include <catalog/pg_proc.h>
+#include <commands/alter.h>
 #include <commands/defrem.h>
 #include <commands/event_trigger.h>
 #include <commands/publicationcmds.h>
@@ -21,6 +25,7 @@
 #include <executor/executor.h>
 #include <executor/spi.h>
 #include <fmgr.h>
+#include <foreign/foreign.h>
 #include <miscadmin.h>
 #include <nodes/bitmapset.h>
 #include <nodes/makefuncs.h>

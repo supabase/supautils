@@ -77,47 +77,39 @@ bool remove_ending_wildcard(char *elem) {
   return wildcard_removed;
 }
 
-static void alter_role_super(const char *rolename, bool make_super) {
-  RoleSpec *rolespec = makeNode(RoleSpec);
-  rolespec->roletype = ROLESPEC_CSTRING;
-  rolespec->rolename = pstrdup(rolename);
-  rolespec->location = -1;
-
-  AlterRoleStmt *alter_stmt = makeNode(AlterRoleStmt);
-  alter_stmt->role          = rolespec;
-
-#if PG15_GTE
-  alter_stmt->options =
-      list_make1(makeDefElem("superuser", (Node *)makeBoolean(make_super), -1));
-
-  AlterRole(NULL, alter_stmt);
+// Sets the owner of a catalog object without checking that the new owner is a
+// superuser.
+//
+// AlterForeignDataWrapperOwner() and AlterEventTriggerOwner() only accept a
+// superuser as the new owner. AlterObjectOwner_internal() is the generic owner
+// change behind most ALTER ... OWNER TO commands: it updates the owner, the
+// ACL and the owner dependency as those two do, but has no such check, and it
+// skips its own permission checks for a superuser, which the caller is while
+// elevated.
+static void set_owner(Oid class_id, Oid object_oid, Oid role_oid) {
+#if PG17_GTE
+  AlterObjectOwner_internal(class_id, object_oid, role_oid);
 #else
-  alter_stmt->options =
-      list_make1(makeDefElem("superuser", (Node *)makeInteger(make_super), -1));
+  Relation catalog = table_open(class_id, RowExclusiveLock);
 
-  AlterRole(alter_stmt);
+  AlterObjectOwner_internal(catalog, object_oid, role_oid);
+  table_close(catalog, RowExclusiveLock);
 #endif
-
   CommandCounterIncrement();
 }
 
 // Changes the OWNER of a database object.
-// Some objects (e.g. foreign data wrappers) can only be owned by superusers, so
-// this switches to superuser accordingly and then goes backs to non-super.
+// Postgres only lets superusers own some objects (foreign data wrappers and
+// event triggers). Those are given to the role with set_owner(), which leaves
+// the role itself alone: making it a superuser for the change would update its
+// pg_authid row, which every database in the cluster shares.
 void alter_owner(const char *obj_name, Oid role_oid,
                  altered_obj_type obj_type) {
   switch (obj_type) {
-  case ALT_FDW: {
-    char *role_name = GetUserNameFromId(role_oid, false);
-    alter_role_super(role_name, true);
-
-    AlterForeignDataWrapperOwner(obj_name, role_oid);
-    CommandCounterIncrement();
-
-    alter_role_super(role_name, false);
-
+  case ALT_FDW:
+    set_owner(ForeignDataWrapperRelationId,
+              get_foreign_data_wrapper_oid(obj_name, false), role_oid);
     break;
-  }
 
   case ALT_PUB:
 
@@ -126,18 +118,10 @@ void alter_owner(const char *obj_name, Oid role_oid,
 
     break;
 
-  case ALT_EVTRIG: {
-    char *role_name = GetUserNameFromId(role_oid, false);
-
-    alter_role_super(role_name, true);
-
-    AlterEventTriggerOwner(obj_name, role_oid);
-    CommandCounterIncrement();
-
-    alter_role_super(role_name, false);
-
+  case ALT_EVTRIG:
+    set_owner(EventTriggerRelationId, get_event_trigger_oid(obj_name, false),
+              role_oid);
     break;
-  }
   }
 }
 
