@@ -138,6 +138,16 @@ drop extension isn;
 reset search_path;
 \echo
 
+-- the save/restore brackets only search_path: an unrelated GUC set by a
+-- script keeps its script-assigned value after create extension
+show work_mem;
+create extension pg_freespacemap;
+select extnamespace::regnamespace from pg_extension where extname = 'pg_freespacemap';
+show work_mem;
+drop extension pg_freespacemap;
+reset work_mem;
+\echo
+
 -- applies to pg_tle extensions, including cascades through tle requirements
 create extension pg_tle;
 select pgtle.install_extension('tle_a', '1.0', 'tle dep',

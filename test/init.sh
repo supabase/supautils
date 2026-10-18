@@ -21,6 +21,10 @@ echo "do \$\$
         if @extname@ = 'isn' then
           perform set_config('search_path', 'public', false);
         end if;
+        -- global script that sets an unrelated GUC
+        if @extname@ = 'pg_freespacemap' then
+          perform set_config('work_mem', '64MB', false);
+        end if;
         if not (@extname@ = ANY(ARRAY['dict_xsyn', 'insert_username'])) then
           return;
         end if;
