@@ -26,14 +26,15 @@ PG_MODULE_MAGIC_EXT(.name = "supautils", .version = MODVERSION);
 PG_MODULE_MAGIC;
 #endif
 
-static char *reserved_roles                 = NULL;
-static char *reserved_memberships           = NULL;
-static char *placeholders                   = NULL;
-static char *placeholders_disallowed_values = NULL;
-static char *empty_placeholder              = NULL;
-static char *privileged_extensions          = NULL;
-static char *supautils_superuser            = NULL;
-static char *extension_custom_scripts_path  = NULL;
+static char *reserved_roles                   = NULL;
+static char *reserved_memberships             = NULL;
+static char *placeholders                     = NULL;
+static char *placeholders_disallowed_values   = NULL;
+static char *empty_placeholder                = NULL;
+static char *privileged_extensions            = NULL;
+static char *supautils_superuser              = NULL;
+static char *extension_custom_scripts_path    = NULL;
+static char *default_extension_install_schema = NULL;
 static char *privileged_role = NULL; // the privileged_role is a proxy role for
                                      // the `supautils.superuser` role
 static char *privileged_role_allowed_configs = NULL;
@@ -263,6 +264,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     .privileged_role       = privileged_role,
     .privileged_extensions = privileged_extensions,
     .custom_scripts_path   = extension_custom_scripts_path,
+    .default_schema        = default_extension_install_schema,
     .overrides             = epos,
     .total_overrides       = total_epos,
     .restrict_versions     = restrict_extension_versions,
@@ -628,6 +630,14 @@ void _PG_init(void) {
                              "Path to load extension custom scripts from", NULL,
                              &extension_custom_scripts_path, NULL, PGC_SIGHUP,
                              0, NULL, NULL, NULL);
+
+  DefineCustomStringVariable(
+      "supautils.default_extension_install_schema",
+      "The default schema where extensions will be installed, unless a schema "
+      "is specified in CREATE EXTENSION or pinned by the extension's control "
+      "file",
+      NULL, &default_extension_install_schema, NULL, PGC_SUSET, 0, NULL, NULL,
+      NULL);
 
   DefineCustomStringVariable(
       "supautils.superuser",
