@@ -60,7 +60,6 @@ static drop_trigger_grants dtgs[MAX_DROP_TRIGGER_GRANTS] = {0};
 static size_t              total_dtgs                    = 0;
 
 static bool log_skipped_evtrigs = false;
-static bool disable_program     = false;
 
 static const struct config_enum_entry restrict_extension_versions_options[] = {
   {"off", RESTRICT_EXTENSION_VERSIONS_OFF, false},
@@ -701,11 +700,6 @@ void _PG_init(void) {
                            "Log skipped event triggers with a NOTICE level",
                            NULL, &log_skipped_evtrigs, false, PGC_USERSET, 0,
                            NULL, NULL, NULL);
-
-  // DO NOT USE; here for backward compat
-  DefineCustomBoolVariable("supautils.disable_program", NULL, NULL,
-                           &disable_program, false, PGC_SIGHUP,
-                           GUC_SUPERUSER_ONLY, NULL, NULL, NULL);
 
   if (placeholders) {
     List     *comma_separated_list;
