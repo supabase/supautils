@@ -655,13 +655,6 @@ void _PG_init(void) {
       "Superuser to install extensions in supautils.privileged_extensions as",
       NULL, &supautils_superuser, NULL, PGC_SIGHUP, 0, NULL, NULL, NULL);
 
-  // TODO emit a warning when this deprecated GUC is used
-  DefineCustomStringVariable(
-      "supautils.privileged_extensions_superuser",
-      "Superuser to install extensions in supautils.privileged_extensions "
-      "as. Deprecated: use supautils.superuser instead.",
-      NULL, &supautils_superuser, NULL, PGC_SIGHUP, 0, NULL, NULL, NULL);
-
   DefineCustomStringVariable(
       "supautils.privileged_role",
       "Non-superuser role to be granted with some superuser privileges", NULL,
