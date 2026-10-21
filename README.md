@@ -355,6 +355,23 @@ supautils.reserved_memberships = 'pg_read_server_files'
 
 This is also useful to limit memberships to the [Reserved Roles](#reserved-roles).
 
+### Supautils Version
+
+If built against postgres 17 or below the version of supautils can be accessed using the 
+`supautils.version` read-only config item. It can be seen using the SHOW command as below.
+
+```
+SHOW supautils.version;
+```
+
+For postgres versions 18 and above this config is marked as deprecated as version can be 
+accessed through postgres natively via the `pg_get_loaded_modules` function as below.
+
+```
+SELECT * 
+FROM pg_get_loaded_modules();
+```
+
 ### Enhanced hints
 
 Errors that originated from "permission denied" (SQLSTATE 42501) errors, will produce a HINT that includes the exact privileges missing to clear the error.
