@@ -27,6 +27,7 @@ PG_MODULE_MAGIC;
 #endif
 
 static char *reserved_roles                   = NULL;
+static char *supautils_version                = NULL;
 static char *reserved_memberships             = NULL;
 static char *placeholders                     = NULL;
 static char *placeholders_disallowed_values   = NULL;
@@ -586,6 +587,16 @@ void _PG_init(void) {
                              PGC_SIGHUP, 0,
                              &extensions_parameter_overrides_check_hook,
                              &extensions_parameter_overrides_assign_hook, NULL);
+#if PG_VERSION_NUM >= 180000
+  DefineCustomStringVariable(
+      "supautils.version", "DEPRECATED: version of the supautils lib", NULL,
+      &supautils_version, MODVERSION, PGC_INTERNAL,
+      GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE, NULL, NULL, NULL);
+#else
+  DefineCustomStringVariable(
+      "supautils.version", "version of the supautils lib", NULL,
+      &supautils_version, MODVERSION, PGC_INTERNAL, 0, NULL, NULL, NULL);
+#endif
 
   DefineCustomStringVariable(
       "supautils.reserved_roles",

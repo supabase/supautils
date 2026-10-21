@@ -48,6 +48,12 @@ else
 TESTS := $(filter-out test/sql/lt16_%.sql, $(TESTS))
 endif
 
+ifneq ($(PG_GE18), 0)
+TESTS := $(filter-out test/sql/ge18_%.sql, $(TESTS))
+else
+TESTS := $(filter-out test/sql/lt18_%.sql, $(TESTS))
+endif
+
 ifeq ($(PG_NEQ15), 0)
 TESTS := $(filter-out test/sql/eq15_%.sql, $(TESTS))
 endif
