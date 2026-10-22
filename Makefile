@@ -64,7 +64,7 @@ endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
-GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out
+GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out test/expected/ge18_supautils_version.out test/expected/lt18_supautils_version.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -174,6 +174,11 @@ else
 		-e '/<PG_LE13>/,/<\/PG_LE13>/d' \
 		$? > $@
 endif
+
+test/expected/%_supautils_version.out: test/expected/%_supautils_version.out.in
+	sed \
+		-e 's/@MODVERSION@/$(MODVERSION)/' \
+		$? > $@
 
 # extra dep for target in pgxs.mk
 installcheck: $(GENERATED_OUT)
