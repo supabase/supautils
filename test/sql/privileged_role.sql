@@ -322,3 +322,9 @@ select obj_description(oid, 'pg_extension') from pg_extension where extname = 'h
 select current_user;
 drop extension hstore;
 \echo
+
+-- unprivileged role does not segfault the server
+create role unprivileged;
+set role unprivileged;
+alter role all set search_path to ''; 
+reset role;

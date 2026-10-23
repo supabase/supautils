@@ -411,3 +411,10 @@ select current_user;
 drop extension hstore;
 \echo
 
+-- unprivileged role does not segfault the server
+create role unprivileged;
+set role unprivileged;
+alter role all set search_path to ''; 
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+reset role;
