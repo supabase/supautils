@@ -130,10 +130,12 @@ static bool alter_role_set(AlterRoleSetStmt        *stmt,
 
   role_is_privileged = is_current_role_privileged(policy->privileged_role);
 
-  char *role_name = get_rolespec_name(stmt->role);
+  if (stmt->role){
+	  char *role_name = get_rolespec_name(stmt->role);
 
-  if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(role_name);
+	  if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
+	    EREPORT_RESERVED_ROLE(role_name);
+  }
 
   if (!role_is_privileged) {
     return false;
