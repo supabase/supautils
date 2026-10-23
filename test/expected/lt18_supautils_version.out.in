@@ -2,7 +2,7 @@
 SHOW supautils.version;
  supautils.version 
 -------------------
- 3.4.4
+ @MODVERSION@
 (1 row)
 
 -- Validate that user is not able to change version
@@ -10,7 +10,8 @@ SET supautils.version to 'v0.0.0';
 ERROR:  parameter "supautils.version" cannot be changed
 -- Validate the deprecated parameter doesnt show up on pg_settings
 SELECT name FROM pg_settings WHERE name = 'supautils.version';
- name 
-------
-(0 rows)
+       name        
+-------------------
+ supautils.version
+(1 row)
 
