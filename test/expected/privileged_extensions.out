@@ -83,3 +83,12 @@ select * from baz.qux;
 --
 (0 rows)
 
+-- test non authorized access
+reset role;
+create role unpermissioned_user;
+set role unpermissioned_user;
+create extension sslinfo;
+ERROR:  permission denied to create extension "sslinfo"
+HINT:  Must be superuser to create this extension.
+reset role;
+drop role unpermissioned_user;

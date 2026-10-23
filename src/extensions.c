@@ -69,6 +69,10 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
   volatile int save_nestlevel = 0;
 
+  if (!is_current_role_privileged(policy->privileged_role) && !superuser()) {
+    return false;
+  }
+
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 

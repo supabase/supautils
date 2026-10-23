@@ -60,3 +60,12 @@ create table public.qux();
 create schema baz;
 alter table public.qux set schema baz;
 select * from baz.qux;
+
+-- test non authorized access
+reset role;
+create role unpermissioned_user;
+set role unpermissioned_user;
+create extension sslinfo;
+
+reset role;
+drop role unpermissioned_user;
