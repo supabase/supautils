@@ -130,7 +130,7 @@ static bool create_extension(CreateExtensionStmt     *stmt,
     RUN_ELEVATED(
         policy->superuser,
         run_ext_after_create_script(stmt->extname, stmt->options,
-                                    policy->custom_scripts_path)
+                                    policy->custom_scripts_path);
             run_global_after_create_script(stmt->extname, stmt->options,
                                            policy->custom_scripts_path));
   } else {
@@ -141,6 +141,7 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   }
   if (save_nestlevel > 0) {
     AtEOXact_GUC(true, save_nestlevel);
+  }
 
     return true;
   }
