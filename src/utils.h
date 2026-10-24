@@ -19,6 +19,17 @@
 extern Oid superuser_oid(const char *superuser);
 
 /**
+ * The role a RoleSpec names, resolving CURRENT_USER, CURRENT_ROLE and
+ * SESSION_USER. NULL when there is no single named role: a NULL spec
+ * (ALTER ROLE ALL) or PUBLIC. Never errors. This is the only way to read a
+ * RoleSpec; the raw core lookups are poisoned in pg_prelude.h.
+ */
+extern const char *rolespec_name_or_null(const RoleSpec *spec);
+
+/** Whether a role with this name exists. False for NULL. */
+extern bool role_exists(const char *role);
+
+/**
  * Run the statements in `...` with the current user and security context set
  * to `uid` and `sec_context`, then restore the caller's, whether the body
  * completes or errors. The saved state lives on the stack. Don't nest one

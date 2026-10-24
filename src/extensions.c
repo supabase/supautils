@@ -44,13 +44,13 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
               (errmsg("only superusers can specify extension versions, "
                       "ignoring version \"%s\" and installing the default "
                       "version",
-                      strVal(defel->arg))));
+                      defGetString(defel))));
     else
       ereport(WARNING,
               (errmsg("only superusers can specify extension versions, "
                       "ignoring version \"%s\" and updating to the default "
                       "version",
-                      strVal(defel->arg))));
+                      defGetString(defel))));
 
     options = foreach_delete_current(options, lc);
   }
@@ -61,7 +61,7 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 /*
  * CREATE EXTENSION <extension>
  */
-static bool create_extension(CreateExtensionStmt     *stmt,
+static bool create_extension(char *extname, List **options,
                              const utility_hook_args *args,
                              const extension_policy  *policy) {
   // volatile is not needed for correctness: the variable is assigned before
@@ -69,8 +69,7 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
   volatile int save_nestlevel = 0;
 
-  stmt->options =
-      restrict_version_specification(EXT_CREATE, stmt->options, policy);
+  *options = restrict_version_specification(EXT_CREATE, *options, policy);
 
   // prepend the default schema to search_path so schema-less creates land
   // there. pinned control files and explicit SCHEMA clauses still win since
@@ -93,17 +92,17 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 
   RUN_ELEVATED(policy->superuser,
 
-               run_global_before_create_script(stmt->extname, stmt->options,
+               run_global_before_create_script(extname, *options,
                                                policy->custom_scripts_path);
 
-               run_ext_before_create_script(stmt->extname, stmt->options,
+               run_ext_before_create_script(extname, *options,
                                             policy->custom_scripts_path);
 
-               stmt->options = override_ext_options(
-                   EXT_CREATE, stmt->extname, stmt->options,
-                   policy->total_overrides, policy->overrides));
+               *options = override_ext_options(EXT_CREATE, extname, *options,
+                                               policy->total_overrides,
+                                               policy->overrides));
 
-  if (is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
+  if (is_extension_privileged(extname, policy->privileged_extensions)) {
     RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
   } else {
     // non-privileged extensions are created as the caller
@@ -111,9 +110,9 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   }
 
   RUN_ELEVATED(policy->superuser,
-               run_ext_after_create_script(stmt->extname, stmt->options,
+               run_ext_after_create_script(extname, *options,
                                            policy->custom_scripts_path);
-               run_global_after_create_script(stmt->extname, stmt->options,
+               run_global_after_create_script(extname, *options,
                                               policy->custom_scripts_path));
 
   if (save_nestlevel > 0) {
@@ -126,21 +125,19 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 /*
  * ALTER EXTENSION <extension> [ UPDATE ]
  */
-static bool alter_extension(AlterExtensionStmt      *stmt,
+static bool alter_extension(char *extname, List **options,
                             const utility_hook_args *args,
                             const extension_policy  *policy) {
   if (superuser()) {
     return false;
   }
 
-  stmt->options =
-      restrict_version_specification(EXT_ALTER, stmt->options, policy);
+  *options = restrict_version_specification(EXT_ALTER, *options, policy);
 
-  stmt->options =
-      override_ext_options(EXT_ALTER, stmt->extname, stmt->options,
-                           policy->total_overrides, policy->overrides);
+  *options = override_ext_options(EXT_ALTER, extname, *options,
+                                  policy->total_overrides, policy->overrides);
 
-  if (!is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
+  if (!is_extension_privileged(extname, policy->privileged_extensions)) {
     return false;
   }
 
@@ -152,17 +149,13 @@ static bool alter_extension(AlterExtensionStmt      *stmt,
 /*
  * ALTER EXTENSION <extension> SET SCHEMA
  */
-static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
+static bool alter_extension_schema(const char              *extname,
                                    const utility_hook_args *args,
                                    const extension_policy  *policy) {
-  if (stmt->objectType != OBJECT_EXTENSION) {
-    return false;
-  }
   if (superuser()) {
     return false;
   }
-  if (!is_extension_privileged(strVal(stmt->object),
-                               policy->privileged_extensions)) {
+  if (!is_extension_privileged(extname, policy->privileged_extensions)) {
     return false;
   }
 
@@ -174,16 +167,12 @@ static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
 /*
  * DROP EXTENSION <extension>
  */
-static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
+static bool drop_extension(List *extnames, const utility_hook_args *args,
                            const extension_policy *policy) {
-  if (stmt->removeType != OBJECT_EXTENSION) {
-    return false;
-  }
   if (superuser()) {
     return false;
   }
-  if (!all_extensions_are_privileged(stmt->objects,
-                                     policy->privileged_extensions)) {
+  if (!all_extensions_are_privileged(extnames, policy->privileged_extensions)) {
     return false;
   }
 
@@ -195,12 +184,8 @@ static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
 /*
  * COMMENT ON EXTENSION <extension>
  */
-static bool comment_on_extension(CommentStmt             *stmt,
-                                 const utility_hook_args *args,
+static bool comment_on_extension(const utility_hook_args *args,
                                  const extension_policy  *policy) {
-  if (stmt->objtype != OBJECT_EXTENSION) {
-    return false;
-  }
   if (!IsTransactionState()) {
     return false;
   }
@@ -216,18 +201,35 @@ static bool comment_on_extension(CommentStmt             *stmt,
   return true;
 }
 
+/*
+ * Handlers never see a parse node: the switch below reads the few fields the
+ * policy needs and hands over plain values. CREATE/ALTER EXTENSION get a
+ * pointer to the options list because they rewrite it before core runs.
+ */
 bool handle_extension_stmt(Node *stmt, const utility_hook_args *args,
                            const extension_policy *policy) {
   switch (nodeTag(stmt)) {
-  case T_CreateExtensionStmt:
-    return create_extension((CreateExtensionStmt *)stmt, args, policy);
-  case T_AlterExtensionStmt:
-    return alter_extension((AlterExtensionStmt *)stmt, args, policy);
-  case T_AlterObjectSchemaStmt:
-    return alter_extension_schema((AlterObjectSchemaStmt *)stmt, args, policy);
-  case T_DropStmt: return drop_extension((DropStmt *)stmt, args, policy);
+  case T_CreateExtensionStmt: {
+    CreateExtensionStmt *create = (CreateExtensionStmt *)stmt;
+    return create_extension(create->extname, &create->options, args, policy);
+  }
+  case T_AlterExtensionStmt: {
+    AlterExtensionStmt *alter = (AlterExtensionStmt *)stmt;
+    return alter_extension(alter->extname, &alter->options, args, policy);
+  }
+  case T_AlterObjectSchemaStmt: {
+    AlterObjectSchemaStmt *schema = (AlterObjectSchemaStmt *)stmt;
+    if (schema->objectType != OBJECT_EXTENSION) return false;
+    return alter_extension_schema(strVal(schema->object), args, policy);
+  }
+  case T_DropStmt: {
+    DropStmt *drop = (DropStmt *)stmt;
+    if (drop->removeType != OBJECT_EXTENSION) return false;
+    return drop_extension(drop->objects, args, policy);
+  }
   case T_CommentStmt:
-    return comment_on_extension((CommentStmt *)stmt, args, policy);
+    if (((CommentStmt *)stmt)->objtype != OBJECT_EXTENSION) return false;
+    return comment_on_extension(args, policy);
   default: return false;
   }
 }

@@ -7,7 +7,8 @@
 /*
  * CREATE FOREIGN DATA WRAPPER <fdw>
  */
-static bool create_fdw(CreateFdwStmt *stmt, const utility_hook_args *args,
+static bool create_fdw(const char *fdwname, List *func_options,
+                       const utility_hook_args      *args,
                        const privileged_role_policy *policy) {
   const Oid current_user_id = GetUserId();
 
@@ -18,13 +19,13 @@ static bool create_fdw(CreateFdwStmt *stmt, const utility_hook_args *args,
     return false;
   }
 
-  validate_func_options(stmt->func_options);
+  validate_func_options(func_options);
 
   RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args);
 
                // Change FDW owner to the current role (which is a privileged
                // role)
-               alter_owner(stmt->fdwname, current_user_id, ALT_FDW));
+               alter_owner(fdwname, current_user_id, ALT_FDW));
 
   return true;
 }
@@ -32,7 +33,7 @@ static bool create_fdw(CreateFdwStmt *stmt, const utility_hook_args *args,
 /*
  * CREATE PUBLICATION
  */
-static bool create_publication(CreatePublicationStmt        *stmt,
+static bool create_publication(const char                   *pubname,
                                const utility_hook_args      *args,
                                const privileged_role_policy *policy) {
   const Oid current_user_id = GetUserId();
@@ -48,7 +49,7 @@ static bool create_publication(CreatePublicationStmt        *stmt,
 
                // Change publication owner to the current role (which is a
                // privileged role)
-               alter_owner(stmt->pubname, current_user_id, ALT_PUB));
+               alter_owner(pubname, current_user_id, ALT_PUB));
 
   return true;
 }
@@ -73,7 +74,8 @@ static bool alter_publication(const utility_hook_args      *args,
 /*
  * SET <allowed config> ...
  */
-static bool set_allowed_config(VariableSetStmt              *stmt,
+// config_name is NULL for RESET ALL.
+static bool set_allowed_config(const char                   *config_name,
                                const utility_hook_args      *args,
                                const privileged_role_policy *policy) {
   if (!IsTransactionState()) {
@@ -85,7 +87,7 @@ static bool set_allowed_config(VariableSetStmt              *stmt,
   if (policy->allowed_configs == NULL) {
     return false;
   }
-  if (!is_string_in_comma_delimited_string(stmt->name,
+  if (!is_string_in_comma_delimited_string(config_name,
                                            policy->allowed_configs)) {
     return false;
   }
@@ -101,7 +103,7 @@ static bool set_allowed_config(VariableSetStmt              *stmt,
 /*
  * CREATE EVENT TRIGGER
  */
-static bool create_event_trigger(CreateEventTrigStmt          *stmt,
+static bool create_event_trigger(const char *trigname, List *funcname,
                                  const utility_hook_args      *args,
                                  const privileged_role_policy *policy) {
   if (!IsTransactionState()) {
@@ -115,7 +117,7 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
 
   bool       current_user_is_super = superuser_arg(current_user_id);
   func_attrs fattrs =
-      get_function_attrs((func_search){FO_SEARCH_NAME, {stmt->funcname}});
+      get_function_attrs((func_search){FO_SEARCH_NAME, {funcname}});
   bool function_is_owned_by_super = superuser_arg(fattrs.owner);
 
   if (!current_user_is_super && function_is_owned_by_super) {
@@ -125,7 +127,7 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
                               "and the function \"%s\" is "
                               "owned by a superuser",
                               GetUserNameFromId(current_user_id, false),
-                              NameListToString(stmt->funcname))));
+                              NameListToString(funcname))));
   }
 
   if (current_user_is_super && !function_is_owned_by_super) {
@@ -135,7 +137,7 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
                               "the function \"%s\" is "
                               "owned by a non-superuser",
                               GetUserNameFromId(current_user_id, false),
-                              NameListToString(stmt->funcname))));
+                              NameListToString(funcname))));
   }
 
   RUN_ELEVATED(
@@ -144,23 +146,33 @@ static bool create_event_trigger(CreateEventTrigStmt          *stmt,
       if (!current_user_is_super) {
         // Change event trigger owner to the current role (which is a
         // privileged role)
-        alter_owner(stmt->trigname, current_user_id, ALT_EVTRIG);
+        alter_owner(trigname, current_user_id, ALT_EVTRIG);
       });
 
   return true;
 }
 
+/*
+ * Handlers never see a parse node: the switch below reads the few fields the
+ * policy needs and hands over plain values.
+ */
 bool handle_privileged_role_stmt(Node *stmt, const utility_hook_args *args,
                                  const privileged_role_policy *policy) {
   switch (nodeTag(stmt)) {
-  case T_CreateFdwStmt: return create_fdw((CreateFdwStmt *)stmt, args, policy);
+  case T_CreateFdwStmt: {
+    CreateFdwStmt *fdw = (CreateFdwStmt *)stmt;
+    return create_fdw(fdw->fdwname, fdw->func_options, args, policy);
+  }
   case T_CreatePublicationStmt:
-    return create_publication((CreatePublicationStmt *)stmt, args, policy);
+    return create_publication(((CreatePublicationStmt *)stmt)->pubname, args,
+                              policy);
   case T_AlterPublicationStmt: return alter_publication(args, policy);
   case T_VariableSetStmt:
-    return set_allowed_config((VariableSetStmt *)stmt, args, policy);
-  case T_CreateEventTrigStmt:
-    return create_event_trigger((CreateEventTrigStmt *)stmt, args, policy);
+    return set_allowed_config(((VariableSetStmt *)stmt)->name, args, policy);
+  case T_CreateEventTrigStmt: {
+    CreateEventTrigStmt *evt = (CreateEventTrigStmt *)stmt;
+    return create_event_trigger(evt->trigname, evt->funcname, args, policy);
+  }
   default: return false;
   }
 }

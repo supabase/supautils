@@ -161,4 +161,15 @@ static inline void run_prev_utility_hook(const utility_hook_args *args) {
 
 #endif
 
+/*
+ * The raw role lookups require a RoleSpec that names a role; ALTER ROLE ALL has
+ * none and PUBLIC is not one. Every call goes through rolespec_name_or_null()
+ * and role_exists() in utils.c, the only file that may define
+ * SUPAUTILS_ALLOW_RAW_ROLESPEC. Using one of these names anywhere else is a
+ * compile error.
+ */
+#ifndef SUPAUTILS_ALLOW_RAW_ROLESPEC
+#  pragma GCC poison get_rolespec_name get_rolespec_tuple get_rolespec_oid get_role_oid
+#endif
+
 #endif /* PG_PRELUDE_H */
