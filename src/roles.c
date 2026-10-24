@@ -21,6 +21,9 @@ bool is_reserved_role(const char *target, bool allow_configurable_roles,
   List     *reserved_roles_list;
   ListCell *role;
 
+  // No single named role (ALTER ROLE ALL, PUBLIC): nothing to protect.
+  if (target == NULL) return false;
+
   if (reserved_roles) {
     SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
 
@@ -50,6 +53,8 @@ static void confirm_reserved_memberships(const char *target,
   List     *reserved_memberships_list;
   ListCell *membership;
 
+  if (target == NULL) return;
+
   if (reserved_memberships) {
     SplitIdentifierString(pstrdup(reserved_memberships), ',',
                           &reserved_memberships_list);
@@ -67,44 +72,59 @@ static void confirm_reserved_memberships(const char *target,
 }
 
 /*
- * ALTER ROLE <role> NOLOGIN NOINHERIT..
+ * Handlers never see a parse node. Each statement is first reduced to the
+ * plain values the policy needs by one of the normalize_* functions below,
+ * which are the only place raw node fields are read. A field the grammar can
+ * leave absent is documented as nullable on its struct, so the handler has to
+ * decide what absence means.
  */
-static bool alter_role(AlterRoleStmt *stmt, const utility_hook_args *args,
+
+/*
+ * ALTER ROLE <role> NOLOGIN NOINHERIT ...
+ */
+typedef struct {
+  const char *role_name;    // NULL for PUBLIC, which is not a role
+  bool sets_superuser_attr; // a SUPERUSER / NOSUPERUSER option is present
+} alter_role_cmd;
+
+static alter_role_cmd normalize_alter_role(const AlterRoleStmt *stmt) {
+  alter_role_cmd cmd = {.role_name = rolespec_name_or_null(stmt->role)};
+  ListCell      *lc;
+
+  foreach (lc, stmt->options) {
+    DefElem *defel = lfirst_node(DefElem, lc);
+    if (strcmp(defel->defname, "superuser") == 0)
+      cmd.sets_superuser_attr = true;
+  }
+
+  return cmd;
+}
+
+static bool alter_role(const alter_role_cmd *cmd, const utility_hook_args *args,
                        const role_policy *policy) {
-  ListCell *option_cell = NULL;
+  // Not a role the policy can protect; core raises its own error.
+  if (cmd->role_name == NULL) return false;
 
-  if (!IsTransactionState()) {
-    return false;
-  }
-  if (superuser()) {
-    return false;
-  }
-
-  char *role_name = get_rolespec_name(stmt->role);
-
-  if (is_reserved_role(role_name, false, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(role_name);
+  if (is_reserved_role(cmd->role_name, false, policy->reserved_roles))
+    EREPORT_RESERVED_ROLE(cmd->role_name);
 
   if (!is_current_role_privileged(policy->privileged_role)) {
     return false;
   }
 
-  if (is_role_privileged(role_name, policy->privileged_role)) {
+  if (is_role_privileged(cmd->role_name, policy->privileged_role)) {
     ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
                     errmsg("permission denied to alter role"),
                     errdetail("Only superusers can alter privileged roles.")));
   }
 
   // Setting the superuser attribute is not allowed.
-  foreach (option_cell, stmt->options) {
-    DefElem *defel = lfirst_node(DefElem, option_cell);
-    if (strcmp(defel->defname, "superuser") == 0) {
-      ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                      errmsg("permission denied to alter role"),
-                      errdetail("Only roles with the %s attribute may alter "
-                                "roles with the %s attribute.",
-                                "SUPERUSER", "SUPERUSER")));
-    }
+  if (cmd->sets_superuser_attr) {
+    ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                    errmsg("permission denied to alter role"),
+                    errdetail("Only roles with the %s attribute may alter "
+                              "roles with the %s attribute.",
+                              "SUPERUSER", "SUPERUSER")));
   }
 
   // Allow setting bypassrls & replication.
@@ -116,24 +136,34 @@ static bool alter_role(AlterRoleStmt *stmt, const utility_hook_args *args,
 /*
  * ALTER ROLE <role> SET search_path TO ...
  */
-static bool alter_role_set(AlterRoleSetStmt        *stmt,
-                           const utility_hook_args *args,
-                           const role_policy       *policy) {
+typedef struct {
+  const char *role_name;   // NULL for ALTER ROLE ALL and for PUBLIC
+  const char *config_name; // NULL for RESET ALL
+} alter_role_set_cmd;
+
+static alter_role_set_cmd
+normalize_alter_role_set(const AlterRoleSetStmt *stmt) {
+  return (alter_role_set_cmd){
+    .role_name   = rolespec_name_or_null(stmt->role),
+    .config_name = stmt->setstmt->name,
+  };
+}
+
+static bool alter_role_set(const alter_role_set_cmd *cmd,
+                           const utility_hook_args  *args,
+                           const role_policy        *policy) {
   bool role_is_privileged = false;
 
-  if (!IsTransactionState()) {
-    return false;
-  }
-  if (superuser()) {
-    return false;
-  }
+  // ALTER ROLE ALL targets every role and PUBLIC is not a role: there is no
+  // reserved role to protect, and core applies its own stricter permission
+  // check for both.
+  if (cmd->role_name == NULL) return false;
 
   role_is_privileged = is_current_role_privileged(policy->privileged_role);
 
-  char *role_name = get_rolespec_name(stmt->role);
-
-  if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(role_name);
+  if (is_reserved_role(cmd->role_name, role_is_privileged,
+                       policy->reserved_roles))
+    EREPORT_RESERVED_ROLE(cmd->role_name);
 
   if (!role_is_privileged) {
     return false;
@@ -143,8 +173,7 @@ static bool alter_role_set(AlterRoleSetStmt        *stmt,
     return false;
   }
   if (!is_string_in_comma_delimited_string(
-          ((VariableSetStmt *)stmt->setstmt)->name,
-          policy->privileged_role_allowed_configs)) {
+          cmd->config_name, policy->privileged_role_allowed_configs)) {
     return false;
   }
 
@@ -156,53 +185,65 @@ static bool alter_role_set(AlterRoleSetStmt        *stmt,
 /*
  * CREATE ROLE
  */
-static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
-                        const role_policy *policy) {
-  const char *created_role   = stmt->role;
-  List       *addroleto      = NIL;   /* roles to make this a member of */
-  bool        hasrolemembers = false; /* has roles to be members of this role */
-  ListCell   *option_cell;
+typedef struct {
+  const char *role_name; // never NULL, the grammar requires a name
+  List       *member_of; // char *: IN ROLE/IN GROUP; NULL entries for PUBLIC
+  bool        has_role_members; // ROLE / ADMIN / USER <roles> given
+  bool        wants_superuser;  // SUPERUSER attribute requested
+} create_role_cmd;
 
-  if (!IsTransactionState() || superuser()) {
-    return false;
+static create_role_cmd normalize_create_role(const CreateRoleStmt *stmt) {
+  create_role_cmd cmd = {.role_name = stmt->role};
+  ListCell       *lc;
+
+  foreach (lc, stmt->options) {
+    DefElem *defel = lfirst_node(DefElem, lc);
+
+    if (strcmp(defel->defname, "addroleto") == 0) {
+      ListCell *role_cell;
+      foreach (role_cell, (List *)defel->arg) {
+        RoleSpec *spec = lfirst_node(RoleSpec, role_cell);
+        cmd.member_of =
+            lappend(cmd.member_of, (void *)rolespec_name_or_null(spec));
+      }
+    } else if (strcmp(defel->defname, "rolemembers") == 0 ||
+               strcmp(defel->defname, "adminmembers") == 0) {
+      cmd.has_role_members = true;
+    } else if (strcmp(defel->defname, "superuser") == 0 &&
+               defGetBoolean(defel)) {
+      cmd.wants_superuser = true;
+    }
   }
+
+  return cmd;
+}
+
+static bool create_role(const create_role_cmd   *cmd,
+                        const utility_hook_args *args,
+                        const role_policy       *policy) {
+  ListCell *lc;
 
   /* if role already exists, bypass the hook to let it fail with the usual
    * error */
-  if (OidIsValid(get_role_oid(created_role, true))) return false;
+  if (role_exists(cmd->role_name)) return false;
 
   /* CREATE ROLE <reserved_role> */
-  if (is_reserved_role(created_role, false, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(created_role);
+  if (is_reserved_role(cmd->role_name, false, policy->reserved_roles))
+    EREPORT_RESERVED_ROLE(cmd->role_name);
 
-  /* Check to see if there are any descriptions related to membership. */
-  foreach (option_cell, stmt->options) {
-    DefElem *defel = lfirst_node(DefElem, option_cell);
-    if (strcmp(defel->defname, "addroleto") == 0)
-      addroleto = (List *)defel->arg;
-
-    if (strcmp(defel->defname, "rolemembers") == 0 ||
-        strcmp(defel->defname, "adminmembers") == 0)
-      hasrolemembers = true;
-
-    // Setting the superuser attribute is not allowed.
-    if (strcmp(defel->defname, "superuser") == 0 && defGetBoolean(defel)) {
-      ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-                      errmsg("permission denied to create role"),
-                      errdetail("Only roles with the %s attribute may "
-                                "create roles with the %s attribute.",
-                                "SUPERUSER", "SUPERUSER")));
-    }
+  // Setting the superuser attribute is not allowed.
+  if (cmd->wants_superuser) {
+    ereport(ERROR, (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+                    errmsg("permission denied to create role"),
+                    errdetail("Only roles with the %s attribute may "
+                              "create roles with the %s attribute.",
+                              "SUPERUSER", "SUPERUSER")));
   }
 
   /* CREATE ROLE <any_role> IN ROLE/GROUP <role_with_reserved_membership> */
-  if (addroleto) {
-    ListCell *role_cell;
-    foreach (role_cell, addroleto) {
-      RoleSpec *rolemember = lfirst_node(RoleSpec, role_cell);
-      confirm_reserved_memberships(get_rolespec_name(rolemember),
-                                   policy->reserved_memberships);
-    }
+  foreach (lc, cmd->member_of) {
+    confirm_reserved_memberships((const char *)lfirst(lc),
+                                 policy->reserved_memberships);
   }
 
   /*
@@ -211,8 +252,8 @@ static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
    * This is a contrived case because the "role_with_reserved_membership"
    * should already exist, but handle it anyway.
    */
-  if (hasrolemembers)
-    confirm_reserved_memberships(created_role, policy->reserved_memberships);
+  if (cmd->has_role_members)
+    confirm_reserved_memberships(cmd->role_name, policy->reserved_memberships);
 
   // We don't want to switch to superuser on PG16+ because the
   // creating role is implicitly granted ADMIN on the new
@@ -242,47 +283,71 @@ static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
 /*
  * DROP ROLE
  */
-static void check_drop_role(DropRoleStmt *stmt, const role_policy *policy) {
-  ListCell *item;
+typedef struct {
+  List *role_names; // char *: named roles only. PUBLIC, CURRENT_USER and
+                    // SESSION_USER are left for core's usual error.
+} drop_role_cmd;
 
-  if (!IsTransactionState() || superuser()) {
-    return;
+static drop_role_cmd normalize_drop_role(const DropRoleStmt *stmt) {
+  drop_role_cmd cmd = {0};
+  ListCell     *lc;
+
+  foreach (lc, stmt->roles) {
+    RoleSpec *spec = lfirst_node(RoleSpec, lc);
+    if (spec->roletype == ROLESPEC_CSTRING)
+      cmd.role_names = lappend(cmd.role_names, spec->rolename);
   }
 
-  foreach (item, stmt->roles) {
-    RoleSpec *role = lfirst_node(RoleSpec, item);
+  return cmd;
+}
 
-    /*
-     * We check only for a named role being dropped; we ignore
-     * the special values like PUBLIC, CURRENT_USER, and
-     * SESSION_USER. We let Postgres throw its usual error messages
-     * for those special values.
-     */
-    if (role->roletype != ROLESPEC_CSTRING) break;
+static void check_drop_role(const drop_role_cmd *cmd,
+                            const role_policy   *policy) {
+  ListCell *lc;
 
-    if (is_reserved_role(role->rolename, false, policy->reserved_roles))
-      EREPORT_RESERVED_ROLE(role->rolename);
+  foreach (lc, cmd->role_names) {
+    const char *role_name = lfirst(lc);
+    if (is_reserved_role(role_name, false, policy->reserved_roles))
+      EREPORT_RESERVED_ROLE(role_name);
   }
 }
 
 /*
  * GRANT <role> and REVOKE <role>
  */
-static void check_grant_role(GrantRoleStmt *stmt, const role_policy *policy) {
-  ListCell *grantee_role_cell;
-  ListCell *role_cell;
-  bool      role_is_privileged = false;
+typedef struct {
+  bool  is_grant;
+  List *granted_role_names; // char *: NULL entries where the grammar gave no
+                            // name (core rejects those)
+  List *grantee_names;      // char *: NULL entries for PUBLIC
+} grant_role_cmd;
 
-  if (!IsTransactionState() || superuser()) {
-    return;
+static grant_role_cmd normalize_grant_role(const GrantRoleStmt *stmt) {
+  grant_role_cmd cmd = {.is_grant = stmt->is_grant};
+  ListCell      *lc;
+
+  foreach (lc, stmt->granted_roles) {
+    cmd.granted_role_names =
+        lappend(cmd.granted_role_names, lfirst_node(AccessPriv, lc)->priv_name);
+  }
+  foreach (lc, stmt->grantee_roles) {
+    RoleSpec *spec = lfirst_node(RoleSpec, lc);
+    cmd.grantee_names =
+        lappend(cmd.grantee_names, (void *)rolespec_name_or_null(spec));
   }
 
+  return cmd;
+}
+
+static void check_grant_role(const grant_role_cmd *cmd,
+                             const role_policy    *policy) {
+  ListCell *lc;
+  bool      role_is_privileged = false;
+
   /* GRANT <reserved_role> TO <role> */
-  if (stmt->is_grant) {
-    foreach (role_cell, stmt->granted_roles) {
-      AccessPriv *priv = lfirst_node(AccessPriv, role_cell);
-      confirm_reserved_memberships(priv->priv_name,
-                                   policy->reserved_memberships);
+  if (cmd->is_grant) {
+    foreach (lc, cmd->granted_role_names) {
+      confirm_reserved_memberships(lfirst(lc), policy->reserved_memberships);
     }
   }
 
@@ -292,9 +357,8 @@ static void check_grant_role(GrantRoleStmt *stmt, const role_policy *policy) {
    * GRANT <role> TO <reserved_roles>
    * REVOKE <role> FROM <reserved_roles>
    */
-  foreach (grantee_role_cell, stmt->grantee_roles) {
-    RoleSpec *spec      = lfirst_node(RoleSpec, grantee_role_cell);
-    char     *role_name = get_rolespec_name(spec);
+  foreach (lc, cmd->grantee_names) {
+    const char *role_name = lfirst(lc);
     // privileged_role can do GRANT <role> to <reserved_role>
     if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
       EREPORT_RESERVED_ROLE(role_name);
@@ -304,38 +368,77 @@ static void check_grant_role(GrantRoleStmt *stmt, const role_policy *policy) {
 /*
  * ALTER ROLE <role> RENAME TO
  */
-static void check_rename_role(RenameStmt *stmt, const role_policy *policy) {
-  if (!IsTransactionState() || superuser()) {
-    return;
-  }
+typedef struct {
+  const char *old_name;
+  const char *new_name;
+} rename_role_cmd;
 
-  /* Make sure we only catch "ALTER ROLE <role> RENAME TO" */
-  if (stmt->renameType != OBJECT_ROLE) return;
+// Returns false when the RenameStmt is not "ALTER ROLE <role> RENAME TO".
+static bool normalize_rename_role(const RenameStmt *stmt,
+                                  rename_role_cmd  *cmd) {
+  if (stmt->renameType != OBJECT_ROLE) return false;
 
-  if (is_reserved_role(stmt->subname, false, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(stmt->subname);
+  *cmd =
+      (rename_role_cmd){.old_name = stmt->subname, .new_name = stmt->newname};
+  return true;
+}
 
-  if (is_reserved_role(stmt->newname, false, policy->reserved_roles))
-    EREPORT_RESERVED_ROLE(stmt->newname);
+static void check_rename_role(const rename_role_cmd *cmd,
+                              const role_policy     *policy) {
+  if (is_reserved_role(cmd->old_name, false, policy->reserved_roles))
+    EREPORT_RESERVED_ROLE(cmd->old_name);
+
+  if (is_reserved_role(cmd->new_name, false, policy->reserved_roles))
+    EREPORT_RESERVED_ROLE(cmd->new_name);
 }
 
 bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
                       const role_policy *policy) {
   switch (nodeTag(stmt)) {
-  case T_AlterRoleStmt: return alter_role((AlterRoleStmt *)stmt, args, policy);
+  case T_AlterRoleStmt:
   case T_AlterRoleSetStmt:
-    return alter_role_set((AlterRoleSetStmt *)stmt, args, policy);
   case T_CreateRoleStmt:
-    return create_role((CreateRoleStmt *)stmt, args, policy);
   case T_DropRoleStmt:
-    check_drop_role((DropRoleStmt *)stmt, policy);
-    return false;
   case T_GrantRoleStmt:
-    check_grant_role((GrantRoleStmt *)stmt, policy);
+  case T_RenameStmt      : break;
+  default                : return false;
+  }
+
+  // Normalizing resolves role names through the catalog, so it needs a
+  // transaction. The role policy never applies to superusers.
+  if (!IsTransactionState() || superuser()) {
     return false;
-  case T_RenameStmt:
-    check_rename_role((RenameStmt *)stmt, policy);
+  }
+
+  switch (nodeTag(stmt)) {
+  case T_AlterRoleStmt: {
+    alter_role_cmd cmd = normalize_alter_role((AlterRoleStmt *)stmt);
+    return alter_role(&cmd, args, policy);
+  }
+  case T_AlterRoleSetStmt: {
+    alter_role_set_cmd cmd = normalize_alter_role_set((AlterRoleSetStmt *)stmt);
+    return alter_role_set(&cmd, args, policy);
+  }
+  case T_CreateRoleStmt: {
+    create_role_cmd cmd = normalize_create_role((CreateRoleStmt *)stmt);
+    return create_role(&cmd, args, policy);
+  }
+  case T_DropRoleStmt: {
+    drop_role_cmd cmd = normalize_drop_role((DropRoleStmt *)stmt);
+    check_drop_role(&cmd, policy);
     return false;
+  }
+  case T_GrantRoleStmt: {
+    grant_role_cmd cmd = normalize_grant_role((GrantRoleStmt *)stmt);
+    check_grant_role(&cmd, policy);
+    return false;
+  }
+  case T_RenameStmt: {
+    rename_role_cmd cmd;
+    if (!normalize_rename_role((RenameStmt *)stmt, &cmd)) return false;
+    check_rename_role(&cmd, policy);
+    return false;
+  }
   default: return false;
   }
 }

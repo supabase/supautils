@@ -19,7 +19,7 @@ static bool policy_granted(const RangeVar *table, LOCKMODE lockmode,
 /*
  * CREATE POLICY / ALTER POLICY
  */
-static bool create_or_alter_policy(RangeVar                 *table,
+static bool create_or_alter_policy(const RangeVar           *table,
                                    const utility_hook_args  *args,
                                    const table_grant_policy *policy) {
   if (superuser()) {
@@ -37,15 +37,15 @@ static bool create_or_alter_policy(RangeVar                 *table,
 /*
  * DROP POLICY
  */
-static bool drop_policy(DropStmt *stmt, const utility_hook_args *args,
+static bool drop_policy(const RangeVar *table, const utility_hook_args *args,
                         const table_grant_policy *policy) {
   if (superuser()) {
     return false;
   }
 
-  // DROP POLICY always has one object.
-  RangeVar *table =
-      object_table(castNode(List, lfirst(list_head(stmt->objects))));
+  if (table == NULL) {
+    return false;
+  }
 
   if (!policy_granted(table, AccessExclusiveLock, policy)) {
     return false;
@@ -59,15 +59,15 @@ static bool drop_policy(DropStmt *stmt, const utility_hook_args *args,
 /*
  * DROP TRIGGER
  */
-static bool drop_trigger(DropStmt *stmt, const utility_hook_args *args,
+static bool drop_trigger(const RangeVar *table, const utility_hook_args *args,
                          const table_grant_policy *policy) {
   if (superuser()) {
     return false;
   }
 
-  // DROP TRIGGER always has one object.
-  RangeVar *table =
-      object_table(castNode(List, lfirst(list_head(stmt->objects))));
+  if (table == NULL) {
+    return false;
+  }
 
   if (!is_current_role_granted_table_drop_trigger(
           table, policy->drop_trigger_grants,
@@ -83,19 +83,15 @@ static bool drop_trigger(DropStmt *stmt, const utility_hook_args *args,
 /*
  * COMMENT ON POLICY
  */
-static bool comment_on_policy(CommentStmt *stmt, const utility_hook_args *args,
+static bool comment_on_policy(const RangeVar           *table,
+                              const utility_hook_args  *args,
                               const table_grant_policy *policy) {
-  if (stmt->objtype != OBJECT_POLICY) {
-    return false;
-  }
   if (!IsTransactionState()) {
     return false;
   }
   if (superuser()) {
     return false;
   }
-
-  RangeVar *table = object_table(castNode(List, stmt->object));
 
   if (!policy_granted(table, AccessShareLock, policy)) {
     return false;
@@ -106,6 +102,20 @@ static bool comment_on_policy(CommentStmt *stmt, const utility_hook_args *args,
   return true;
 }
 
+/*
+ * The table a DROP POLICY / DROP TRIGGER names, or NULL when the statement
+ * doesn't carry exactly one object. The grammar always gives one; anything
+ * else is left to core.
+ */
+static RangeVar *dropped_object_table(const DropStmt *stmt) {
+  if (list_length(stmt->objects) != 1) return NULL;
+  return object_table(castNode(List, linitial(stmt->objects)));
+}
+
+/*
+ * Handlers never see a parse node: the switch below reads the few fields the
+ * policy needs and hands over plain values.
+ */
 bool handle_table_grant_stmt(Node *stmt, const utility_hook_args *args,
                              const table_grant_policy *policy) {
   switch (nodeTag(stmt)) {
@@ -115,14 +125,22 @@ bool handle_table_grant_stmt(Node *stmt, const utility_hook_args *args,
   case T_AlterPolicyStmt:
     return create_or_alter_policy(((AlterPolicyStmt *)stmt)->table, args,
                                   policy);
-  case T_DropStmt:
-    switch (((DropStmt *)stmt)->removeType) {
-    case OBJECT_POLICY : return drop_policy((DropStmt *)stmt, args, policy);
-    case OBJECT_TRIGGER: return drop_trigger((DropStmt *)stmt, args, policy);
-    default            : return false;
+  case T_DropStmt: {
+    DropStmt *drop = (DropStmt *)stmt;
+    switch (drop->removeType) {
+    case OBJECT_POLICY:
+      return drop_policy(dropped_object_table(drop), args, policy);
+    case OBJECT_TRIGGER:
+      return drop_trigger(dropped_object_table(drop), args, policy);
+    default: return false;
     }
-  case T_CommentStmt:
-    return comment_on_policy((CommentStmt *)stmt, args, policy);
+  }
+  case T_CommentStmt: {
+    CommentStmt *comment = (CommentStmt *)stmt;
+    if (comment->objtype != OBJECT_POLICY) return false;
+    return comment_on_policy(object_table(castNode(List, comment->object)),
+                             args, policy);
+  }
   default: return false;
   }
 }
