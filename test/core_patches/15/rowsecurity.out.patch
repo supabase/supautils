@@ -80,3 +80,39 @@
  SELECT * FROM rls_view; -- OK
   a  
  ----
+@@ -4472,6 +4487,7 @@
+ 
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ SELECT * FROM rls_ptbl WHERE a <<< 1000;
+  a 
+ ---
+@@ -4491,6 +4507,7 @@
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ RESET SESSION AUTHORIZATION;
+ REVOKE SELECT ON rls_tbl FROM regress_rls_alice;
+ CREATE VIEW rls_tbl_view AS SELECT * FROM rls_tbl;
+@@ -4500,8 +4517,10 @@
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SELECT * FROM rls_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM rls_tbl_view WHERE a <<< 1000;
+ ERROR:  permission denied for view rls_tbl_view
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl_view TO regress_rls_alice;
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+  a 
+ ---
+@@ -4510,6 +4529,7 @@
+ SELECT * FROM (SELECT * FROM rls_tbl UNION ALL
+                SELECT * FROM rls_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+  a 
+

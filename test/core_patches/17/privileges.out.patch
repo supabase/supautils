@@ -1,7 +1,7 @@
 # Differences here are expected due to the "Enhanced Hints" feature
 --- a/expected/privileges.out
 +++ b/expected/privileges.out
-@@ -240,10 +240,12 @@
+@@ -314,10 +314,12 @@
  INSERT INTO atest1 VALUES (2, 'two'); -- ok
  INSERT INTO atest2 VALUES ('foo', true); -- fail
  ERROR:  permission denied for table atest2
@@ -14,7 +14,7 @@
  SELECT * FROM atest1 FOR UPDATE; -- ok
   a |  b  
  ---+-----
-@@ -253,8 +255,10 @@
+@@ -327,8 +329,10 @@
  
  SELECT * FROM atest2 FOR UPDATE; -- fail
  ERROR:  permission denied for table atest2
@@ -25,7 +25,7 @@
  TRUNCATE atest2; -- fail
  ERROR:  permission denied for table atest2
  BEGIN;
-@@ -291,21 +295,27 @@
+@@ -365,21 +369,27 @@
  
  INSERT INTO atest2 VALUES ('foo', true); -- fail
  ERROR:  permission denied for table atest2
@@ -53,7 +53,7 @@
  SET SESSION AUTHORIZATION regress_priv_user3;
  SELECT session_user, current_user;
      session_user    |    current_user    
-@@ -322,24 +332,33 @@
+@@ -396,24 +406,33 @@
  
  SELECT * FROM atest2; -- fail
  ERROR:  permission denied for table atest2
@@ -87,7 +87,7 @@
  TRUNCATE atest2; -- fail
  ERROR:  permission denied for table atest2
  BEGIN;
-@@ -350,8 +369,10 @@
+@@ -424,8 +443,10 @@
  -- checks in subquery, both fail
  SELECT * FROM atest1 WHERE ( b IN ( SELECT col1 FROM atest2 ) );
  ERROR:  permission denied for table atest2
@@ -98,15 +98,21 @@
  SET SESSION AUTHORIZATION regress_priv_user4;
  COPY atest2 FROM stdin; -- ok
  SELECT * FROM atest1; -- ok
-@@ -430,6 +451,7 @@
- -- This should not show any "leak" notices before failing.
+@@ -502,10 +523,13 @@
+ -- These should not show any "leak" notices before failing.
  EXPLAIN (COSTS OFF) SELECT * FROM atest12 WHERE a >>> 0;
  ERROR:  permission denied for table atest12
 +HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.atest12 TO regress_priv_user2;
- -- These plans should continue to use a nestloop, since they execute with the
- -- privileges of the view owner.
- EXPLAIN (COSTS OFF) SELECT * FROM atest12v x, atest12v y WHERE x.a = y.b;
-@@ -523,6 +545,7 @@
+ EXPLAIN (COSTS OFF) SELECT * FROM atest12v WHERE a >>> 0;
+ ERROR:  permission denied for view atest12v
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.atest12v TO regress_priv_user2;
+ EXPLAIN (COSTS OFF) SELECT * FROM atest12sbv WHERE a >>> 0;
+ ERROR:  permission denied for view atest12sbv
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.atest12sbv TO regress_priv_user2;
+ -- Now regress_priv_user1 grants access to regress_priv_user2 via the views.
+ SET SESSION AUTHORIZATION regress_priv_user1;
+ GRANT SELECT ON atest12v TO PUBLIC;
+@@ -604,6 +628,7 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  SELECT * FROM atest3; -- fail
  ERROR:  permission denied for table atest3
@@ -114,7 +120,7 @@
  DELETE FROM atest3; -- ok
  BEGIN;
  RESET SESSION AUTHORIZATION;
-@@ -536,12 +559,14 @@
+@@ -617,12 +642,14 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  DELETE FROM atest3; -- fail
  ERROR:  permission denied for table atest3
@@ -129,7 +135,7 @@
  ROLLBACK;
  -- views
  SET SESSION AUTHORIZATION regress_priv_user3;
-@@ -560,6 +585,7 @@
+@@ -641,6 +668,7 @@
  
  SELECT * FROM atestv2; -- fail
  ERROR:  permission denied for table atest2
@@ -137,7 +143,7 @@
  GRANT SELECT ON atestv1, atestv3 TO regress_priv_user4;
  GRANT SELECT ON atestv2 TO regress_priv_user2;
  SET SESSION AUTHORIZATION regress_priv_user4;
-@@ -572,6 +598,7 @@
+@@ -653,6 +681,7 @@
  
  SELECT * FROM atestv2; -- fail
  ERROR:  permission denied for view atestv2
@@ -145,7 +151,7 @@
  SELECT * FROM atestv3; -- ok
   one | two | three 
  -----+-----+-------
-@@ -579,6 +606,7 @@
+@@ -660,6 +689,7 @@
  
  SELECT * FROM atestv0; -- fail
  ERROR:  permission denied for view atestv0
@@ -153,7 +159,7 @@
  -- Appendrels excluded by constraints failed to check permissions in 8.4-9.2.
  select * from
    ((select a.q1 as x from int8_tbl a offset 0)
-@@ -586,6 +614,7 @@
+@@ -667,6 +697,7 @@
     (select b.q2 as x from int8_tbl b offset 0)) ss
  where false;
  ERROR:  permission denied for table int8_tbl
@@ -161,7 +167,7 @@
  set constraint_exclusion = on;
  select * from
    ((select a.q1 as x, random() from int8_tbl a where q1 > 0)
-@@ -593,6 +622,7 @@
+@@ -674,6 +705,7 @@
     (select b.q2 as x, random() from int8_tbl b where q2 > 0)) ss
  where x < 0;
  ERROR:  permission denied for table int8_tbl
@@ -169,7 +175,7 @@
  reset constraint_exclusion;
  CREATE VIEW atestv4 AS SELECT * FROM atestv3; -- nested view
  SELECT * FROM atestv4; -- ok
-@@ -605,6 +635,7 @@
+@@ -686,6 +718,7 @@
  -- Two complex cases:
  SELECT * FROM atestv3; -- fail
  ERROR:  permission denied for view atestv3
@@ -177,7 +183,7 @@
  SELECT * FROM atestv4; -- ok (even though regress_priv_user2 cannot access underlying atestv3)
   one | two | three 
  -----+-----+-------
-@@ -618,6 +649,7 @@
+@@ -699,6 +732,7 @@
  
  SELECT * FROM atestv2; -- fail (even though regress_priv_user2 can access underlying atest2)
  ERROR:  permission denied for table atest2
@@ -185,7 +191,7 @@
  -- Test column level permissions
  SET SESSION AUTHORIZATION regress_priv_user1;
  CREATE TABLE atest5 (one int, two int unique, three int, four int unique);
-@@ -628,6 +660,7 @@
+@@ -709,6 +743,7 @@
  SET SESSION AUTHORIZATION regress_priv_user4;
  SELECT * FROM atest5; -- fail
  ERROR:  permission denied for table atest5
@@ -193,7 +199,7 @@
  SELECT one FROM atest5; -- ok
   one 
  -----
-@@ -638,10 +671,12 @@
+@@ -719,10 +754,12 @@
  1
  SELECT two FROM atest5; -- fail
  ERROR:  permission denied for table atest5
@@ -206,7 +212,7 @@
  COPY atest5 (one,two) TO stdout; -- fail
  ERROR:  permission denied for table atest5
  SELECT 1 FROM atest5; -- ok
-@@ -658,14 +693,19 @@
+@@ -739,14 +776,19 @@
  
  SELECT 1 FROM atest5 a JOIN atest5 b USING (two); -- fail
  ERROR:  permission denied for table atest5
@@ -226,7 +232,7 @@
  SELECT one FROM (atest5 a JOIN atest5 b(one,x,y,z) USING (one)) j; -- ok
   one 
  -----
-@@ -680,38 +720,55 @@
+@@ -761,38 +803,55 @@
  
  SELECT two FROM (atest5 a JOIN atest5 b(one,x,y,z) USING (one)) j; -- fail
  ERROR:  permission denied for table atest5
@@ -282,7 +288,7 @@
  SELECT atest1.* FROM atest1, atest5; -- ok
   a |  b  
  ---+-----
-@@ -728,6 +785,7 @@
+@@ -809,6 +868,7 @@
  
  SELECT atest1.*,atest5.one FROM atest1 JOIN atest5 ON (atest1.a = atest5.two); -- fail
  ERROR:  permission denied for table atest5
@@ -290,7 +296,7 @@
  SELECT atest1.*,atest5.one FROM atest1 JOIN atest5 ON (atest1.a = atest5.one); -- ok
   a |  b  | one 
  ---+-----+-----
-@@ -737,11 +795,13 @@
+@@ -818,11 +878,13 @@
  
  SELECT one, two FROM atest5; -- fail
  ERROR:  permission denied for table atest5
@@ -304,7 +310,7 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  GRANT SELECT (two) ON atest5 TO regress_priv_user4;
  SET SESSION AUTHORIZATION regress_priv_user4;
-@@ -757,19 +817,24 @@
+@@ -838,19 +900,24 @@
  COPY atest5 (two) FROM stdin; -- ok
  INSERT INTO atest5 (three) VALUES (4); -- fail
  ERROR:  permission denied for table atest5
@@ -329,7 +335,7 @@
  -- Ok.  May SELECT on column "one":
  INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = 10 RETURNING atest5.one;
   one 
-@@ -783,20 +848,26 @@
+@@ -864,20 +931,26 @@
  -- Error. No select rights on three
  INSERT INTO atest5(two) VALUES (6) ON CONFLICT (two) DO UPDATE set three = EXCLUDED.three;
  ERROR:  permission denied for table atest5
@@ -356,7 +362,7 @@
  INSERT INTO atest5(four) VALUES (4); -- ok
  SET SESSION AUTHORIZATION regress_priv_user1;
  GRANT SELECT (four) ON atest5 TO regress_priv_user4;
-@@ -809,8 +880,10 @@
+@@ -890,8 +963,10 @@
  SET SESSION AUTHORIZATION regress_priv_user4;
  SELECT one FROM atest5; -- fail
  ERROR:  permission denied for table atest5
@@ -367,7 +373,7 @@
  SELECT atest6 FROM atest6; -- ok
   atest6 
  --------
-@@ -838,6 +911,7 @@
+@@ -919,6 +994,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, NULL);
  ERROR:  permission denied for table msource
@@ -375,7 +381,7 @@
  -- fail (s.b used in the INSERTed values)
  MERGE INTO mtarget t USING msource s ON t.a = s.a
  WHEN MATCHED THEN
-@@ -845,6 +919,7 @@
+@@ -926,6 +1002,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, b);
  ERROR:  permission denied for table msource
@@ -383,7 +389,7 @@
  -- fail (s.b used in the WHEN quals)
  MERGE INTO mtarget t USING msource s ON t.a = s.a
  WHEN MATCHED AND s.b = 'x' THEN
-@@ -852,6 +927,7 @@
+@@ -933,6 +1010,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, NULL);
  ERROR:  permission denied for table msource
@@ -391,7 +397,7 @@
  -- this should be ok since only s.a is accessed
  BEGIN;
  MERGE INTO mtarget t USING msource s ON t.a = s.a
-@@ -881,6 +957,7 @@
+@@ -962,6 +1040,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, NULL);
  ERROR:  permission denied for table mtarget
@@ -399,7 +405,7 @@
  -- fail (no UPDATE on t.a)
  MERGE INTO mtarget t USING msource s ON t.a = s.a
  WHEN MATCHED THEN
-@@ -888,6 +965,7 @@
+@@ -969,6 +1048,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, b);
  ERROR:  permission denied for table mtarget
@@ -407,7 +413,7 @@
  -- fail (no SELECT on t.b)
  MERGE INTO mtarget t USING msource s ON t.a = s.a
  WHEN MATCHED AND t.b IS NOT NULL THEN
-@@ -895,6 +973,7 @@
+@@ -976,6 +1056,7 @@
  WHEN NOT MATCHED THEN
  	INSERT VALUES (a, b);
  ERROR:  permission denied for table mtarget
@@ -415,7 +421,7 @@
  -- ok
  BEGIN;
  MERGE INTO mtarget t USING msource s ON t.a = s.a
-@@ -906,6 +985,7 @@
+@@ -987,6 +1068,7 @@
  WHEN MATCHED AND t.b IS NOT NULL THEN
  	DELETE;
  ERROR:  permission denied for table mtarget
@@ -423,7 +429,7 @@
  -- grant delete privileges
  SET SESSION AUTHORIZATION regress_priv_user1;
  GRANT DELETE ON mtarget TO regress_priv_user4;
-@@ -995,8 +1075,10 @@
+@@ -1076,8 +1158,10 @@
  SET SESSION AUTHORIZATION regress_priv_user4;
  SELECT atest6 FROM atest6; -- fail
  ERROR:  permission denied for table atest6
@@ -434,7 +440,7 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  ALTER TABLE atest6 DROP COLUMN three;
  SET SESSION AUTHORIZATION regress_priv_user4;
-@@ -1016,11 +1098,14 @@
+@@ -1097,11 +1181,14 @@
  SET SESSION AUTHORIZATION regress_priv_user4;
  SELECT * FROM atest6; -- fail
  ERROR:  permission denied for table atest6
@@ -449,7 +455,7 @@
  DELETE FROM atest5 WHERE two = 2; -- ok
  -- check inheritance cases
  SET SESSION AUTHORIZATION regress_priv_user1;
-@@ -1052,6 +1137,7 @@
+@@ -1133,6 +1220,7 @@
  
  SELECT fy FROM atestc; -- fail
  ERROR:  permission denied for table atestc
@@ -457,7 +463,7 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  GRANT SELECT(fy,tableoid) ON atestc TO regress_priv_user2;
  SET SESSION AUTHORIZATION regress_priv_user2;
-@@ -1087,12 +1173,15 @@
+@@ -1168,12 +1256,15 @@
  
  SELECT f2 FROM atestc; -- fail
  ERROR:  permission denied for table atestc
@@ -473,7 +479,7 @@
  TRUNCATE atestp1; -- ok
  TRUNCATE atestc; -- fail
  ERROR:  permission denied for table atestc
-@@ -1164,6 +1253,7 @@
+@@ -1245,6 +1336,7 @@
  ERROR:  permission denied for procedure priv_testproc1
  SELECT col1 FROM atest2 WHERE col2 = true; -- fail
  ERROR:  permission denied for table atest2
@@ -481,7 +487,7 @@
  SELECT priv_testfunc4(true); -- ok
   priv_testfunc4 
  ----------------
-@@ -2083,6 +2173,7 @@
+@@ -2216,6 +2308,7 @@
  SET SESSION AUTHORIZATION regress_priv_user1;
  SELECT * FROM pg_largeobject LIMIT 0;			-- to be denied
  ERROR:  permission denied for table pg_largeobject
@@ -489,7 +495,7 @@
  -- pg_signal_backend can't signal superusers
  RESET SESSION AUTHORIZATION;
  BEGIN;
-@@ -2152,6 +2243,7 @@
+@@ -2285,6 +2378,7 @@
  INSERT INTO datdba_only DEFAULT VALUES;
  SAVEPOINT q; DELETE FROM datdba_only; ROLLBACK TO q;
  ERROR:  permission denied for table datdba_only
@@ -497,7 +503,7 @@
  SET SESSION AUTHORIZATION regress_priv_user2;
  TABLE information_schema.enabled_roles;
       role_name      
-@@ -2161,6 +2253,7 @@
+@@ -2294,6 +2388,7 @@
  
  INSERT INTO datdba_only DEFAULT VALUES;
  ERROR:  permission denied for table datdba_only
