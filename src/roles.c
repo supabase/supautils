@@ -110,8 +110,10 @@ static void check_option_members(List *options, const role_policy *policy) {
         strcmp(option->defname, "adminmembers") == 0) {
       ListCell *member_cell;
       foreach (member_cell, (List *)option->arg) {
-        const char *name =
-            get_rolespec_name(lfirst_node(RoleSpec, member_cell));
+        RoleSpec   *member = lfirst_node(RoleSpec, member_cell);
+        const char *name   = member->roletype == ROLESPEC_CSTRING
+                                 ? member->rolename
+                                 : get_rolespec_name(member);
         if (is_reserved_role_member(name, policy->reserved_role_members))
           EREPORT_RESERVED_ROLE(name);
       }

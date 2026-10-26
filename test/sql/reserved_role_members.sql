@@ -7,6 +7,8 @@ create role protected_ordinary;
 grant protected_ordinary to protected_customer with admin option;
 set role protected_customer;
 
+create role protected_recursive role protected_recursive;
+create role protected_recursive admin protected_recursive;
 grant protected_parent to protected_customer;
 grant protected_catalog to protected_customer;
 grant protected_login to protected_customer;

@@ -6,6 +6,10 @@ create role protected_customer createrole;
 create role protected_ordinary;
 grant protected_ordinary to protected_customer with admin option;
 set role protected_customer;
+create role protected_recursive role protected_recursive;
+ERROR:  role "protected_recursive" is a member of role "protected_recursive"
+create role protected_recursive admin protected_recursive;
+ERROR:  role "protected_recursive" is a member of role "protected_recursive"
 grant protected_parent to protected_customer;
 ERROR:  "protected_parent" role memberships are reserved, only superusers can grant them
 grant protected_catalog to protected_customer;
