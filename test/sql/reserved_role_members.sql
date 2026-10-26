@@ -1,0 +1,48 @@
+create role protected_parent nologin;
+create role protected_catalog in role protected_parent;
+create role protected_login login noinherit;
+grant protected_catalog to protected_login;
+create role protected_customer createrole;
+create role protected_ordinary;
+grant protected_ordinary to protected_customer with admin option;
+set role protected_customer;
+
+grant protected_parent to protected_customer;
+grant protected_catalog to protected_customer;
+grant protected_login to protected_customer;
+grant protected_login to protected_ordinary with admin option;
+create role protected_intruder in role protected_catalog;
+create role protected_intruder admin protected_login;
+create role protected_intruder role protected_catalog;
+comment on role protected_catalog is 'forged';
+alter group protected_ordinary add user protected_login;
+alter role protected_catalog login;
+alter role protected_login password 'changed';
+alter role protected_login rename to protected_renamed;
+alter role protected_catalog set search_path to public;
+drop role protected_catalog;
+drop role protected_login;
+revoke protected_catalog from protected_login;
+revoke protected_parent from protected_catalog;
+grant protected_ordinary to protected_login;
+
+reset role;
+revoke protected_catalog from protected_login;
+set role protected_login;
+alter role current_user password 'after-revocation';
+reset role;
+grant protected_catalog to protected_login;
+set role protected_customer;
+grant protected_login to protected_ordinary;
+reset role;
+
+revoke protected_catalog from protected_login;
+drop role protected_login;
+revoke protected_parent from protected_catalog;
+drop role protected_catalog;
+drop role protected_parent;
+set role protected_customer;
+create role protected_parent;
+reset role;
+drop role protected_ordinary;
+drop role protected_customer;

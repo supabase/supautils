@@ -29,6 +29,7 @@ PG_MODULE_MAGIC;
 static char *reserved_roles                   = NULL;
 static char *supautils_version                = NULL;
 static char *reserved_memberships             = NULL;
+static char *reserved_role_members            = NULL;
 static char *placeholders                     = NULL;
 static char *placeholders_disallowed_values   = NULL;
 static char *empty_placeholder                = NULL;
@@ -131,9 +132,9 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
               : GetUserId();
       const char *current_role_name =
           GetUserNameFromId(current_role_oid, false);
-      const bool role_is_super = superuser_arg(current_role_oid);
-      const bool role_is_reserved =
-          is_reserved_role(current_role_name, false, reserved_roles);
+      const bool role_is_super    = superuser_arg(current_role_oid);
+      const bool role_is_reserved = is_reserved_role(
+          current_role_name, false, reserved_roles, reserved_role_members);
       const bool  function_is_owned_by_super = superuser_arg(fattrs.owner);
       const bool  role_is_function_owner     = current_role_oid == fattrs.owner;
       const char *func_name                  = get_func_name(flinfo->fn_oid);
@@ -276,6 +277,7 @@ static void supautils_hook_internal(PROCESS_UTILITY_PARAMS) {
     .privileged_role                 = privileged_role,
     .reserved_roles                  = reserved_roles,
     .reserved_memberships            = reserved_memberships,
+    .reserved_role_members           = reserved_role_members,
     .privileged_role_allowed_configs = privileged_role_allowed_configs,
   };
 
@@ -425,6 +427,14 @@ reserved_memberships_check_hook(char                            **newval,
                                 __attribute__((unused)) GucSource source) {
   check_parameter(*newval, "supautils.reserved_memberships");
 
+  return true;
+}
+
+static bool
+reserved_role_members_check_hook(char                            **newval,
+                                 __attribute__((unused)) void    **extra,
+                                 __attribute__((unused)) GucSource source) {
+  check_parameter(*newval, "supautils.reserved_role_members");
   return true;
 }
 
@@ -609,6 +619,13 @@ void _PG_init(void) {
       "Comma-separated list of roles whose memberships cannot be granted", NULL,
       &reserved_memberships, NULL, PGC_SIGHUP, 0,
       reserved_memberships_check_hook, NULL, NULL);
+
+  DefineCustomStringVariable(
+      "supautils.reserved_role_members",
+      "Comma-separated list of roles whose transitive members and memberships "
+      "can only be managed by superusers",
+      NULL, &reserved_role_members, NULL, PGC_SIGHUP, 0,
+      reserved_role_members_check_hook, NULL, NULL);
 
   DefineCustomStringVariable(
       "supautils.placeholders",

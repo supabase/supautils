@@ -338,6 +338,26 @@ By default, reserved roles cannot have their settings changed. However their set
 supautils.reserved_roles = 'connector*, storage_admin*'
 ```
 
+### Reserved Role Members
+
+`supautils.reserved_role_members` protects a group and all its direct and indirect
+members. Only superusers can create or modify the configured root roles, alter,
+rename or drop their members, or grant/revoke memberships involving those roles.
+Protection follows membership regardless of `INHERIT` or `SET` options, and cannot
+be relaxed using the configurable-role `*` suffix.
+
+```ini
+supautils.reserved_role_members = 'protected_parent'
+```
+
+This supports dynamically provisioned roles without changing server configuration
+for each role. Create a `NOLOGIN` parent with no object privileges, then have a
+superuser create each protected group as its member. Protecting authorized logins
+too prevents a role administrator from granting themselves an authorized login,
+changing its password, or removing the membership to bypass protection. Review
+existing memberships before adding an account: all its transitive members gain
+the same access and protection. Only superusers can revoke this authorization.
+
 ### Reserved Memberships
 
 Certain default postgres roles are dangerous to expose to every database user. From [pg default roles](https://www.postgresql.org/docs/11/default-roles.html):
