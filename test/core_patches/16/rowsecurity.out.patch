@@ -1,6 +1,6 @@
 # Differences here are expected due to the "Enhanced Hints" feature
 --- a/expected/rowsecurity.out
-+++ b/expected/rowsecurity.out
++++ b/results/rowsecurity.out
 @@ -2634,8 +2634,10 @@
  SET SESSION AUTHORIZATION regress_rls_carol;
  SELECT * FROM rls_view; --fail - permission denied.
@@ -80,3 +80,38 @@
  SELECT * FROM rls_view; -- OK
   a  
  ----
+@@ -4444,6 +4459,7 @@
+ 
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ SELECT * FROM rls_ptbl WHERE a <<< 1000;
+  a 
+ ---
+@@ -4463,6 +4479,7 @@
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_child_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_child_tbl TO regress_rls_alice;
+ RESET SESSION AUTHORIZATION;
+ REVOKE SELECT ON rls_tbl FROM regress_rls_alice;
+ CREATE VIEW rls_tbl_view AS SELECT * FROM rls_tbl;
+@@ -4472,8 +4489,10 @@
+ SET SESSION AUTHORIZATION regress_rls_alice;
+ SELECT * FROM rls_tbl WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM rls_tbl_view WHERE a <<< 1000;
+ ERROR:  permission denied for view rls_tbl_view
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl_view TO regress_rls_alice;
+ SELECT * FROM rls_child_tbl WHERE a <<< 1000;
+  a 
+ ---
+@@ -4482,6 +4501,7 @@
+ SELECT * FROM (SELECT * FROM rls_tbl UNION ALL
+                SELECT * FROM rls_tbl) t WHERE a <<< 1000;
+ ERROR:  permission denied for table rls_tbl
++HINT:  Grant the required privileges to the current role with: GRANT SELECT ON regress_rls_schema.rls_tbl TO regress_rls_alice;
+ SELECT * FROM (SELECT * FROM rls_child_tbl UNION ALL
+                SELECT * FROM rls_child_tbl) t WHERE a <<< 1000;
+  a 
