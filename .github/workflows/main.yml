@@ -85,8 +85,13 @@ jobs:
           name: nxpg
           authtoken: ${{ secrets.cachix_auth_token }}
 
+      - name: clang analyze
+        run: nix-shell --run "CPPFLAGS='--analyze -Xanalyzer  -analyzer-werror' xpg --cassert -v ${{ matrix.pg-version }} build"
+
       - name: build
-        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} build"
+        run: |
+          nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} build"
+          rm -rf ./build-${{ matrix.pg-version }}
 
       - name: run tests
         run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} test"
