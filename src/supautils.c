@@ -78,15 +78,14 @@ static bool is_hint_role(const char *target);
 
 static void check_parameter(char *val, char *name);
 
-static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
-PlannedStmt * supautils_planner(Query *parse, const char *query_string,
-									 int cursorOptions,
-ParamListInfo boundParams
+static void  supautils_executor_start(QueryDesc *queryDesc, int eflags);
+PlannedStmt *supautils_planner(Query *parse, const char *query_string,
+                               int cursorOptions, ParamListInfo boundParams
 #if PG_VERSION_NUM >= 190000
-,ExplainState *es
-#endif									 
-									 );
-									 
+                               ,
+                               ExplainState *es
+#endif
+);
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
@@ -181,11 +180,11 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
   }
 }
 
-PlannedStmt *
- supautils_planner(
-Query *parse, const char *query_string, int cursorOptions,ParamListInfo boundParams
+PlannedStmt *supautils_planner(Query *parse, const char *query_string,
+                               int cursorOptions, ParamListInfo boundParams
 #if PG_VERSION_NUM >= 190000
-, ExplainState *es
+                               ,
+                               ExplainState *es
 #endif
 ) {
   MemoryContext cur_ctx = CurrentMemoryContext;
@@ -196,30 +195,36 @@ Query *parse, const char *query_string, int cursorOptions,ParamListInfo boundPar
     if (prev_planner_hook)
       result = prev_planner_hook(parse, query_string, cursorOptions, boundParams
 #if PG_VERSION_NUM >= 190000
-		      ,es
+                                 ,
+                                 es
 #endif
-		      );
+      );
     else
       result = standard_planner(parse, query_string, cursorOptions, boundParams
 #if PG_VERSION_NUM >= 190000
-		      ,es
+                                ,
+                                es
 #endif
-		      );
+      );
   } else {
     PG_TRY();
     {
       if (prev_planner_hook)
-        result = prev_planner_hook(parse, query_string, cursorOptions, boundParams
+        result =
+            prev_planner_hook(parse, query_string, cursorOptions, boundParams
 #if PG_VERSION_NUM >= 190000
-		      ,es
+                              ,
+                              es
 #endif
-			);
+            );
       else
-        result = standard_planner(parse, query_string, cursorOptions, boundParams
+        result =
+            standard_planner(parse, query_string, cursorOptions, boundParams
 #if PG_VERSION_NUM >= 190000
-		      ,es
+                             ,
+                             es
 #endif
-			);
+            );
     }
     PG_CATCH();
     {
@@ -232,8 +237,7 @@ Query *parse, const char *query_string, int cursorOptions,ParamListInfo boundPar
       if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
         const Oid current_role_oid = GetUserId();
 
-        missing_perm missing =
-            find_missing_perm_plan(parse, current_role_oid);
+        missing_perm missing = find_missing_perm_plan(parse, current_role_oid);
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
             (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
@@ -676,7 +680,7 @@ void _PG_init(void) {
   ExecutorStart_hook       = supautils_executor_start;
 
   prev_planner_hook = planner_hook;
-  planner_hook = supautils_planner;
+  planner_hook      = supautils_planner;
 
   hook_timezone_check();
   check_timezone_at_startup();
@@ -833,5 +837,5 @@ void _PG_init(void) {
 void _PG_fini(void) {
   ProcessUtility_hook = prev_hook;
   ExecutorStart_hook  = prev_executor_start_hook;
-  planner_hook  = prev_planner_hook;
+  planner_hook        = prev_planner_hook;
 }
