@@ -186,6 +186,12 @@ installcheck: $(GENERATED_OUT)
 CORE_STAGEDIR = $(BUILD_DIR)/$(notdir $(PG_REGRESS_TESTS))
 CORE_VERSION_PATCH_DIR = $(if $(filter 15 16 17 18 19,$(PG_VERSION)),test/core_patches/$(PG_VERSION))
 CORE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/*.patch)
+# src/test/modules/unsafe_tests from the same PG version. Upstream keeps these
+# out of installcheck because they change cluster-wide state; our cluster is
+# disposable. Staged only when the directory exists.
+UNSAFE_TESTS_DIR ?= $(PG_REGRESS_TESTS)/unsafe_tests
+UNSAFE_TESTS = rolenames setconfig alter_system_table guc_privs
+UNSAFE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/unsafe_tests/*.patch)
 
 $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 	rm -rf $(CORE_STAGEDIR)
@@ -198,10 +204,20 @@ $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 	for patch in $(CORE_PATCHES); do \
 		patch -d $(CORE_STAGEDIR) -p1 < $$patch; \
 	done
+	@set -e; \
+	if [ -d $(UNSAFE_TESTS_DIR) ]; then \
+		chmod -R u+w $(CORE_STAGEDIR); \
+		cp $(UNSAFE_TESTS_DIR)/sql/*.sql $(CORE_STAGEDIR)/sql/; \
+		cp $(UNSAFE_TESTS_DIR)/expected/*.out $(CORE_STAGEDIR)/expected/; \
+		for patch in $(UNSAFE_PATCHES); do \
+			patch -d $(CORE_STAGEDIR) -p1 < $$patch; \
+		done; \
+		for t in $(UNSAFE_TESTS); do echo "test: $$t" >> $(CORE_STAGEDIR)/parallel_schedule; done; \
+	fi
 
 .PHONY: test-core
 test-core: $(CORE_STAGEDIR)/parallel_schedule
-	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression
+	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression --create-role=regress_authenticated_user_sr --create-role=regress_authenticated_user_ssa
 
 .PHONY: test-startup
 test-startup:
