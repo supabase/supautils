@@ -21,6 +21,8 @@ bool is_reserved_role(const char *target, bool allow_configurable_roles,
   List     *reserved_roles_list;
   ListCell *role;
 
+  if (target == NULL) return false;
+
   if (reserved_roles) {
     SplitIdentifierString(pstrdup(reserved_roles), ',', &reserved_roles_list);
 
@@ -49,6 +51,8 @@ static void confirm_reserved_memberships(const char *target,
                                          const char *reserved_memberships) {
   List     *reserved_memberships_list;
   ListCell *membership;
+
+  if (target == NULL) return;
 
   if (reserved_memberships) {
     SplitIdentifierString(pstrdup(reserved_memberships), ',',
@@ -80,7 +84,7 @@ static bool alter_role(AlterRoleStmt *stmt, const utility_hook_args *args,
     return false;
   }
 
-  char *role_name = get_rolespec_name(stmt->role);
+  const char *role_name = rolespec_name_or_null(stmt->role);
 
   if (is_reserved_role(role_name, false, policy->reserved_roles))
     EREPORT_RESERVED_ROLE(role_name);
@@ -130,7 +134,10 @@ static bool alter_role_set(AlterRoleSetStmt        *stmt,
 
   role_is_privileged = is_current_role_privileged(policy->privileged_role);
 
-  char *role_name = get_rolespec_name(stmt->role);
+  // ALTER ROLE ALL has no RoleSpec and PUBLIC is not a role: nothing for the
+  // policy to check, core applies its own permission checks
+  const char *role_name = rolespec_name_or_null(stmt->role);
+  if (role_name == NULL) return false;
 
   if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
     EREPORT_RESERVED_ROLE(role_name);
@@ -169,7 +176,7 @@ static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
 
   /* if role already exists, bypass the hook to let it fail with the usual
    * error */
-  if (OidIsValid(get_role_oid(created_role, true))) return false;
+  if (role_exists(created_role)) return false;
 
   /* CREATE ROLE <reserved_role> */
   if (is_reserved_role(created_role, false, policy->reserved_roles))
@@ -200,7 +207,7 @@ static bool create_role(CreateRoleStmt *stmt, const utility_hook_args *args,
     ListCell *role_cell;
     foreach (role_cell, addroleto) {
       RoleSpec *rolemember = lfirst_node(RoleSpec, role_cell);
-      confirm_reserved_memberships(get_rolespec_name(rolemember),
+      confirm_reserved_memberships(rolespec_name_or_null(rolemember),
                                    policy->reserved_memberships);
     }
   }
@@ -293,8 +300,8 @@ static void check_grant_role(GrantRoleStmt *stmt, const role_policy *policy) {
    * REVOKE <role> FROM <reserved_roles>
    */
   foreach (grantee_role_cell, stmt->grantee_roles) {
-    RoleSpec *spec      = lfirst_node(RoleSpec, grantee_role_cell);
-    char     *role_name = get_rolespec_name(spec);
+    RoleSpec   *spec      = lfirst_node(RoleSpec, grantee_role_cell);
+    const char *role_name = rolespec_name_or_null(spec);
     // privileged_role can do GRANT <role> to <reserved_role>
     if (is_reserved_role(role_name, role_is_privileged, policy->reserved_roles))
       EREPORT_RESERVED_ROLE(role_name);

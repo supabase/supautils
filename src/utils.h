@@ -69,6 +69,17 @@ extern bool is_current_role_privileged(const char *privileged_role);
 extern bool is_role_privileged(const char *role, const char *privileged_role);
 
 /**
+ * The role a RoleSpec names, resolving CURRENT_USER, CURRENT_ROLE and
+ * SESSION_USER. NULL when there is no single named role: a NULL spec, as in
+ * ALTER ROLE ALL, or PUBLIC. This is the only way to read a RoleSpec; the raw
+ * core lookups are blocked in pg_prelude.h.
+ */
+extern const char *rolespec_name_or_null(const RoleSpec *spec);
+
+/** Whether a role with this name exists. False for NULL. */
+extern bool role_exists(const char *role);
+
+/**
  * Returns `false` if either s1 or s2 is NULL.
  */
 extern bool is_string_in_comma_delimited_string(const char *s1, const char *s2);
