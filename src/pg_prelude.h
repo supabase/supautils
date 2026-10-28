@@ -18,7 +18,6 @@
 #include <commands/event_trigger.h>
 #include <commands/publicationcmds.h>
 #include <common/jsonapi.h>
-#include <optimizer/planner.h>
 #include <executor/executor.h>
 #include <executor/spi.h>
 #include <fmgr.h>
@@ -28,6 +27,7 @@
 #include <nodes/parsenodes.h>
 #include <nodes/pg_list.h>
 #include <nodes/value.h>
+#include <optimizer/planner.h>
 #include <parser/parse_func.h>
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>

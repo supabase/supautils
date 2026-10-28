@@ -8,7 +8,6 @@ typedef struct {
   AclMode acl;
 } missing_perm;
 
-
 missing_perm find_missing_perm_plan(Query *ps, Oid current_role_oid);
 missing_perm find_missing_perm(PlannedStmt *ps, Oid current_role_oid);
 void         build_privileges_string(StringInfo buf, AclMode missing_perms);
