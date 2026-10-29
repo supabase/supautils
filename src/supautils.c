@@ -45,6 +45,7 @@ static ProcessUtility_hook_type prev_hook                = NULL;
 static fmgr_hook_type           next_fmgr_hook           = NULL;
 static needs_fmgr_hook_type     next_needs_fmgr_hook     = NULL;
 static ExecutorStart_hook_type  prev_executor_start_hook = NULL;
+static planner_hook_type        prev_planner_hook        = NULL;
 
 static char                         *extensions_parameter_overrides_str = NULL;
 static extension_parameter_overrides epos[MAX_EXTENSIONS_PARAMETER_OVERRIDES] =
@@ -77,7 +78,14 @@ static bool is_hint_role(const char *target);
 
 static void check_parameter(char *val, char *name);
 
-static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
+static void  supautils_executor_start(QueryDesc *queryDesc, int eflags);
+PlannedStmt *supautils_planner(Query *parse, const char *query_string,
+                               int cursorOptions, ParamListInfo boundParams
+#if PG_VERSION_NUM >= 190000
+                               ,
+                               ExplainState *es
+#endif
+);
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
@@ -170,6 +178,99 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
 
   default: elog(ERROR, "unexpected event type: %d", (int)event); break;
   }
+}
+
+PlannedStmt *supautils_planner(Query *parse, const char *query_string,
+                               int cursorOptions, ParamListInfo boundParams
+#if PG_VERSION_NUM >= 190000
+                               ,
+                               ExplainState *es
+#endif
+) {
+  MemoryContext cur_ctx = CurrentMemoryContext;
+
+  PlannedStmt *result;
+
+  if (!is_hint_role(GetUserNameFromId(GetUserId(), false))) {
+    if (prev_planner_hook)
+      result = prev_planner_hook(parse, query_string, cursorOptions, boundParams
+#if PG_VERSION_NUM >= 190000
+                                 ,
+                                 es
+#endif
+      );
+    else
+      result = standard_planner(parse, query_string, cursorOptions, boundParams
+#if PG_VERSION_NUM >= 190000
+                                ,
+                                es
+#endif
+      );
+  } else {
+    PG_TRY();
+    {
+      if (prev_planner_hook)
+        result =
+            prev_planner_hook(parse, query_string, cursorOptions, boundParams
+#if PG_VERSION_NUM >= 190000
+                              ,
+                              es
+#endif
+            );
+      else
+        result =
+            standard_planner(parse, query_string, cursorOptions, boundParams
+#if PG_VERSION_NUM >= 190000
+                             ,
+                             es
+#endif
+            );
+    }
+    PG_CATCH();
+    {
+      MemoryContext oldcxt = MemoryContextSwitchTo(cur_ctx);
+      ErrorData    *edata  = CopyErrorData();
+      MemoryContextSwitchTo(oldcxt);
+
+      FlushErrorState();
+
+      if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
+        const Oid current_role_oid = GetUserId();
+
+        missing_perm missing = find_missing_perm_plan(parse, current_role_oid);
+
+        if (missing.acl != 0 && OidIsValid(missing.relid) &&
+            (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
+                0) {
+
+          StringInfo privileges_str = makeStringInfo();
+          build_privileges_string(privileges_str, missing.acl);
+
+          if (privileges_str->len > 0) {
+            char *schema = get_namespace_name(get_rel_namespace(missing.relid));
+            char *relname = get_rel_name(missing.relid);
+
+            if (relname != NULL) {
+              char *qualified_rel_name =
+                  quote_qualified_identifier(schema, relname);
+              char *username = GetUserNameFromId(current_role_oid, false);
+              char *quoted_role_name =
+                  quote_qualified_identifier(NULL, username);
+
+              edata->hint = psprintf(
+                  "Grant the required privileges to the current "
+                  "role with: GRANT %s ON %s TO %s;",
+                  privileges_str->data, qualified_rel_name, quoted_role_name);
+            }
+          }
+        }
+      }
+
+      ReThrowError(edata);
+    }
+    PG_END_TRY();
+  }
+  return result;
 }
 
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
@@ -578,6 +679,9 @@ void _PG_init(void) {
   prev_executor_start_hook = ExecutorStart_hook;
   ExecutorStart_hook       = supautils_executor_start;
 
+  prev_planner_hook = planner_hook;
+  planner_hook      = supautils_planner;
+
   hook_timezone_check();
   check_timezone_at_startup();
 
@@ -733,4 +837,5 @@ void _PG_init(void) {
 void _PG_fini(void) {
   ProcessUtility_hook = prev_hook;
   ExecutorStart_hook  = prev_executor_start_hook;
+  planner_hook        = prev_planner_hook;
 }
