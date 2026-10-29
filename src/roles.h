@@ -9,16 +9,19 @@ typedef struct {
   const char *privileged_role;
   const char *reserved_roles;
   const char *reserved_memberships;
+  const char *reserved_role_members;
   const char *privileged_role_allowed_configs;
 } role_policy;
 
 /**
  * Whether `target` is one of the reserved roles. Roles listed with a trailing
  * `*` are configurable: they still count as reserved unless
- * `allow_configurable_roles` is set.
+ * `allow_configurable_roles` is set. The roots in `reserved_role_members` and
+ * their transitive members are always reserved.
  */
 extern bool is_reserved_role(const char *target, bool allow_configurable_roles,
-                             const char *reserved_roles);
+                             const char *reserved_roles,
+                             const char *reserved_role_members);
 
 /**
  * Handles the role DDL that supautils intercepts: CREATE, ALTER, ALTER ... SET,

@@ -1,0 +1,69 @@
+create role protected_parent nologin;
+create role protected_catalog in role protected_parent;
+create role protected_login login noinherit;
+grant protected_catalog to protected_login;
+create role protected_customer createrole;
+create role protected_ordinary;
+grant protected_ordinary to protected_customer with admin option;
+set role protected_customer;
+create role protected_recursive role protected_recursive;
+ERROR:  role "protected_recursive" is a member of role "protected_recursive"
+create role protected_recursive admin protected_recursive;
+ERROR:  role "protected_recursive" is a member of role "protected_recursive"
+grant protected_parent to protected_customer;
+ERROR:  "protected_parent" role memberships are reserved, only superusers can grant them
+grant protected_catalog to protected_customer;
+ERROR:  "protected_catalog" role memberships are reserved, only superusers can grant them
+grant protected_login to protected_customer;
+ERROR:  "protected_login" role memberships are reserved, only superusers can grant them
+grant protected_login to protected_ordinary with admin option;
+ERROR:  "protected_login" role memberships are reserved, only superusers can grant them
+create role protected_intruder in role protected_catalog;
+ERROR:  "protected_catalog" role memberships are reserved, only superusers can grant them
+create role protected_intruder admin protected_login;
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+create role protected_intruder role protected_catalog;
+ERROR:  "protected_catalog" is a reserved role, only superusers can modify it
+comment on role protected_catalog is 'forged';
+ERROR:  "protected_catalog" is a reserved role, only superusers can modify it
+alter group protected_ordinary add user protected_login;
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+alter role protected_catalog login;
+ERROR:  "protected_catalog" is a reserved role, only superusers can modify it
+alter role protected_login password 'changed';
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+alter role protected_login rename to protected_renamed;
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+alter role protected_catalog set search_path to public;
+ERROR:  "protected_catalog" is a reserved role, only superusers can modify it
+drop role protected_catalog;
+ERROR:  "protected_catalog" is a reserved role, only superusers can modify it
+drop role protected_login;
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+revoke protected_catalog from protected_login;
+ERROR:  "protected_catalog" role memberships are reserved, only superusers can grant them
+revoke protected_parent from protected_catalog;
+ERROR:  "protected_parent" role memberships are reserved, only superusers can grant them
+grant protected_ordinary to protected_login;
+ERROR:  "protected_login" is a reserved role, only superusers can modify it
+reset role;
+revoke protected_catalog from protected_login;
+set role protected_login;
+alter role current_user password 'after-revocation';
+reset role;
+grant protected_catalog to protected_login;
+set role protected_customer;
+grant protected_login to protected_ordinary;
+ERROR:  "protected_login" role memberships are reserved, only superusers can grant them
+reset role;
+revoke protected_catalog from protected_login;
+drop role protected_login;
+revoke protected_parent from protected_catalog;
+drop role protected_catalog;
+drop role protected_parent;
+set role protected_customer;
+create role protected_parent;
+ERROR:  "protected_parent" is a reserved role, only superusers can modify it
+reset role;
+drop role protected_ordinary;
+drop role protected_customer;
