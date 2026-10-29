@@ -326,8 +326,50 @@ static void check_rename_role(RenameStmt *stmt, const role_policy *policy) {
     EREPORT_RESERVED_ROLE(stmt->newname);
 }
 
+#if TEST_CORE
+/*
+ * Only for the core regression run (TEST_CORE). Those tests run as a
+ * superuser, and the handlers return for superusers before reading the
+ * statement, so the role fields would never be read. Read here the same
+ * fields the handlers read, then let the handlers return as usual.
+ *
+ * DROP ROLE is skipped: its handler uses the plain name, and looking it up
+ * would make "DROP ROLE IF EXISTS" fail for a missing role.
+ */
+static void read_role_specs(Node *stmt) {
+  ListCell *lc;
+
+  switch (nodeTag(stmt)) {
+  case T_AlterRoleStmt:
+    (void)rolespec_name_or_null(((AlterRoleStmt *)stmt)->role);
+    break;
+  case T_AlterRoleSetStmt:
+    (void)rolespec_name_or_null(((AlterRoleSetStmt *)stmt)->role);
+    break;
+  case T_CreateRoleStmt:
+    foreach (lc, ((CreateRoleStmt *)stmt)->options) {
+      DefElem  *defel = lfirst_node(DefElem, lc);
+      ListCell *rc;
+      if (strcmp(defel->defname, "addroleto") != 0) continue;
+      foreach (rc, (List *)defel->arg)
+        (void)rolespec_name_or_null(lfirst_node(RoleSpec, rc));
+    }
+    break;
+  case T_GrantRoleStmt:
+    foreach (lc, ((GrantRoleStmt *)stmt)->grantee_roles)
+      (void)rolespec_name_or_null(lfirst_node(RoleSpec, lc));
+    break;
+  default: break;
+  }
+}
+#endif
+
 bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
                       const role_policy *policy) {
+#if TEST_CORE
+  if (IsTransactionState()) read_role_specs(stmt);
+#endif
+
   switch (nodeTag(stmt)) {
   case T_AlterRoleStmt: return alter_role((AlterRoleStmt *)stmt, args, policy);
   case T_AlterRoleSetStmt:
