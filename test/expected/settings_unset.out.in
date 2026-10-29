@@ -1,0 +1,119 @@
+-- With every supautils setting at its default the hook must leave every
+-- statement to core. init.sql sets them through ALTER SYSTEM so RESET can
+-- reach the default.
+create table settings_unset_t (id int);
+select current_setting('supautils.reserved_roles') as reserved_roles, current_setting('supautils.reserved_memberships') as reserved_memberships, current_setting('supautils.privileged_role') as privileged_role, current_setting('supautils.privileged_role_allowed_configs') as privileged_role_allowed_configs, current_setting('supautils.privileged_extensions') as privileged_extensions, current_setting('supautils.policy_grants') as policy_grants, current_setting('supautils.drop_trigger_grants') as drop_trigger_grants, current_setting('supautils.restrict_extension_versions') as restrict_extension_versions \gset
+alter system reset supautils.reserved_roles;
+alter system reset supautils.reserved_memberships;
+alter system reset supautils.privileged_role;
+alter system reset supautils.privileged_role_allowed_configs;
+alter system reset supautils.privileged_extensions;
+alter system reset supautils.policy_grants;
+alter system reset supautils.drop_trigger_grants;
+alter system reset supautils.restrict_extension_versions;
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+\c
+select source = 'default' as unset from pg_settings where name = 'supautils.reserved_roles';
+ unset 
+-------
+ t
+(1 row)
+
+set role nonsuper;
+alter role anon nologin;
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  permission denied
+</PG_GE_14>
+alter role anon set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  permission denied
+</PG_GE_14>
+create role settings_unset_member in role anon;
+ERROR:  permission denied to create role
+<PG_GE_16>
+DETAIL:  Only roles with the CREATEROLE attribute may create roles.
+</PG_GE_16>
+grant pg_read_server_files to nonsuper;
+<PG_GE_16>
+ERROR:  permission denied to grant role "pg_read_server_files"
+DETAIL:  Only roles with the ADMIN option on role "pg_read_server_files" may grant this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must have admin option on role "pg_read_server_files"
+</PG_GE_14>
+create extension postgres_fdw;
+ERROR:  permission denied to create extension "postgres_fdw"
+HINT:  Must be superuser to create this extension.
+create policy p on settings_unset_t using (true);
+ERROR:  must be owner of table settings_unset_t
+set session_replication_role = 'replica';
+ERROR:  permission denied to set parameter "session_replication_role"
+create publication settings_unset_pub for table settings_unset_t;
+ERROR:  must be owner of table settings_unset_t
+reset role;
+set role privileged_role;
+alter role anon nologin;
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+alter role anon set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+create role settings_unset_member in role anon;
+<PG_GE_16>
+ERROR:  permission denied to grant role "anon"
+DETAIL:  Only roles with the ADMIN option on role "anon" may grant this role.
+</PG_GE_16>
+grant pg_read_server_files to privileged_role;
+<PG_GE_16>
+ERROR:  permission denied to grant role "pg_read_server_files"
+DETAIL:  Only roles with the ADMIN option on role "pg_read_server_files" may grant this role.
+</PG_GE_16>
+create extension postgres_fdw;
+ERROR:  permission denied to create extension "postgres_fdw"
+HINT:  Must be superuser to create this extension.
+create policy p on settings_unset_t using (true);
+ERROR:  must be owner of table settings_unset_t
+set session_replication_role = 'replica';
+ERROR:  permission denied to set parameter "session_replication_role"
+create publication settings_unset_pub for table settings_unset_t;
+ERROR:  permission denied for database contrib_regression
+reset role;
+alter system set supautils.reserved_roles = :'reserved_roles';
+alter system set supautils.reserved_memberships = :'reserved_memberships';
+alter system set supautils.privileged_role = :'privileged_role';
+alter system set supautils.privileged_role_allowed_configs = :'privileged_role_allowed_configs';
+alter system set supautils.privileged_extensions = :'privileged_extensions';
+alter system set supautils.policy_grants = :'policy_grants';
+alter system set supautils.drop_trigger_grants = :'drop_trigger_grants';
+alter system set supautils.restrict_extension_versions = :'restrict_extension_versions';
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+\c
+select source = 'configuration file' as restored from pg_settings where name = 'supautils.reserved_roles';
+ restored 
+----------
+ t
+(1 row)
+
+drop table settings_unset_t;
