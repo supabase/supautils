@@ -64,7 +64,7 @@ endif
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
-GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out test/expected/ge18_supautils_version.out test/expected/lt18_supautils_version.out
+GENERATED_OUT = test/expected/role_spec_forms.out test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out test/expected/ge18_supautils_version.out test/expected/lt18_supautils_version.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -137,6 +137,21 @@ else
 		-e '/<PG_GE_14>/,/<\/PG_GE_14>/d' \
 		-e '/<PG_GE_16>/,/<\/PG_GE_16>/d' \
 		$? > $@
+endif
+
+# core's permission errors changed wording in PG16
+.PHONY: test/expected/role_spec_forms.out
+test/expected/role_spec_forms.out: test/expected/%.out: test/expected/%.out.in
+ifeq ($(PG_GE16), 0)
+	sed \
+		-e '/<\/\?PG_GE_16>/d' \
+		-e '/<PG_GE_14>/,/<\/PG_GE_14>/d' \
+		$< > $@
+else
+	sed \
+		-e '/<\/\?PG_GE_14>/d' \
+		-e '/<PG_GE_16>/,/<\/PG_GE_16>/d' \
+		$< > $@
 endif
 
 .PHONY: test/expected/permission_hints.out
