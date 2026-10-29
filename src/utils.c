@@ -1,3 +1,6 @@
+// This file owns the raw role lookups that pg_prelude.h blocks everywhere
+// else: every read goes through rolespec_name_or_null() and role_exists().
+#define SUPAUTILS_ALLOW_RAW_ROLESPEC
 #include "pg_prelude.h"
 
 #include "utils.h"
@@ -30,7 +33,17 @@ bool is_current_role_privileged(const char *privileged_role) {
 }
 
 bool is_role_privileged(const char *role, const char *privileged_role) {
+  if (role == NULL) return false;
   return role_oid_is_privileged(get_role_oid(role, true), privileged_role);
+}
+
+const char *rolespec_name_or_null(const RoleSpec *spec) {
+  if (spec == NULL || spec->roletype == ROLESPEC_PUBLIC) return NULL;
+  return get_rolespec_name(spec);
+}
+
+bool role_exists(const char *role) {
+  return role != NULL && OidIsValid(get_role_oid(role, true));
 }
 
 bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
