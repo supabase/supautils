@@ -69,6 +69,9 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
   volatile int save_nestlevel = 0;
 
+  bool excalate_privs =
+      is_current_role_privileged(policy->privileged_role) || superuser();
+
   stmt->options =
       restrict_version_specification(EXT_CREATE, stmt->options, policy);
 
@@ -91,143 +94,175 @@ static bool create_extension(CreateExtensionStmt     *stmt,
         PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
   }
 
-  RUN_ELEVATED(policy->superuser,
+  if (excalate_privs) {
+    RUN_ELEVATED(policy->superuser,
 
-               run_global_before_create_script(stmt->extname, stmt->options,
-                                               policy->custom_scripts_path);
+                 run_global_before_create_script(stmt->extname, stmt->options,
+                                                 policy->custom_scripts_path);
 
-               run_ext_before_create_script(stmt->extname, stmt->options,
-                                            policy->custom_scripts_path);
+                 run_ext_before_create_script(stmt->extname, stmt->options,
+                                              policy->custom_scripts_path);
 
-               stmt->options = override_ext_options(
-                   EXT_CREATE, stmt->extname, stmt->options,
-                   policy->total_overrides, policy->overrides));
+                 stmt->options = override_ext_options(
+                     EXT_CREATE, stmt->extname, stmt->options,
+                     policy->total_overrides, policy->overrides));
+  } else {
+    run_global_before_create_script(stmt->extname, stmt->options,
+                                    policy->custom_scripts_path);
 
-  if (is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
+    run_ext_before_create_script(stmt->extname, stmt->options,
+                                 policy->custom_scripts_path);
+
+    stmt->options =
+        override_ext_options(EXT_CREATE, stmt->extname, stmt->options,
+                             policy->total_overrides, policy->overrides);
+  }
+
+  if (is_extension_privileged(stmt->extname, policy->privileged_extensions) &&
+      excalate_privs) {
     RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
   } else {
     // non-privileged extensions are created as the caller
     run_prev_utility_hook(args);
   }
 
-  RUN_ELEVATED(policy->superuser,
-               run_ext_after_create_script(stmt->extname, stmt->options,
-                                           policy->custom_scripts_path);
-               run_global_after_create_script(stmt->extname, stmt->options,
-                                              policy->custom_scripts_path));
-
+  if (excalate_privs) {
+    RUN_ELEVATED(
+        policy->superuser,
+        run_ext_after_create_script(stmt->extname, stmt->options,
+                                    policy->custom_scripts_path);
+            run_global_after_create_script(stmt->extname, stmt->options,
+                                           policy->custom_scripts_path));
+  } else {
+    run_ext_after_create_script(stmt->extname, stmt->options,
+                                policy->custom_scripts_path);
+    run_global_after_create_script(stmt->extname, stmt->options,
+                                   policy->custom_scripts_path);
+  }
   if (save_nestlevel > 0) {
     AtEOXact_GUC(true, save_nestlevel);
   }
 
-  return true;
-}
-
-/*
- * ALTER EXTENSION <extension> [ UPDATE ]
- */
-static bool alter_extension(AlterExtensionStmt      *stmt,
-                            const utility_hook_args *args,
-                            const extension_policy  *policy) {
-  if (superuser()) {
-    return false;
+    return true;
   }
 
-  stmt->options =
-      restrict_version_specification(EXT_ALTER, stmt->options, policy);
+  /*
+   * ALTER EXTENSION <extension> [ UPDATE ]
+   */
+  static bool alter_extension(AlterExtensionStmt * stmt,
+                              const utility_hook_args *args,
+                              const extension_policy  *policy) {
+    if (superuser()) {
+      return false;
+    }
 
-  stmt->options =
-      override_ext_options(EXT_ALTER, stmt->extname, stmt->options,
-                           policy->total_overrides, policy->overrides);
+    stmt->options =
+        restrict_version_specification(EXT_ALTER, stmt->options, policy);
 
-  if (!is_extension_privileged(stmt->extname, policy->privileged_extensions)) {
-    return false;
+    stmt->options =
+        override_ext_options(EXT_ALTER, stmt->extname, stmt->options,
+                             policy->total_overrides, policy->overrides);
+
+    if (!is_extension_privileged(stmt->extname,
+                                 policy->privileged_extensions)) {
+      return false;
+    }
+
+    if (!is_current_role_privileged(policy->privileged_role)) {
+      return false;
+    }
+
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
+
+    return true;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
+  /*
+   * ALTER EXTENSION <extension> SET SCHEMA
+   */
+  static bool alter_extension_schema(AlterObjectSchemaStmt * stmt,
+                                     const utility_hook_args *args,
+                                     const extension_policy  *policy) {
+    if (stmt->objectType != OBJECT_EXTENSION) {
+      return false;
+    }
+    if (superuser()) {
+      return false;
+    }
+    if (!is_extension_privileged(strVal(stmt->object),
+                                 policy->privileged_extensions)) {
+      return false;
+    }
+    if (!is_current_role_privileged(policy->privileged_role)) {
+      return false;
+    }
 
-  return true;
-}
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
 
-/*
- * ALTER EXTENSION <extension> SET SCHEMA
- */
-static bool alter_extension_schema(AlterObjectSchemaStmt   *stmt,
+    return true;
+  }
+
+  /*
+   * DROP EXTENSION <extension>
+   */
+  static bool drop_extension(DropStmt * stmt, const utility_hook_args *args,
+                             const extension_policy *policy) {
+    if (stmt->removeType != OBJECT_EXTENSION) {
+      return false;
+    }
+    if (superuser()) {
+      return false;
+    }
+    if (!is_current_role_privileged(policy->privileged_role)) {
+      return false;
+    }
+    if (!all_extensions_are_privileged(stmt->objects,
+                                       policy->privileged_extensions)) {
+      return false;
+    }
+
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
+
+    return true;
+  }
+
+  /*
+   * COMMENT ON EXTENSION <extension>
+   */
+  static bool comment_on_extension(CommentStmt * stmt,
                                    const utility_hook_args *args,
                                    const extension_policy  *policy) {
-  if (stmt->objectType != OBJECT_EXTENSION) {
-    return false;
-  }
-  if (superuser()) {
-    return false;
-  }
-  if (!is_extension_privileged(strVal(stmt->object),
-                               policy->privileged_extensions)) {
-    return false;
+    if (stmt->objtype != OBJECT_EXTENSION) {
+      return false;
+    }
+    if (!IsTransactionState()) {
+      return false;
+    }
+    if (superuser()) {
+      return false;
+    }
+    if (!is_current_role_privileged(policy->privileged_role)) {
+      return false;
+    }
+
+    RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
+
+    return true;
   }
 
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
-
-  return true;
-}
-
-/*
- * DROP EXTENSION <extension>
- */
-static bool drop_extension(DropStmt *stmt, const utility_hook_args *args,
-                           const extension_policy *policy) {
-  if (stmt->removeType != OBJECT_EXTENSION) {
-    return false;
+  bool handle_extension_stmt(Node * stmt, const utility_hook_args *args,
+                             const extension_policy *policy) {
+    switch (nodeTag(stmt)) {
+    case T_CreateExtensionStmt:
+      return create_extension((CreateExtensionStmt *)stmt, args, policy);
+    case T_AlterExtensionStmt:
+      return alter_extension((AlterExtensionStmt *)stmt, args, policy);
+    case T_AlterObjectSchemaStmt:
+      return alter_extension_schema((AlterObjectSchemaStmt *)stmt, args,
+                                    policy);
+    case T_DropStmt: return drop_extension((DropStmt *)stmt, args, policy);
+    case T_CommentStmt:
+      return comment_on_extension((CommentStmt *)stmt, args, policy);
+    default: return false;
+    }
   }
-  if (superuser()) {
-    return false;
-  }
-  if (!all_extensions_are_privileged(stmt->objects,
-                                     policy->privileged_extensions)) {
-    return false;
-  }
-
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
-
-  return true;
-}
-
-/*
- * COMMENT ON EXTENSION <extension>
- */
-static bool comment_on_extension(CommentStmt             *stmt,
-                                 const utility_hook_args *args,
-                                 const extension_policy  *policy) {
-  if (stmt->objtype != OBJECT_EXTENSION) {
-    return false;
-  }
-  if (!IsTransactionState()) {
-    return false;
-  }
-  if (superuser()) {
-    return false;
-  }
-  if (!is_current_role_privileged(policy->privileged_role)) {
-    return false;
-  }
-
-  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(args));
-
-  return true;
-}
-
-bool handle_extension_stmt(Node *stmt, const utility_hook_args *args,
-                           const extension_policy *policy) {
-  switch (nodeTag(stmt)) {
-  case T_CreateExtensionStmt:
-    return create_extension((CreateExtensionStmt *)stmt, args, policy);
-  case T_AlterExtensionStmt:
-    return alter_extension((AlterExtensionStmt *)stmt, args, policy);
-  case T_AlterObjectSchemaStmt:
-    return alter_extension_schema((AlterObjectSchemaStmt *)stmt, args, policy);
-  case T_DropStmt: return drop_extension((DropStmt *)stmt, args, policy);
-  case T_CommentStmt:
-    return comment_on_extension((CommentStmt *)stmt, args, policy);
-  default: return false;
-  }
-}
