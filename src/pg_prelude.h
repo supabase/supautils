@@ -18,6 +18,7 @@
 #include <commands/event_trigger.h>
 #include <commands/publicationcmds.h>
 #include <common/jsonapi.h>
+#include <optimizer/planner.h>
 #include <executor/executor.h>
 #include <executor/spi.h>
 #include <fmgr.h>

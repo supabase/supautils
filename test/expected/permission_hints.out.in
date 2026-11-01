@@ -135,9 +135,7 @@ ERROR:  permission denied for table hint_target
 -- views rely on the owner's privileges, ensure hints still fire
 select * from hint_view;
 ERROR:  permission denied for view hint_view
-<PG_LT_18>
 HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.hint_view TO hint_role;
-</PG_LT_18>
 \echo
 
 reset role;
