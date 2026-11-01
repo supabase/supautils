@@ -13,12 +13,6 @@
 #include <utils/queryenvironment.h>
 
 /**
- * Oid of the role used for elevation: `supautils.superuser` when set,
- * otherwise the bootstrap superuser.
- */
-extern Oid superuser_oid(const char *superuser);
-
-/**
  * Run the statements in `...` with the current user and security context set
  * to `uid` and `sec_context`, then restore the caller's, whether the body
  * completes or errors. The saved state lives on the stack. Don't nest one
@@ -60,24 +54,6 @@ extern Oid superuser_oid(const char *superuser);
                SECURITY_RESTRICTED_OPERATION,                                  \
            __VA_ARGS__);                                                       \
   } while (0)
-
-/**
- * Whether the current role, or a named role, has the privileges of
- * `privileged_role`. Both return false when no privileged role is configured.
- */
-extern bool is_current_role_privileged(const char *privileged_role);
-extern bool is_role_privileged(const char *role, const char *privileged_role);
-
-/**
- * The role a RoleSpec names, resolving CURRENT_USER, CURRENT_ROLE and
- * SESSION_USER. NULL when there is no single named role: a NULL spec, as in
- * ALTER ROLE ALL, or PUBLIC. This is the only way to read a RoleSpec; the raw
- * core lookups are blocked in pg_prelude.h.
- */
-extern const char *rolespec_name_or_null(const RoleSpec *spec);
-
-/** Whether a role with this name exists. False for NULL. */
-extern bool role_exists(const char *role);
 
 /**
  * Returns `false` if either s1 or s2 is NULL.

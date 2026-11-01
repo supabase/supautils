@@ -162,14 +162,65 @@ static inline void run_prev_utility_hook(const utility_hook_args *args) {
 #endif
 
 /*
- * The raw role lookups require a RoleSpec that names a role; ALTER ROLE ALL
- * has none and PUBLIC is not one. Every read goes through
- * rolespec_name_or_null() and role_exists() in utils.c, the only file that may
- * define SUPAUTILS_ALLOW_RAW_ROLESPEC. Anywhere else these names are blocked
- * at compile time.
+ * Role lookups. The raw core lookups require a RoleSpec that names a role;
+ * ALTER ROLE ALL has none and PUBLIC is not one. These helpers are the only
+ * callers: they are defined here, above the pragma that blocks the raw names
+ * everywhere else at compile time.
  */
-#ifndef SUPAUTILS_ALLOW_RAW_ROLESPEC
-#  pragma GCC poison get_rolespec_name get_rolespec_tuple get_rolespec_oid get_role_oid
-#endif
+
+/**
+ * Oid of the role used for elevation: `supautils.superuser` when set,
+ * otherwise the bootstrap superuser.
+ */
+static inline Oid superuser_oid(const char *superuser) {
+  if (superuser != NULL) {
+    return get_role_oid(superuser, false);
+  }
+  return BOOTSTRAP_SUPERUSERID;
+}
+
+static inline bool role_oid_is_privileged(Oid         role_oid,
+                                          const char *privileged_role) {
+  Oid privileged_role_oid;
+
+  if (privileged_role == NULL || !OidIsValid(role_oid)) {
+    return false;
+  }
+  privileged_role_oid = get_role_oid(privileged_role, true);
+
+  return OidIsValid(privileged_role_oid) &&
+         has_privs_of_role(role_oid, privileged_role_oid);
+}
+
+/**
+ * Whether the current role, or a named role, has the privileges of
+ * `privileged_role`. Both return false when no privileged role is configured.
+ */
+static inline bool is_current_role_privileged(const char *privileged_role) {
+  return role_oid_is_privileged(GetUserId(), privileged_role);
+}
+
+static inline bool is_role_privileged(const char *role,
+                                      const char *privileged_role) {
+  if (role == NULL) return false;
+  return role_oid_is_privileged(get_role_oid(role, true), privileged_role);
+}
+
+/**
+ * The role a RoleSpec names, resolving CURRENT_USER, CURRENT_ROLE and
+ * SESSION_USER. NULL when there is no single named role: a NULL spec, as in
+ * ALTER ROLE ALL, or PUBLIC.
+ */
+static inline const char *rolespec_name_or_null(const RoleSpec *spec) {
+  if (spec == NULL || spec->roletype == ROLESPEC_PUBLIC) return NULL;
+  return get_rolespec_name(spec);
+}
+
+/** Whether a role with this name exists. False for NULL. */
+static inline bool role_exists(const char *role) {
+  return role != NULL && OidIsValid(get_role_oid(role, true));
+}
+
+#pragma GCC poison get_rolespec_name get_rolespec_tuple get_rolespec_oid get_role_oid
 
 #endif /* PG_PRELUDE_H */

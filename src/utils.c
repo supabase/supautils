@@ -1,49 +1,9 @@
-// This file owns the raw role lookups that pg_prelude.h blocks everywhere
-// else: every read goes through rolespec_name_or_null() and role_exists().
-#define SUPAUTILS_ALLOW_RAW_ROLESPEC
 #include "pg_prelude.h"
 
 #include "utils.h"
 
 static bool strstarts(const char *str, const char *prefix) {
   return strncmp(str, prefix, strlen(prefix)) == 0;
-}
-
-Oid superuser_oid(const char *superuser) {
-  if (superuser != NULL) {
-    return get_role_oid(superuser, false);
-  }
-  return BOOTSTRAP_SUPERUSERID;
-}
-
-static bool role_oid_is_privileged(Oid role_oid, const char *privileged_role) {
-  Oid privileged_role_oid;
-
-  if (privileged_role == NULL || !OidIsValid(role_oid)) {
-    return false;
-  }
-  privileged_role_oid = get_role_oid(privileged_role, true);
-
-  return OidIsValid(privileged_role_oid) &&
-         has_privs_of_role(role_oid, privileged_role_oid);
-}
-
-bool is_current_role_privileged(const char *privileged_role) {
-  return role_oid_is_privileged(GetUserId(), privileged_role);
-}
-
-bool is_role_privileged(const char *role, const char *privileged_role) {
-  if (role == NULL) return false;
-  return role_oid_is_privileged(get_role_oid(role, true), privileged_role);
-}
-
-const char *rolespec_name_or_null(const RoleSpec *spec) {
-  if (spec == NULL || spec->roletype == ROLESPEC_PUBLIC) return NULL;
-  return get_rolespec_name(spec);
-}
-
-bool role_exists(const char *role) {
-  return role != NULL && OidIsValid(get_role_oid(role, true));
 }
 
 bool is_string_in_comma_delimited_string(const char *s1, const char *s2) {
