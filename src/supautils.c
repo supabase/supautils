@@ -80,13 +80,15 @@ static void check_parameter(char *val, char *name);
 
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 #if PG_VERSION_NUM >= 190000
-PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams,
-                               ExplainState *es);
+#define PLANNER_ARGS_DEF Query *parse, const char *query_string, int cursorOptions, ParamListInfo boundParams, ExplainState *es
+#define PLANNER_ARGS parse, query_string, cursorOptions, boundParams, es
+
 #else
-PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams);
+#define PLANNER_ARGS_DEF Query *parse, const char *query_string, int cursorOptions, ParamListInfo boundParams
+#define PLANNER_ARGS parse, query_string, cursorOptions, boundParams
 #endif
+
+PlannedStmt *supautils_planner(PLANNER_ARGS_DEF);
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
@@ -181,14 +183,7 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
   }
 }
 
-#if PG_VERSION_NUM >= 190000
-PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams,
-                               ExplainState *es)
-#else
-PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams)
-#endif
+PlannedStmt *supautils_planner(PLANNER_ARGS_DEF)
 {
   MemoryContext cur_ctx = CurrentMemoryContext;
 
@@ -196,41 +191,16 @@ PlannedStmt *supautils_planner(Query *parse, const char *query_string,
 
   if (!is_hint_role(GetUserNameFromId(GetUserId(), false))) {
     if (prev_planner_hook)
-#if PG_VERSION_NUM >= 190000
-      result = prev_planner_hook(parse, query_string, cursorOptions,
-                                 boundParams, es);
-#else
-      result =
-          prev_planner_hook(parse, query_string, cursorOptions, boundParams);
-#endif
+      result = prev_planner_hook(PLANNER_ARGS);
     else
-#if PG_VERSION_NUM >= 190000
-      result =
-          standard_planner(parse, query_string, cursorOptions, boundParams, es);
-#else
-      result =
-          standard_planner(parse, query_string, cursorOptions, boundParams);
-#endif
+      result = standard_planner(PLANNER_ARGS);
   } else {
     PG_TRY();
     {
       if (prev_planner_hook)
-        result =
-
-#if PG_VERSION_NUM >= 190000
-            prev_planner_hook(parse, query_string, cursorOptions, boundParams,
-                              es);
-#else
-            prev_planner_hook(parse, query_string, cursorOptions, boundParams);
-#endif
+        result = prev_planner_hook(PLANNER_ARGS);
       else
-        result =
-#if PG_VERSION_NUM >= 190000
-            standard_planner(parse, query_string, cursorOptions, boundParams,
-                             es);
-#else
-            standard_planner(parse, query_string, cursorOptions, boundParams);
-#endif
+        result = standard_planner(PLANNER_ARGS);
     }
     PG_CATCH();
     {
