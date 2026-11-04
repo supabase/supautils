@@ -111,40 +111,19 @@ static AclMode get_missing_aclmode(
 // Given the required RTEPermissionInfo list from the query and the role oid,
 // we find the first missing ACL (which should also match the failed acl on
 // ERRCODE_INSUFFICIENT_PRIVILEGE)
-missing_perm find_missing_perm_plan(Query *ps, Oid current_role_oid) {
-  missing_perm result = {.relid = InvalidOid, .acl = 0};
-
 #if PG16_LT
-  foreach_ptr(RangeTblEntry, info, ps->rtable) {
-    // on these versions, views contain an invalid oid on the first entry
-    if (!OidIsValid(info->relid)) continue;
+missing_perm find_missing_perm(List *rtable, Oid current_role_oid) {
 #else
-  foreach_ptr(RTEPermissionInfo, info, ps->rteperminfos) {
+missing_perm find_missing_perm(List *perminfos, Oid current_role_oid) {
 #endif
-    AclMode missing_acl = get_missing_aclmode(info, current_role_oid);
-
-    if (missing_acl != 0) {
-      result.relid = info->relid;
-      result.acl   = missing_acl;
-      return result;
-    }
-  }
-
-  return result;
-}
-
-// Given the required RTEPermissionInfo list from the query and the role oid,
-// we find the first missing ACL (which should also match the failed acl on
-// ERRCODE_INSUFFICIENT_PRIVILEGE)
-missing_perm find_missing_perm(PlannedStmt *ps, Oid current_role_oid) {
   missing_perm result = {.relid = InvalidOid, .acl = 0};
 
 #if PG16_LT
-  foreach_ptr(RangeTblEntry, info, ps->rtable) {
+  foreach_ptr(RangeTblEntry, info, rtable) {
     // on these versions, views contain an invalid oid on the first entry
     if (!OidIsValid(info->relid)) continue;
 #else
-  foreach_ptr(RTEPermissionInfo, info, ps->permInfos) {
+  foreach_ptr(RTEPermissionInfo, info, perminfos) {
 #endif
     AclMode missing_acl = get_missing_aclmode(info, current_role_oid);
 
