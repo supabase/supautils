@@ -27,6 +27,7 @@
 #include <nodes/parsenodes.h>
 #include <nodes/pg_list.h>
 #include <nodes/value.h>
+#include <optimizer/planner.h>
 #include <parser/parse_func.h>
 #include <tcop/utility.h>
 #include <tsearch/ts_locale.h>
