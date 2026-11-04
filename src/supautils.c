@@ -80,12 +80,16 @@ static void check_parameter(char *val, char *name);
 
 static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 #if PG_VERSION_NUM >= 190000
-#define PLANNER_ARGS_DEF Query *parse, const char *query_string, int cursorOptions, ParamListInfo boundParams, ExplainState *es
-#define PLANNER_ARGS parse, query_string, cursorOptions, boundParams, es
+#  define PLANNER_ARGS_DEF                                                     \
+    Query *parse, const char *query_string, int cursorOptions,                 \
+        ParamListInfo boundParams, ExplainState *es
+#  define PLANNER_ARGS parse, query_string, cursorOptions, boundParams, es
 
 #else
-#define PLANNER_ARGS_DEF Query *parse, const char *query_string, int cursorOptions, ParamListInfo boundParams
-#define PLANNER_ARGS parse, query_string, cursorOptions, boundParams
+#  define PLANNER_ARGS_DEF                                                     \
+    Query *parse, const char *query_string, int cursorOptions,                 \
+        ParamListInfo boundParams
+#  define PLANNER_ARGS parse, query_string, cursorOptions, boundParams
 #endif
 
 PlannedStmt *supautils_planner(PLANNER_ARGS_DEF);
@@ -183,8 +187,7 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
   }
 }
 
-PlannedStmt *supautils_planner(PLANNER_ARGS_DEF)
-{
+PlannedStmt *supautils_planner(PLANNER_ARGS_DEF) {
   MemoryContext cur_ctx = CurrentMemoryContext;
 
   PlannedStmt *result;
