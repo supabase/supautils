@@ -235,7 +235,12 @@ PlannedStmt *supautils_planner(Query *parse, const char *query_string,
       if (edata->sqlerrcode == ERRCODE_INSUFFICIENT_PRIVILEGE) {
         const Oid current_role_oid = GetUserId();
 
-        missing_perm missing = find_missing_perm_plan(parse, current_role_oid);
+#if PG16_LT
+        missing_perm missing = find_missing_perm(parse->rtable, current_role_oid);
+#else
+
+        missing_perm missing = find_missing_perm(parse->rteperminfos, current_role_oid);
+#endif
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
             (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
@@ -299,7 +304,11 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
         const Oid current_role_oid = GetUserId();
 
         missing_perm missing =
-            find_missing_perm(queryDesc->plannedstmt, current_role_oid);
+#if PG16_LT
+            find_missing_perm(queryDesc->plannedstmt->rtable, current_role_oid);
+#else
+            find_missing_perm(queryDesc->plannedstmt->permInfos, current_role_oid);
+#endif
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
             (missing.acl & (ACL_TRUNCATE | ACL_TRIGGER | ACL_REFERENCES)) ==
