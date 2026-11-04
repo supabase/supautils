@@ -78,10 +78,11 @@ static bool is_hint_role(const char *target);
 
 static void check_parameter(char *val, char *name);
 
-static void  supautils_executor_start(QueryDesc *queryDesc, int eflags);
+static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 #if PG_VERSION_NUM >= 190000
 PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams, ExplainState *es);
+                               int cursorOptions, ParamListInfo boundParams,
+                               ExplainState *es);
 #else
 PlannedStmt *supautils_planner(Query *parse, const char *query_string,
                                int cursorOptions, ParamListInfo boundParams);
@@ -182,7 +183,8 @@ static void supautils_fmgr_hook(FmgrHookEventType event, FmgrInfo *flinfo,
 
 #if PG_VERSION_NUM >= 190000
 PlannedStmt *supautils_planner(Query *parse, const char *query_string,
-                               int cursorOptions, ParamListInfo boundParams, ExplainState *es)
+                               int cursorOptions, ParamListInfo boundParams,
+                               ExplainState *es)
 #else
 PlannedStmt *supautils_planner(Query *parse, const char *query_string,
                                int cursorOptions, ParamListInfo boundParams)
@@ -195,31 +197,37 @@ PlannedStmt *supautils_planner(Query *parse, const char *query_string,
   if (!is_hint_role(GetUserNameFromId(GetUserId(), false))) {
     if (prev_planner_hook)
 #if PG_VERSION_NUM >= 190000
-      result = prev_planner_hook(parse, query_string, cursorOptions, boundParams, es);
+      result = prev_planner_hook(parse, query_string, cursorOptions,
+                                 boundParams, es);
 #else
-      result = prev_planner_hook(parse, query_string, cursorOptions, boundParams);
+      result =
+          prev_planner_hook(parse, query_string, cursorOptions, boundParams);
 #endif
     else
 #if PG_VERSION_NUM >= 190000
-      result = standard_planner(parse, query_string, cursorOptions, boundParams, es);
+      result =
+          standard_planner(parse, query_string, cursorOptions, boundParams, es);
 #else
-      result = standard_planner(parse, query_string, cursorOptions, boundParams);
+      result =
+          standard_planner(parse, query_string, cursorOptions, boundParams);
 #endif
   } else {
     PG_TRY();
     {
       if (prev_planner_hook)
         result =
-            
+
 #if PG_VERSION_NUM >= 190000
-          prev_planner_hook(parse, query_string, cursorOptions, boundParams, es);
+            prev_planner_hook(parse, query_string, cursorOptions, boundParams,
+                              es);
 #else
-          prev_planner_hook(parse, query_string, cursorOptions, boundParams);
+            prev_planner_hook(parse, query_string, cursorOptions, boundParams);
 #endif
       else
         result =
 #if PG_VERSION_NUM >= 190000
-            standard_planner(parse, query_string, cursorOptions, boundParams, es);
+            standard_planner(parse, query_string, cursorOptions, boundParams,
+                             es);
 #else
             standard_planner(parse, query_string, cursorOptions, boundParams);
 #endif
@@ -236,10 +244,12 @@ PlannedStmt *supautils_planner(Query *parse, const char *query_string,
         const Oid current_role_oid = GetUserId();
 
 #if PG16_LT
-        missing_perm missing = find_missing_perm(parse->rtable, current_role_oid);
+        missing_perm missing =
+            find_missing_perm(parse->rtable, current_role_oid);
 #else
 
-        missing_perm missing = find_missing_perm(parse->rteperminfos, current_role_oid);
+        missing_perm missing =
+            find_missing_perm(parse->rteperminfos, current_role_oid);
 #endif
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
@@ -307,7 +317,8 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags) {
 #if PG16_LT
             find_missing_perm(queryDesc->plannedstmt->rtable, current_role_oid);
 #else
-            find_missing_perm(queryDesc->plannedstmt->permInfos, current_role_oid);
+            find_missing_perm(queryDesc->plannedstmt->permInfos,
+                              current_role_oid);
 #endif
 
         if (missing.acl != 0 && OidIsValid(missing.relid) &&
