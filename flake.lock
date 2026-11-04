@@ -43,17 +43,17 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1793245359,
-        "narHash": "sha256-m0DRMa/csqo/nZ2C93oBn3/KTeUJ9Otj7fuIZz9s1HU=",
+        "lastModified": 1793674321,
+        "narHash": "sha256-wLcCioA8+xi7ck/gdZmBeZo/NJfXxvYYCVOpAGvCgK8=",
         "owner": "supabase",
         "repo": "xpg",
-        "rev": "98cbbc1ce3209e9584561f961db03aafb9c51daa",
+        "rev": "27aedcb0a23bce2879e7b114369e9c937665082d",
         "type": "github"
       },
       "original": {
         "owner": "supabase",
+        "ref": "v2.7.0",
         "repo": "xpg",
-        "rev": "98cbbc1ce3209e9584561f961db03aafb9c51daa",
         "type": "github"
       }
     }
