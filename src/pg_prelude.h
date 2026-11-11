@@ -10,7 +10,9 @@
 
 #include <access/htup_details.h>
 #include <access/xact.h>
+#include <catalog/catalog.h>
 #include <catalog/namespace.h>
+#include <catalog/pg_auth_members.h>
 #include <catalog/pg_authid.h>
 #include <catalog/pg_collation_d.h>
 #include <catalog/pg_proc.h>
@@ -33,6 +35,7 @@
 #include <tsearch/ts_locale.h>
 #include <utils/acl.h>
 #include <utils/builtins.h>
+#include <utils/catcache.h>
 #include <utils/fmgrprotos.h>
 #include <utils/formatting.h>
 #include <utils/guc.h>
@@ -217,9 +220,15 @@ static inline const char *rolespec_name_or_null(const RoleSpec *spec) {
   return get_rolespec_name(spec);
 }
 
+/** Oid of the role with this name. InvalidOid for NULL or a missing role. */
+static inline Oid role_oid_or_invalid(const char *role) {
+  if (role == NULL) return InvalidOid;
+  return get_role_oid(role, true);
+}
+
 /** Whether a role with this name exists. False for NULL. */
 static inline bool role_exists(const char *role) {
-  return role != NULL && OidIsValid(get_role_oid(role, true));
+  return OidIsValid(role_oid_or_invalid(role));
 }
 
 #pragma GCC poison get_rolespec_name get_rolespec_tuple get_rolespec_oid get_role_oid

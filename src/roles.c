@@ -308,6 +308,179 @@ static void check_grant_role(GrantRoleStmt *stmt, const role_policy *policy) {
   }
 }
 
+#if PG16_GTE
+
+/*
+ * Starting from PG16, CREATEROLE is no longer enough to manage a role: the
+ * ADMIN option on it is required. Roles created by the privileged role on
+ * PG16+ get it implicitly, but the ones that were created before a major
+ * version upgrade (or by a superuser) don't, which leaves the privileged role
+ * unable to manage them.
+ *
+ * The functions below let the privileged role obtain the ADMIN option by
+ * itself on the roles that are safe to hand over.
+ */
+
+/* GRANT .. WITH ADMIN OPTION / WITH ADMIN TRUE */
+static bool grants_admin_option(const GrantRoleStmt *stmt) {
+  ListCell *opt_cell;
+  bool      admin = false;
+
+  foreach (opt_cell, stmt->opt) {
+    DefElem *opt = lfirst_node(DefElem, opt_cell);
+    if (strcmp(opt->defname, "admin") == 0) admin = defGetBoolean(opt);
+  }
+
+  return admin;
+}
+
+/*
+ * The role itself plus every role it's directly or indirectly a member of,
+ * regardless of the INHERIT and SET options of the memberships.
+ */
+static List *role_and_its_memberships(Oid role_oid) {
+  List     *roles = list_make1_oid(role_oid);
+  ListCell *role_cell;
+
+  // appending to the list while iterating it is safe, the new elements get
+  // visited too
+  foreach (role_cell, roles) {
+    CatCList *memberships = SearchSysCacheList1(
+        AUTHMEMMEMROLE, ObjectIdGetDatum(lfirst_oid(role_cell)));
+
+    for (int i = 0; i < memberships->n_members; i++) {
+      HeapTuple tuple = &memberships->members[i]->tuple;
+      roles           = list_append_unique_oid(
+          roles, ((Form_pg_auth_members)GETSTRUCT(tuple))->roleid);
+    }
+
+    ReleaseSysCacheList(memberships);
+  }
+
+  return roles;
+}
+
+/*
+ * Whether the privileged role may get the ADMIN option on a role without
+ * having it already.
+ *
+ * Having ADMIN on a role is as good as being that role, so this must be false
+ * for any role that gives more power than the privileged role is meant to
+ * have: reserved roles, predefined roles, and any role that is, or is a member
+ * of, a superuser, the privileged role or a reserved membership.
+ */
+static bool can_self_grant_admin_on(const char *role_name, Oid role_oid,
+                                    const role_policy *policy) {
+  Oid       privileged_role_oid = role_oid_or_invalid(policy->privileged_role);
+  List     *roles;
+  ListCell *role_cell;
+  bool      allowed = true;
+
+  if (IsReservedName(role_name)) return false;
+
+  if (is_reserved_role(role_name, false, policy->reserved_roles)) return false;
+
+  roles = role_and_its_memberships(role_oid);
+
+  foreach (role_cell, roles) {
+    Oid member_of = lfirst_oid(role_cell);
+
+    if (superuser_arg(member_of) || member_of == privileged_role_oid ||
+        is_string_in_comma_delimited_string(GetUserNameFromId(member_of, true),
+                                            policy->reserved_memberships)) {
+      allowed = false;
+      break;
+    }
+  }
+
+  list_free(roles);
+
+  return allowed;
+}
+
+/*
+ * GRANT <role> TO <privileged_role> WITH ADMIN OPTION
+ *
+ * Done by the privileged role when it lacks the ADMIN option on <role>.
+ */
+static bool self_grant_admin(GrantRoleStmt *stmt, const utility_hook_args *args,
+                             const role_policy *policy) {
+  ListCell         *grantee_role_cell;
+  ListCell         *role_cell;
+  bool              lacks_admin = false;
+  utility_hook_args elevated_args;
+  GrantRoleStmt    *elevated_stmt;
+
+  if (!IsTransactionState() || superuser()) {
+    return false;
+  }
+
+  // GRANTED BY is left to core: the elevated role could grant on behalf of
+  // anyone
+  if (!stmt->is_grant || stmt->grantor != NULL || !grants_admin_option(stmt)) {
+    return false;
+  }
+
+  if (!is_current_role_privileged(policy->privileged_role)) {
+    return false;
+  }
+
+  // the ADMIN option can only go to roles that are already privileged
+  foreach (grantee_role_cell, stmt->grantee_roles) {
+    RoleSpec *spec = lfirst_node(RoleSpec, grantee_role_cell);
+    if (!is_role_privileged(rolespec_name_or_null(spec),
+                            policy->privileged_role))
+      return false;
+  }
+
+  foreach (role_cell, stmt->granted_roles) {
+    AccessPriv *priv     = lfirst_node(AccessPriv, role_cell);
+    Oid         role_oid = role_oid_or_invalid(priv->priv_name);
+
+    // let core fail with the usual error
+    if (!OidIsValid(role_oid)) return false;
+
+    if (!can_self_grant_admin_on(priv->priv_name, role_oid, policy))
+      return false;
+
+    if (!is_admin_of_role(GetUserId(), role_oid)) lacks_admin = true;
+  }
+
+  // when core would already allow the grant, let it do it so the privileged
+  // role is recorded as the grantor
+  if (!lacks_admin) return false;
+
+  // CURRENT_USER, CURRENT_ROLE and SESSION_USER would resolve to the elevated
+  // role, so pin the grantees to the roles that were checked above. This is
+  // done on a copy since the statement can belong to a cached plan.
+  elevated_args       = *args;
+  elevated_args.pstmt = copyObject(args->pstmt);
+  elevated_stmt       = (GrantRoleStmt *)elevated_args.pstmt->utilityStmt;
+
+  foreach (grantee_role_cell, elevated_stmt->grantee_roles) {
+    RoleSpec *spec = lfirst_node(RoleSpec, grantee_role_cell);
+    spec->rolename = pstrdup(rolespec_name_or_null(spec));
+    spec->roletype = ROLESPEC_CSTRING;
+  }
+
+  RUN_ELEVATED(policy->superuser, run_prev_utility_hook(&elevated_args));
+
+  return true;
+}
+
+#else
+
+// CREATEROLE is enough to manage roles before PG16
+static bool self_grant_admin(GrantRoleStmt *stmt, const utility_hook_args *args,
+                             const role_policy *policy) {
+  (void)stmt;
+  (void)args;
+  (void)policy;
+  return false;
+}
+
+#endif
+
 /*
  * ALTER ROLE <role> RENAME TO
  */
@@ -339,7 +512,7 @@ bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
     return false;
   case T_GrantRoleStmt:
     check_grant_role((GrantRoleStmt *)stmt, policy);
-    return false;
+    return self_grant_admin((GrantRoleStmt *)stmt, args, policy);
   case T_RenameStmt:
     check_rename_role((RenameStmt *)stmt, policy);
     return false;
