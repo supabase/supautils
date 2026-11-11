@@ -386,8 +386,8 @@ static bool can_self_grant_admin_on(const char *role_name, Oid role_oid,
     Oid member_of = lfirst_oid(role_cell);
 
     if (superuser_arg(member_of) || member_of == privileged_role_oid ||
-        is_string_in_comma_delimited_string(
-            GetUserNameFromId(member_of, true), policy->reserved_memberships)) {
+        is_string_in_comma_delimited_string(GetUserNameFromId(member_of, true),
+                                            policy->reserved_memberships)) {
       allowed = false;
       break;
     }
@@ -468,6 +468,17 @@ static bool self_grant_admin(GrantRoleStmt *stmt, const utility_hook_args *args,
   return true;
 }
 
+#else
+
+// CREATEROLE is enough to manage roles before PG16
+static bool self_grant_admin(GrantRoleStmt *stmt, const utility_hook_args *args,
+                             const role_policy *policy) {
+  (void)stmt;
+  (void)args;
+  (void)policy;
+  return false;
+}
+
 #endif
 
 /*
@@ -501,11 +512,7 @@ bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
     return false;
   case T_GrantRoleStmt:
     check_grant_role((GrantRoleStmt *)stmt, policy);
-#if PG16_GTE
     return self_grant_admin((GrantRoleStmt *)stmt, args, policy);
-#else
-    return false;
-#endif
   case T_RenameStmt:
     check_rename_role((RenameStmt *)stmt, policy);
     return false;
