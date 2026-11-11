@@ -37,6 +37,7 @@ ALTER ROLE role1 SET session_preload_libraries TO 'supautils';
 - [Non-Superuser Foreign Data Wrappers](#non-superuser-foreign-data-wrappers)
 - [Non-Superuser Settings](#non-superuser-settings)
 - [Non-Superuser Event Triggers](#non-superuser-event-triggers)
+- [Self-Granting ADMIN on Roles](#self-granting-admin-on-roles)
 - [Privileged extensions](#privileged-extensions)
 - [Extensions Parameter Overrides](#extensions-parameter-overrides)
 - [Table Ownership Bypass](#table-ownership-bypass)
@@ -150,6 +151,37 @@ You can also choose to allow all the extension settings by using a wildcard:
 ```
 supautils.privileged_role_allowed_configs="ext.*"
 ```
+
+### Self-Granting ADMIN on Roles
+
+Starting from PostgreSQL 16, the CREATEROLE attribute is not enough to manage a role, the ADMIN option on it is required. A role gets it implicitly on the roles it creates, but not on the ones that already existed before a major version upgrade to PostgreSQL 16 or later. This leaves the privileged role unable to alter, drop or grant those roles until a superuser fixes each one of them.
+
+On PostgreSQL 16 and later, supautils allows the privileged role to get the ADMIN option by itself:
+
+```sql
+set role privileged_role;
+
+drop role legacy_role;
+ERROR:  permission denied to drop role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "legacy_role" may drop this role.
+
+grant legacy_role to privileged_role with admin option;
+
+drop role legacy_role;
+```
+
+The grant is recorded as done by the bootstrap superuser, which is the same result as creating the role on PostgreSQL 16 or later.
+
+This only applies when all the grantees are the privileged role or roles that have its privileges, and `GRANTED BY` is not used. It's not allowed for:
+
+- Superusers.
+- [Reserved Roles](#reserved-roles).
+- [Reserved Memberships](#reserved-memberships).
+- The privileged role.
+- Roles that are members of any of the above, directly or through other roles. Members of reserved roles are allowed.
+- Predefined roles (`pg_*`).
+
+In those cases the statement fails with the usual PostgreSQL permission error.
 
 ### Privileged Extensions
 
