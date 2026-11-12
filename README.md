@@ -198,6 +198,16 @@ Then put the scripts inside the path:
     └── before-create.sql
 ```
 
+Scripts run with `search_path` set to `pg_catalog, pg_temp`, the same as core extension scripts, so schema-qualify anything a script references outside `pg_catalog`. The caller's `search_path` is restored once the script finishes. A session-level `set_config(..., false)` done by a script still persists.
+
+The following placeholders are substituted into scripts before they run (`@extcascade@` as a boolean, the rest as SQL string literals):
+
+- `@extname@`: the extension name
+- `@extschema@`: the `SCHEMA` clause of the statement, or `NULL` when absent
+- `@extversion@`: the `VERSION` clause of the statement, or `NULL` when absent
+- `@extcascade@`: `true` when `CASCADE` was given, otherwise `false`
+- `@extdefaultschema@`: the schema a schema-less `CREATE EXTENSION` is created in: `supautils.default_extension_install_schema` when set and existing, otherwise the first valid schema on the caller's `search_path`. `NULL` when there is none. Use this instead of reading `search_path` inside the script.
+
 This is useful for things like creating a dedicated role per extension, granting privileges as needed to that role, etc.
 
 ### Default Extension Install Schema
