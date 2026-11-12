@@ -87,8 +87,24 @@ static pg_noinline char *read_custom_script_file(const char *filename) {
 }
 
 /*
- * Substitute @extname@, @extschema@, @extversion@, and @extcascade@ in the
- * SQL script with their corresponding values, quoted as SQL string literals.
+ * The schema a schema-less `create extension` lands in, resolved the same
+ * way core's CreateExtension does. NULL when search_path has no valid schema.
+ */
+static char *default_creation_schema(void) {
+  List *search_path = fetch_search_path(false);
+
+  if (search_path == NIL) return NULL;
+
+  Oid schema_oid = linitial_oid(search_path);
+  list_free(search_path);
+
+  return get_namespace_name(schema_oid);
+}
+
+/*
+ * Substitute @extname@, @extschema@, @extversion@, @extcascade@, and
+ * @extdefaultschema@ in the SQL script with their corresponding values,
+ * quoted as SQL string literals.
  *
  * This must do a single left-to-right pass over c_sql and never rescan text
  * that was just substituted in. Otherwise a malicious extension name/schema/
@@ -100,7 +116,8 @@ static pg_noinline char *read_custom_script_file(const char *filename) {
  */
 static char *substitute_variables(const char *sql, const char *extname,
                                   const char *extschema, const char *extversion,
-                                  bool extcascade) {
+                                  bool        extcascade,
+                                  const char *extdefaultschema) {
   /*
    * These values get substituted as single-quoted string literals. When the
    * arg contains one of the following characters, no one collection of
@@ -132,10 +149,17 @@ static char *substitute_variables(const char *sql, const char *extname,
   // We don't check extcascade because it's a bool and user can't pass
   // an arbitrary string in it
 
-  const char *quoted_extname    = sql_literal(extname);
-  const char *quoted_extschema  = sql_literal(extschema);
-  const char *quoted_extversion = sql_literal(extversion);
-  const char *quoted_extcascade = extcascade ? "true" : "false";
+  if (extdefaultschema && strpbrk(extdefaultschema, quoting_relevant_chars))
+    ereport(ERROR, (errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
+                    errmsg("invalid character in default extension schema: "
+                           "must not contain any of \"%s\"",
+                           quoting_relevant_chars)));
+
+  const char *quoted_extname          = sql_literal(extname);
+  const char *quoted_extschema        = sql_literal(extschema);
+  const char *quoted_extversion       = sql_literal(extversion);
+  const char *quoted_extcascade       = extcascade ? "true" : "false";
+  const char *quoted_extdefaultschema = sql_literal(extdefaultschema);
 
   StringInfoData out;
   initStringInfo(&out);
@@ -153,6 +177,9 @@ static char *substitute_variables(const char *sql, const char *extname,
     } else if (strncmp(p, "@extcascade@", 12) == 0) {
       appendStringInfoString(&out, quoted_extcascade);
       p += 12;
+    } else if (strncmp(p, "@extdefaultschema@", 18) == 0) {
+      appendStringInfoString(&out, quoted_extdefaultschema);
+      p += 18;
     } else {
       appendStringInfoChar(&out, *p);
       p += 1;
@@ -178,9 +205,19 @@ static void run_custom_script(const char *filename, const char *extname,
 
   PG_TRY();
   {
-    sql = substitute_variables(sql, extname, extschema, extversion, extcascade);
+    const char *extdefaultschema = default_creation_schema();
+
+    sql = substitute_variables(sql, extname, extschema, extversion, extcascade,
+                               extdefaultschema);
 
     PushActiveSnapshot(GetTransactionSnapshot());
+
+    // run the script with search_path set to pg_catalog, same as core's
+    // execute_extension_script. saved and restored via a GUC nest level so on
+    // error the change is rolled back with the transaction
+    int save_nestlevel = NewGUCNestLevel();
+    (void)set_config_option("search_path", "pg_catalog, pg_temp", PGC_USERSET,
+                            PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
 
     int rc = SPI_connect();
     if (rc != SPI_OK_CONNECT) {
@@ -196,6 +233,8 @@ static void run_custom_script(const char *filename, const char *extname,
     if (rc != SPI_OK_FINISH) {
       elog(ERROR, "SPI_finish failed with error code %d", rc);
     }
+
+    AtEOXact_GUC(true, save_nestlevel);
 
     PopActiveSnapshot();
   }

@@ -47,9 +47,10 @@ bool is_extension_available(const char *extname) {
   StringInfoData sql;
 
   initStringInfo(&sql);
-  appendStringInfo(
-      &sql, "select 1 from pg_catalog.pg_available_extensions where name = %s",
-      quote_literal_cstr(extname));
+  appendStringInfo(&sql,
+                   "select 1 from pg_catalog.pg_available_extensions where "
+                   "name operator(pg_catalog.=) %s",
+                   quote_literal_cstr(extname));
 
   int rc = SPI_execute(sql.data, true, 1);
 

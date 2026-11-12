@@ -1,0 +1,50 @@
+-- custom scripts run with search_path set to pg_catalog, pg_temp, so names
+-- they don't qualify resolve in pg_catalog regardless of the caller's
+-- search_path. the caller's search_path is restored once the script is done
+set role extensions_role;
+\echo
+
+-- a function with the same name as a builtin, in a schema ahead of pg_catalog
+create schema my_schema;
+create function my_schema.current_setting(text) returns text
+language sql
+as $$ select 'my_schema'::text $$;
+set search_path = my_schema, pg_catalog;
+create extension amcheck;
+show search_path;
+drop extension amcheck;
+\echo
+
+-- same via pg_temp, which postgres searches first unless listed explicitly
+reset search_path;
+create function pg_temp.current_setting(text) returns text
+language sql
+as $$ select 'pg_temp'::text $$;
+create extension amcheck;
+drop extension amcheck;
+drop function pg_temp.current_setting(text);
+\echo
+
+-- @extdefaultschema@ is the schema a schema-less create extension lands in
+-- (above: my_schema, then public). null when search_path has no valid
+-- schema, and the create then fails as it would in stock postgres
+set search_path = '';
+create extension amcheck;
+reset search_path;
+\echo
+
+-- with supautils.default_extension_install_schema set, it is that schema
+reset role;
+create schema extensions;
+set supautils.default_extension_install_schema to 'extensions';
+set role extensions_role;
+create extension amcheck;
+select extnamespace::regnamespace from pg_extension where extname = 'amcheck';
+drop extension amcheck;
+reset role;
+reset supautils.default_extension_install_schema;
+drop schema extensions;
+\echo
+
+-- cleanup
+drop schema my_schema cascade;
