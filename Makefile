@@ -217,7 +217,7 @@ $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
 
 .PHONY: test-core
 test-core: $(CORE_STAGEDIR)/parallel_schedule
-	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression --create-role=regress_authenticated_user_sr --create-role=regress_authenticated_user_ssa
+	$(pg_regress_installcheck) --dlpath=$(PG_REGRESS_TESTS)/lib --inputdir=$(CORE_STAGEDIR) --schedule=$(CORE_STAGEDIR)/parallel_schedule --dbname=regression --create-role=regress_authenticated_user_db_sr --create-role=regress_authenticated_user_db_ssa --create-role=regress_authenticated_user_sr --create-role=regress_authenticated_user_ssa
 
 .PHONY: test-startup
 test-startup:
