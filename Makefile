@@ -190,7 +190,7 @@ CORE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/*.patch)
 # out of installcheck because they change cluster-wide state; our cluster is
 # disposable. Staged only when the directory exists.
 UNSAFE_TESTS_DIR ?= $(PG_REGRESS_TESTS)/unsafe_tests
-UNSAFE_TESTS = rolenames setconfig alter_system_table guc_privs
+UNSAFE_TESTS = $(notdir $(basename $(wildcard $(UNSAFE_TESTS_DIR)/sql/*.sql)))
 UNSAFE_PATCHES = $(wildcard $(CORE_VERSION_PATCH_DIR)/unsafe_tests/*.patch)
 
 $(CORE_STAGEDIR)/parallel_schedule: $(CORE_PATCHES)
