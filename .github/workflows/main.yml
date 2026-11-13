@@ -94,7 +94,9 @@ jobs:
           rm -rf ./build-${{ matrix.pg-version }}
 
       - name: run tests
-        run: nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} test"
+        run: |
+          export UBSAN_OPTIONS="print_stacktrace=1:disable_coredump=0:abort_on_error=1:verbosity=0"
+          nix-shell --run "xpg --cassert -v ${{ matrix.pg-version }} test"
 
       - if: ${{ failure() }}
         run: cat regression.diffs

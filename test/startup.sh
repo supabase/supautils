@@ -7,10 +7,17 @@ set -euo pipefail
 # strip the build- portion to recover the version.
 pg_version="${BUILD_DIR#build-}"
 
+# Start the server from the same build the extension was compiled against,
+# otherwise a cassert build of the extension loads into a plain server.
+cassert=()
+if pg_config --configure | grep -q -- --enable-cassert; then
+  cassert=(--cassert)
+fi
+
 echo "TEST: invalid timezone in startup packet fails"
 
 if output=$(
-  xpg -v "$pg_version" psql "options='-c timezone=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0'" \
+  xpg "${cassert[@]}" -v "$pg_version" psql "options='-c timezone=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX0'" \
     -c "select 1" 2>&1
 ); then
   echo "Expected psql to fail" >&2
@@ -26,7 +33,7 @@ fi
 echo "TEST: valid timezones should pass successfully"
 
 if output=$(
-  xpg -v "$pg_version" psql "options='-c timezone=posix/America/Argentina/ComodRivadavia'" \
+  xpg "${cassert[@]}" -v "$pg_version" psql "options='-c timezone=posix/America/Argentina/ComodRivadavia'" \
     -c "select 1" 2>&1 >/dev/null
 ); then
   :

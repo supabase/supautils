@@ -1,0 +1,19 @@
+# Expected: supautils.hint_roles adds a hint to permission errors
+--- a/expected/alter_system_table.out
++++ b/expected/alter_system_table.out
+@@ -26,6 +26,7 @@
+ SET ROLE regress_user_ast;
+ INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 1, 'foo');
+ ERROR:  permission denied for table pg_description
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON pg_catalog.pg_description TO regress_user_ast;
+ RESET ROLE;
+ -- policy on system catalog
+ CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%');
+@@ -114,6 +115,7 @@
+ SET ROLE regress_user_ast;
+ INSERT INTO pg_description (objoid, classoid, objsubid, description) VALUES (0, 0, 3, 'foo');
+ ERROR:  permission denied for table pg_description
++HINT:  Grant the required privileges to the current role with: GRANT INSERT ON pg_catalog.pg_description TO regress_user_ast;
+ RESET ROLE;
+ -- policy on system catalog
+ BEGIN;
