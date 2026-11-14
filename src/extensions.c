@@ -2,6 +2,7 @@
 
 #include "extension_custom_scripts.h"
 #include "privileged_extensions.h"
+#include "catalog/namespace.h"
 #include "utils.h"
 
 static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
@@ -80,19 +81,58 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // postgres only falls back to search_path. saved and restored via a GUC
   // nest level, same as core's execute_extension_script, so on error the
   // change is rolled back with the transaction.
+  StringInfoData pathbuf;
+
+  List *current_search_path = fetch_search_path(false);
+  ListCell   *lc;
+  // todo remove any usage of explicit pg_catalog in search path
+  StringInfoData pathbuf2;
+  bool first = true;
+
+  initStringInfo(&pathbuf);
+  initStringInfo(&pathbuf2);
+
+  foreach(lc, current_search_path)
+  {
+    Oid			reqschema = lfirst_oid(lc);
+    char	   *reqname = get_namespace_name(reqschema);
+    if (reqname && strcmp(reqname, "pg_catalog") != 0){
+      if (first) {
+        appendStringInfo(&pathbuf2, "%s", quote_identifier(reqname));
+	first = false;
+      } else {
+        appendStringInfo(&pathbuf2, ", %s", quote_identifier(reqname));
+      }
+  }
+  }
+
+  save_nestlevel = NewGUCNestLevel();
+
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
-    const char *current = GetConfigOption("search_path", true, false);
 
-    save_nestlevel = NewGUCNestLevel();
-    (void)set_config_option(
-        "search_path",
-        (current == NULL || current[0] == '\0')
-            ? quote_identifier(policy->default_schema)
-            : psprintf("%s, %s", quote_identifier(policy->default_schema),
-                       current),
-        PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
+     if (pathbuf2.data == NULL || pathbuf2.data[0] == '\0'){
+        appendStringInfoString(&pathbuf, quote_identifier(policy->default_schema));
+
+     } else {
+        appendStringInfoString(&pathbuf, psprintf("%s, %s", quote_identifier(policy->default_schema),
+                        pathbuf2.data));
+     }
+     appendStringInfoString(&pathbuf, ", pg_temp");
+   
+ } else {
+     if (pathbuf2.data == NULL || pathbuf2.data[0] == '\0'){
+        appendStringInfoString(&pathbuf, quote_identifier("pg_temp"));
+
+     } else {
+        appendStringInfoString(&pathbuf, psprintf("%s, %s",
+                        pathbuf2.data, "pg_temp"));
+     }
   }
+  (void) set_config_option("search_path", pathbuf.data,
+						 PGC_USERSET, PGC_S_SESSION,
+						 GUC_ACTION_SAVE, true, 0, false);
+
 
   if (excalate_privs) {
     RUN_ELEVATED(policy->superuser,
