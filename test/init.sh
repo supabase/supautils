@@ -25,6 +25,15 @@ echo "do \$\$
         if @extname@ = 'pg_freespacemap' then
           perform set_config('work_mem', '64MB', false);
         end if;
+
+        -- pg_surgery is only created when this global script is run
+        -- for tsm_system_time. This is not a cyclic dependency. It would have
+        -- been a cyclic dependency only if the 'create extension ...' command
+        -- unconditionally outside the if's block.
+        if @extname@ = 'tsm_system_time' then
+          create extension if not exists pg_surgery;
+        end if;
+
         if not (@extname@ = ANY(ARRAY['dict_xsyn', 'insert_username'])) then
           return;
         end if;
@@ -94,3 +103,63 @@ echo "do \$\$
       begin
         perform set_config('search_path', 'public', false);
       end \$\$;" > "$TMPDIR/extension-custom-scripts/intarray/before-create.sql"
+
+# Self-recursion: bloom extension's before-create.sql creates itself
+mkdir -p "$TMPDIR/extension-custom-scripts/bloom"
+echo "do \$\$
+      begin
+        create extension bloom;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/bloom/before-create.sql"
+
+# Mutual-recursion: pgrowlocks extension's before-create.sql creates pgstattuple
+# and vice-versa
+mkdir -p "$TMPDIR/extension-custom-scripts/pgrowlocks"
+echo "do \$\$
+      begin
+        create extension pgstattuple;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/pgrowlocks/before-create.sql"
+
+mkdir -p "$TMPDIR/extension-custom-scripts/pgstattuple"
+echo "do \$\$
+      begin
+        create extension pgrowlocks;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/pgstattuple/after-create.sql"
+
+# Mutual-recusion with three extensions: pg_buffercache -> pg_visibility -> pg_prewarm -> pg_buffercache
+mkdir -p "$TMPDIR/extension-custom-scripts/pg_buffercache"
+echo "do \$\$
+      begin
+        create extension pg_visibility;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/pg_buffercache/before-create.sql"
+
+mkdir -p "$TMPDIR/extension-custom-scripts/pg_visibility"
+echo "do \$\$
+      begin
+        create extension pg_prewarm;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/pg_visibility/after-create.sql"
+
+mkdir -p "$TMPDIR/extension-custom-scripts/pg_prewarm"
+echo "do \$\$
+      begin
+        create extension pg_buffercache;
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/pg_prewarm/before-create.sql"
+
+# Non-cyclic dependency: amcheck's before-create.sql creates tsm_system_rows.
+# This should run both extensions' custom scripts.
+mkdir -p "$TMPDIR/extension-custom-scripts/amcheck"
+echo "do \$\$
+      begin
+        raise notice 'before creating tsm_system_rows in amcheck''s before-create.sql script';
+        create extension if not exists tsm_system_rows;
+        raise notice 'after creating tsm_system_rows in amcheck''s before-create.sql script';
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/amcheck/before-create.sql"
+
+mkdir -p "$TMPDIR/extension-custom-scripts/tsm_system_rows"
+echo "do \$\$
+      begin
+        raise notice 'tsm_system_rows''s before-create.sql running';
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/tsm_system_rows/before-create.sql"
+echo "do \$\$
+      begin
+        raise notice 'tsm_system_rows''s after-create.sql running';
+      end \$\$;" > "$TMPDIR/extension-custom-scripts/tsm_system_rows/after-create.sql"
