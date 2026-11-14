@@ -3,8 +3,59 @@
 #include <storage/fd.h>
 #include <sys/stat.h>
 
-// Prevent recursively running custom scripts
-static bool running_custom_script = false;
+static List *extensions_under_creation = NIL;
+
+/*
+ * Returns a palloc'd error message if the extensions being created
+ * have a cyclic dependency via their custom extension scripts, NULL
+ * otherwise.
+ *
+ * For example, if extension a's before-create.sql file contains a
+ * `create extension a` command, it will return the following error
+ * message:
+ *
+ * cyclic dependency found while running custom extension scripts: a -> a
+ *
+ * Similar errors are shown for mutually recursive dependencies of
+ * two or more extensions. For example:
+ *
+ *    a -> b -> a
+ * or a -> b -> c -> a
+ *
+ * And so on.
+ */
+static char *check_cyclic_dependency(const char *extension_name) {
+  ListCell      *lc;
+  bool           cycle_found = false;
+  StringInfoData error_message;
+
+  foreach (lc, extensions_under_creation) {
+    const char *current_extension_name = (const char *)lfirst(lc);
+
+    if (cycle_found) {
+      appendStringInfo(&error_message, " -> %s", current_extension_name);
+    } else {
+      if (strcmp(current_extension_name, extension_name) == 0) {
+        cycle_found = true;
+
+        initStringInfo(&error_message);
+        appendStringInfo(&error_message,
+                         "cyclic dependency found while running custom "
+                         "extension scripts: %s",
+                         current_extension_name);
+      }
+    }
+  }
+
+  // If cycle is found append the current extension name to
+  // end the error message with
+  if (cycle_found) {
+    appendStringInfo(&error_message, " -> %s", extension_name);
+    return error_message.data;
+  }
+
+  return NULL;
+}
 
 // This produces a quoted SQL string literal, e.g. x -> 'x'. NULL is
 // substituted as the bare SQL NULL keyword, so an absent CREATE EXTENSION
@@ -165,8 +216,10 @@ static char *substitute_variables(const char *sql, const char *extname,
 static void run_custom_script(const char *filename, const char *extname,
                               const char *extschema, const char *extversion,
                               bool extcascade) {
-  if (running_custom_script) {
-    return;
+  char *cyclic_dep_msg = check_cyclic_dependency(extname);
+  if (cyclic_dep_msg != NULL) {
+    ereport(ERROR,
+            (errcode(ERRCODE_INVALID_RECURSION), errmsg("%s", cyclic_dep_msg)));
   }
 
   char *sql = read_custom_script_file(filename);
@@ -174,7 +227,8 @@ static void run_custom_script(const char *filename, const char *extname,
     return; // no custom script for this extension/event
   }
 
-  running_custom_script = true;
+  extensions_under_creation =
+      lappend(extensions_under_creation, (void *)extname);
 
   PG_TRY();
   {
@@ -201,12 +255,12 @@ static void run_custom_script(const char *filename, const char *extname,
   }
   PG_CATCH();
   {
-    running_custom_script = false;
+    extensions_under_creation = list_delete_last(extensions_under_creation);
     PG_RE_THROW();
   }
   PG_END_TRY();
 
-  running_custom_script = false;
+  extensions_under_creation = list_delete_last(extensions_under_creation);
 }
 
 /*
