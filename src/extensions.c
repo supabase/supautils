@@ -106,29 +106,31 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 
   save_nestlevel = NewGUCNestLevel();
   if (excalate_privs) {
-
     sanitized_search_path = get_sanitized_search_path();
-
-    if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
-        OidIsValid(get_namespace_oid(policy->default_schema, true))) {
-
-      sanitized_search_path =
-          lcons_oid(get_namespace_oid(policy->default_schema, true),
-                    sanitized_search_path);
-    }
-
-    foreach (lc, sanitized_search_path) {
-      Oid   reqschema = lfirst_oid(lc);
-      char *reqname   = get_namespace_name(reqschema);
-
-      appendStringInfo(&pathbuf, "%s, ", quote_identifier(reqname));
-    }
-
-    appendStringInfo(&pathbuf, "%s", quote_identifier("pg_temp"));
-
-    (void)set_config_option("search_path", pathbuf.data, PGC_USERSET,
-                            PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
+  } else {
+    sanitized_search_path = NIL;
   }
+
+  if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
+      OidIsValid(get_namespace_oid(policy->default_schema, true))) {
+
+    sanitized_search_path =
+        lcons_oid(get_namespace_oid(policy->default_schema, true),
+                  sanitized_search_path);
+  }
+
+  foreach (lc, sanitized_search_path) {
+    Oid   reqschema = lfirst_oid(lc);
+    char *reqname   = get_namespace_name(reqschema);
+
+    appendStringInfo(&pathbuf, "%s, ", quote_identifier(reqname));
+  }
+
+  appendStringInfo(&pathbuf, "%s", quote_identifier("pg_temp"));
+
+  (void)set_config_option("search_path", pathbuf.data, PGC_USERSET,
+                          PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
+ 
 
   if (excalate_privs) {
     RUN_ELEVATED(policy->superuser,
