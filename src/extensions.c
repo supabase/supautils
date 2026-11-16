@@ -114,9 +114,8 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
 
-    sanitized_search_path =
-        lcons_oid(get_namespace_oid(policy->default_schema, true),
-                  sanitized_search_path);
+    sanitized_search_path = lcons_oid(
+        get_namespace_oid(policy->default_schema, true), sanitized_search_path);
   }
 
   foreach (lc, sanitized_search_path) {
@@ -130,7 +129,6 @@ static bool create_extension(CreateExtensionStmt     *stmt,
 
   (void)set_config_option("search_path", pathbuf.data, PGC_USERSET,
                           PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
- 
 
   if (excalate_privs) {
     RUN_ELEVATED(policy->superuser,
