@@ -1,5 +1,9 @@
--- supautils settings go through ALTER SYSTEM rather than init.conf so a
--- test can RESET them all the way back to their defaults
+-- settings are set via alter system and not init.conf. settings_unset.sql
+-- needs every supautils setting back at its default to check the hooks
+-- do nothing when nothing is configured. reset on a value coming from a
+-- config file only goes back to the file value, alter system reset goes
+-- all the way to the default. extension_custom_scripts_path stays in
+-- init.conf because xpg replaces @TMPDIR@ only there
 alter system set supautils.reserved_roles = 'supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*';
 alter system set supautils.reserved_memberships = 'pg_read_server_files,pg_write_server_files,pg_execute_server_program,role_with_reserved_membership';
 alter system set supautils.privileged_extensions = 'autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, postgres_fdw, pageinspect, plls, no_control_file_extension, dblink, ltree, unaccent, tablefunc, tcn';

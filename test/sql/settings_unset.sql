@@ -1,6 +1,19 @@
--- With every supautils setting at its default the hook must leave every
--- statement to core. init.sql sets them through ALTER SYSTEM so RESET can
--- reach the default.
+-- what this test is about:
+-- supautils only acts when its settings are configured. with nothing
+-- configured every hook should fall through and let core handle the
+-- statement, this test makes sure of that.
+--
+-- how it works:
+-- 1. save the current values of the settings with \gset so they can be
+--    restored at the end
+-- 2. alter system reset each one so they go back to their defaults, reload
+--    and reconnect so the new session sees the defaults
+-- 3. run the statements the hooks intercept (alter role, create role, grant,
+--    create extension, create policy, set, create publication) as nonsuper
+--    and then as privileged_role. the errors in the output should be the
+--    ones core gives, no supautils error or hint should show up
+-- 4. put the settings back and reconnect so the next test runs with the
+--    usual config
 create table settings_unset_t (id int);
 select current_setting('supautils.reserved_roles') as reserved_roles, current_setting('supautils.reserved_memberships') as reserved_memberships, current_setting('supautils.privileged_role') as privileged_role, current_setting('supautils.privileged_role_allowed_configs') as privileged_role_allowed_configs, current_setting('supautils.privileged_extensions') as privileged_extensions, current_setting('supautils.policy_grants') as policy_grants, current_setting('supautils.drop_trigger_grants') as drop_trigger_grants, current_setting('supautils.restrict_extension_versions') as restrict_extension_versions \gset
 alter system reset supautils.reserved_roles;
@@ -12,8 +25,22 @@ alter system reset supautils.policy_grants;
 alter system reset supautils.drop_trigger_grants;
 alter system reset supautils.restrict_extension_versions;
 select pg_reload_conf();
+-- reconnect, pg_reload_conf only signals the backends and the change
+-- may not be picked up before the next statement runs
 \c
-select source = 'default' as unset from pg_settings where name = 'supautils.reserved_roles';
+-- every setting should now come from its default
+select name, source
+from pg_settings
+where name in (
+    'supautils.reserved_roles',
+    'supautils.reserved_memberships',
+    'supautils.privileged_role',
+    'supautils.privileged_role_allowed_configs',
+    'supautils.privileged_extensions',
+    'supautils.policy_grants',
+    'supautils.drop_trigger_grants',
+    'supautils.restrict_extension_versions')
+order by name;
 
 set role nonsuper;
 alter role anon nologin;
@@ -46,6 +73,19 @@ alter system set supautils.policy_grants = :'policy_grants';
 alter system set supautils.drop_trigger_grants = :'drop_trigger_grants';
 alter system set supautils.restrict_extension_versions = :'restrict_extension_versions';
 select pg_reload_conf();
+-- reconnect so the restored values are picked up
 \c
-select source = 'configuration file' as restored from pg_settings where name = 'supautils.reserved_roles';
+-- and back from the config file after the restore
+select name, source
+from pg_settings
+where name in (
+    'supautils.reserved_roles',
+    'supautils.reserved_memberships',
+    'supautils.privileged_role',
+    'supautils.privileged_role_allowed_configs',
+    'supautils.privileged_extensions',
+    'supautils.policy_grants',
+    'supautils.drop_trigger_grants',
+    'supautils.restrict_extension_versions')
+order by name;
 drop table settings_unset_t;

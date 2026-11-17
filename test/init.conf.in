@@ -5,4 +5,6 @@ shared_preload_libraries='pg_tle,plpgsql_check'
 session_preload_libraries = 'supautils'
 wal_level=logical
 
+# rest of the supautils settings are in init.sql via alter system, this one
+# stays here because xpg replaces @TMPDIR@ only in this file
 supautils.extension_custom_scripts_path='@TMPDIR@/extension-custom-scripts'
