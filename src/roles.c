@@ -333,8 +333,9 @@ static void check_rename_role(RenameStmt *stmt, const role_policy *policy) {
  * statement, so the role fields would never be read. Read here the same
  * fields the handlers read, then let the handlers return as usual.
  *
- * DROP ROLE is skipped: its handler uses the plain name, and looking it up
- * would make "DROP ROLE IF EXISTS" fail for a missing role.
+ * Keep the cases in sync with handle_role_stmt and read what its handler
+ * reads, no more: a lookup on DROP ROLE would fail "DROP ROLE IF EXISTS"
+ * for a missing role.
  */
 static void read_role_specs(Node *stmt) {
   ListCell *lc;
@@ -355,6 +356,13 @@ static void read_role_specs(Node *stmt) {
         (void)rolespec_name_or_null(lfirst_node(RoleSpec, rc));
     }
     break;
+  case T_DropRoleStmt:
+    foreach (lc, ((DropRoleStmt *)stmt)->roles) {
+      RoleSpec *role = lfirst_node(RoleSpec, lc);
+      if (role->roletype != ROLESPEC_CSTRING) break;
+      (void)role->rolename;
+    }
+    break;
   case T_GrantRoleStmt:
     foreach (lc, ((GrantRoleStmt *)stmt)->grantee_roles)
       (void)rolespec_name_or_null(lfirst_node(RoleSpec, lc));
@@ -364,6 +372,9 @@ static void read_role_specs(Node *stmt) {
 }
 #endif
 
+/*
+ * Keep the cases in sync with read_role_specs above.
+ */
 bool handle_role_stmt(Node *stmt, const utility_hook_args *args,
                       const role_policy *policy) {
 #if TEST_CORE
