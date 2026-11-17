@@ -4,11 +4,17 @@
 #include <sys/stat.h>
 
 /*
- * A list of extension names which are currently under creation.
- * Used to detect cyclic dependencies between extensions via
- * their custom scripts.
+ * Marker callback pushed onto error_context_stack by run_custom_script() for
+ * the duration of a custom script, with the extension name as arg. It
+ * reports nothing. It only lets error_if_cycle_detected() find the
+ * extensions whose custom scripts are currently running by walking the
+ * stack. The frames live on the C stack and core unwinds them on error
+ * (PG_TRY restores error_context_stack, top-level abort resets it), so no
+ * cleanup or global state is needed here.
  */
-static List *extensions_under_creation = NIL;
+static void custom_script_error_callback(void *arg) {
+  (void)arg;
+}
 
 /*
  * Raises an cyclic dependency error if the extensions being created
@@ -29,33 +35,38 @@ static List *extensions_under_creation = NIL;
  * And so on.
  */
 static void error_if_cycle_detected(const char *extension_name) {
-  ListCell      *lc;
-  bool           cycle_found = false;
+  ErrorContextCallback *outermost = NULL;
+
+  // the stack is innermost-first, keep going to find the outermost match
+  for (ErrorContextCallback *ec = error_context_stack; ec != NULL;
+       ec                       = ec->previous) {
+    if (ec->callback == custom_script_error_callback &&
+        strcmp((const char *)ec->arg, extension_name) == 0)
+      outermost = ec;
+  }
+
+  if (outermost == NULL) return;
+
+  // prepend while walking outwards so the chain reads outermost-first
+  List *chain = NIL;
+  for (ErrorContextCallback *ec = error_context_stack;; ec = ec->previous) {
+    if (ec->callback == custom_script_error_callback)
+      chain = lcons(ec->arg, chain);
+    if (ec == outermost) break;
+  }
+
   StringInfoData error_message;
+  ListCell      *lc;
 
-  foreach (lc, extensions_under_creation) {
-    const char *current_extension_name = (const char *)lfirst(lc);
+  initStringInfo(&error_message);
+  appendStringInfoString(&error_message, "cyclic dependency found while "
+                                         "running custom extension scripts: ");
+  foreach (lc, chain)
+    appendStringInfo(&error_message, "%s -> ", (const char *)lfirst(lc));
+  appendStringInfoString(&error_message, extension_name);
 
-    if (cycle_found) {
-      appendStringInfo(&error_message, " -> %s", current_extension_name);
-    } else {
-      if (strcmp(current_extension_name, extension_name) == 0) {
-        cycle_found = true;
-
-        initStringInfo(&error_message);
-        appendStringInfo(&error_message,
-                         "cyclic dependency found while running custom "
-                         "extension scripts: %s",
-                         current_extension_name);
-      }
-    }
-  }
-
-  if (cycle_found) {
-    appendStringInfo(&error_message, " -> %s", extension_name);
-    ereport(ERROR, (errcode(ERRCODE_INVALID_RECURSION),
-                    errmsg("%s", error_message.data)));
-  }
+  ereport(ERROR, (errcode(ERRCODE_INVALID_RECURSION),
+                  errmsg("%s", error_message.data)));
 }
 
 // This produces a quoted SQL string literal, e.g. x -> 'x'. NULL is
@@ -112,11 +123,8 @@ static char *read_whole_file(const char *filename, int *length) {
 /*
  * Read an SQL script file into a string, and convert to database encoding.
  * Returns NULL if the file does not exist.
- *
- * Disable inlining to avoid gcc's -Wclobbered warnings on the PG_TRY()
- * clause in this function's caller.
  */
-static pg_noinline char *read_custom_script_file(const char *filename) {
+static char *read_custom_script_file(const char *filename) {
   int len;
 
   char *src_str = read_whole_file(filename, &len);
@@ -224,40 +232,37 @@ static void run_custom_script(const char *filename, const char *extname,
     return; // no custom script for this extension/event
   }
 
-  extensions_under_creation =
-      lappend(extensions_under_creation, (void *)extname);
+  // mark this extension as running a custom script, see
+  // custom_script_error_callback. must be popped on every non-error exit
+  ErrorContextCallback errcallback = {
+    .previous = error_context_stack,
+    .callback = custom_script_error_callback,
+    .arg      = (void *)extname,
+  };
+  error_context_stack = &errcallback;
 
-  PG_TRY();
-  {
-    sql = substitute_variables(sql, extname, extschema, extversion, extcascade);
+  sql = substitute_variables(sql, extname, extschema, extversion, extcascade);
 
-    PushActiveSnapshot(GetTransactionSnapshot());
+  PushActiveSnapshot(GetTransactionSnapshot());
 
-    int rc = SPI_connect();
-    if (rc != SPI_OK_CONNECT) {
-      elog(ERROR, "SPI_connect failed with error code %d", rc);
-    }
-
-    rc = SPI_execute(sql, false, 0);
-    if (rc != SPI_OK_UTILITY) {
-      elog(ERROR, "SPI_execute failed with error code %d", rc);
-    }
-
-    rc = SPI_finish();
-    if (rc != SPI_OK_FINISH) {
-      elog(ERROR, "SPI_finish failed with error code %d", rc);
-    }
-
-    PopActiveSnapshot();
+  int rc = SPI_connect();
+  if (rc != SPI_OK_CONNECT) {
+    elog(ERROR, "SPI_connect failed with error code %d", rc);
   }
-  PG_CATCH();
-  {
-    extensions_under_creation = list_delete_last(extensions_under_creation);
-    PG_RE_THROW();
-  }
-  PG_END_TRY();
 
-  extensions_under_creation = list_delete_last(extensions_under_creation);
+  rc = SPI_execute(sql, false, 0);
+  if (rc != SPI_OK_UTILITY) {
+    elog(ERROR, "SPI_execute failed with error code %d", rc);
+  }
+
+  rc = SPI_finish();
+  if (rc != SPI_OK_FINISH) {
+    elog(ERROR, "SPI_finish failed with error code %d", rc);
+  }
+
+  PopActiveSnapshot();
+
+  error_context_stack = errcallback.previous;
 }
 
 /*
