@@ -402,5 +402,25 @@ ERROR:  permission denied to set parameter "supautils.default_extension_install_
 reset role;
 \echo
 
+set role extensions_role;
+-- Test with only one normal schema in search path
+set search_path to 'public';
+create extension amcheck;
+NOTICE:  amcheck before-create.sql firing, search_path: extensions, public, pg_temp
+NOTICE:  amcheck after-create.sql firing, search_path: extensions, public, pg_temp
+drop extension amcheck;
+-- Test with pg_catalog in search path explicitly
+set search_path to 'pg_catalog';
+create extension amcheck;
+NOTICE:  amcheck before-create.sql firing, search_path: extensions, pg_temp
+NOTICE:  amcheck after-create.sql firing, search_path: extensions, pg_temp
+drop extension amcheck;
+-- Test with pg_catalog and pg_temp in correct order
+set search_path to 'pg_catalog', 'pg_temp';
+create extension amcheck;
+NOTICE:  amcheck before-create.sql firing, search_path: extensions, pg_temp
+NOTICE:  amcheck after-create.sql firing, search_path: extensions, pg_temp
+drop extension amcheck;
+reset role;
 -- cleanup
 drop schema extensions;

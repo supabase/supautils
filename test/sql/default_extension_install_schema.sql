@@ -191,5 +191,24 @@ set supautils.default_extension_install_schema to 'public';
 reset role;
 \echo
 
+set role extensions_role;
+
+-- Test with only one normal schema in search path
+set search_path to 'public';
+create extension amcheck;
+drop extension amcheck;
+
+-- Test with pg_catalog in search path explicitly
+set search_path to 'pg_catalog';
+create extension amcheck;
+drop extension amcheck;
+
+-- Test with pg_catalog and pg_temp in correct order
+set search_path to 'pg_catalog', 'pg_temp';
+create extension amcheck;
+drop extension amcheck;
+
+reset role;
+
 -- cleanup
 drop schema extensions;

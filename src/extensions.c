@@ -1,8 +1,10 @@
 #include "extensions.h"
 
+#include "catalog/namespace.h"
 #include "extension_custom_scripts.h"
 #include "privileged_extensions.h"
 #include "utils.h"
+#include <nodes/pg_list.h>
 
 static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
                                             List                   *options,
@@ -59,6 +61,50 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 }
 
 /*
+ * Sanitize search path. Essential when using RUN_ELEVATED to prevent
+ * untrusted code from executing. Please note that the final step of
+ * sanitization should be to add pg_temp to the end of a search path. pg_temp
+ * does not have its own OID so it is not appeneded in this function.
+ *
+ * example sanitizations:
+ * pg_catalog -> pg_catalog
+ * pg_temp, pg_catalog -> pg_temp
+ * public, pg_catalog -> public
+ * public, pg_catalog, pg_temp -> public, pg_temp
+ *
+ */
+static List *sanitize_search_path(List *search_path) {
+
+  List     *sanitized_search_path = NIL;
+  ListCell *lc;
+  Oid       reqschema;
+  char     *reqname;
+
+  /* Ensure at leaat one item on search path */
+  if (search_path == NIL) return NIL;
+
+  /*
+   * If pg_catalog is the first item in search path allow that to be added to
+   * sanitized search path.
+   */
+  reqschema = lfirst_oid(list_head(search_path));
+  reqname   = get_namespace_name(reqschema);
+  if (reqname && strcmp(reqname, "pg_catalog") == 0)
+    sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
+
+  /* loop through and add only non pg_catalog entries to search_path */
+  foreach (lc, search_path) {
+    reqschema = lfirst_oid(lc);
+    reqname   = get_namespace_name(reqschema);
+    if (reqname && strcmp(reqname, "pg_catalog") != 0) {
+      sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
+    }
+  }
+
+  return sanitized_search_path;
+}
+
+/*
  * CREATE EXTENSION <extension>
  */
 static bool create_extension(CreateExtensionStmt     *stmt,
@@ -68,6 +114,10 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // the PG_TRY inside RUN_ELEVATED and never read in the catch path. it only
   // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
   volatile int save_nestlevel = 0;
+  ListCell    *lc;
+
+  StringInfoData pathbuf;
+  initStringInfo(&pathbuf);
 
   bool excalate_privs =
       is_current_role_privileged(policy->privileged_role) || superuser();
@@ -80,19 +130,30 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // postgres only falls back to search_path. saved and restored via a GUC
   // nest level, same as core's execute_extension_script, so on error the
   // change is rolled back with the transaction.
+
+  save_nestlevel    = NewGUCNestLevel();
+  List *search_path = fetch_search_path(false);
+
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
-    const char *current = GetConfigOption("search_path", true, false);
 
-    save_nestlevel = NewGUCNestLevel();
-    (void)set_config_option(
-        "search_path",
-        (current == NULL || current[0] == '\0')
-            ? quote_identifier(policy->default_schema)
-            : psprintf("%s, %s", quote_identifier(policy->default_schema),
-                       current),
-        PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
+    search_path =
+        lcons_oid(get_namespace_oid(policy->default_schema, true), search_path);
   }
+
+  if (excalate_privs) search_path = sanitize_search_path(search_path);
+
+  foreach (lc, search_path) {
+    Oid   reqschema = lfirst_oid(lc);
+    char *reqname   = get_namespace_name(reqschema);
+
+    appendStringInfo(&pathbuf, "%s, ", quote_identifier(reqname));
+  }
+
+  appendStringInfo(&pathbuf, "%s", quote_identifier("pg_temp"));
+
+  (void)set_config_option("search_path", pathbuf.data, PGC_USERSET,
+                          PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
 
   if (excalate_privs) {
     RUN_ELEVATED(policy->superuser,
