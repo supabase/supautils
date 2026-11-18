@@ -95,6 +95,7 @@ echo "do \$\$
         perform set_config('search_path', 'public', false);
       end \$\$;" > "$TMPDIR/extension-custom-scripts/intarray/before-create.sql"
 
+<<<<<<< HEAD
 # Self-recursion: bloom extension's before-create.sql creates itself
 mkdir -p "$TMPDIR/extension-custom-scripts/bloom"
 echo "do \$\$
@@ -154,3 +155,14 @@ echo "do \$\$
       begin
         raise notice 'tsm_system_rows''s after-create.sql running';
       end \$\$;" > "$TMPDIR/extension-custom-scripts/tsm_system_rows/after-create.sql"
+
+mkdir -p "$TMPDIR/extension-custom-scripts/amcheck"
+echo  "do \$\$
+      begin
+      raise notice 'amcheck before-create.sql firing, search_path: %', current_setting('search_path');
+end \$\$;" > "$TMPDIR/extension-custom-scripts/amcheck/before-create.sql"
+
+echo  "do \$\$
+      begin
+      raise notice 'amcheck after-create.sql firing, search_path: %', current_setting('search_path');
+end \$\$;" > "$TMPDIR/extension-custom-scripts/amcheck/after-create.sql"

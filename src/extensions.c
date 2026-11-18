@@ -1,8 +1,10 @@
 #include "extensions.h"
 
+#include "catalog/namespace.h"
 #include "extension_custom_scripts.h"
 #include "privileged_extensions.h"
 #include "utils.h"
+#include <nodes/pg_list.h>
 
 static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
                                             List                   *options,
@@ -58,6 +60,21 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
   return options;
 }
 
+static List *get_sanitized_search_path(void) {
+  List     *current_search_path   = fetch_search_path(false);
+  List     *sanitized_search_path = NIL;
+  ListCell *lc;
+  foreach (lc, current_search_path) {
+    Oid   reqschema = lfirst_oid(lc);
+    char *reqname   = get_namespace_name(reqschema);
+    if (reqname && strcmp(reqname, "pg_catalog") != 0) {
+      sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
+    }
+  }
+
+  return sanitized_search_path;
+}
+
 /*
  * CREATE EXTENSION <extension>
  */
@@ -68,6 +85,12 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // the PG_TRY inside RUN_ELEVATED and never read in the catch path. it only
   // silences gcc's conservative -Wclobbered, which errors under -Werror in CI
   volatile int save_nestlevel = 0;
+  ListCell    *lc;
+
+  StringInfoData pathbuf;
+  initStringInfo(&pathbuf);
+
+  List *sanitized_search_path;
 
   bool excalate_privs =
       is_current_role_privileged(policy->privileged_role) || superuser();
@@ -80,18 +103,31 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // postgres only falls back to search_path. saved and restored via a GUC
   // nest level, same as core's execute_extension_script, so on error the
   // change is rolled back with the transaction.
-  if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
-      OidIsValid(get_namespace_oid(policy->default_schema, true))) {
-    const char *current = GetConfigOption("search_path", true, false);
 
-    save_nestlevel = NewGUCNestLevel();
-    (void)set_config_option(
-        "search_path",
-        (current == NULL || current[0] == '\0')
-            ? quote_identifier(policy->default_schema)
-            : psprintf("%s, %s", quote_identifier(policy->default_schema),
-                       current),
-        PGC_USERSET, PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
+  save_nestlevel = NewGUCNestLevel();
+  if (excalate_privs) {
+
+    sanitized_search_path = get_sanitized_search_path();
+
+    if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
+        OidIsValid(get_namespace_oid(policy->default_schema, true))) {
+
+      sanitized_search_path =
+          lcons_oid(get_namespace_oid(policy->default_schema, true),
+                    sanitized_search_path);
+    }
+
+    foreach (lc, sanitized_search_path) {
+      Oid   reqschema = lfirst_oid(lc);
+      char *reqname   = get_namespace_name(reqschema);
+
+      appendStringInfo(&pathbuf, "%s, ", quote_identifier(reqname));
+    }
+
+    appendStringInfo(&pathbuf, "%s", quote_identifier("pg_temp"));
+
+    (void)set_config_option("search_path", pathbuf.data, PGC_USERSET,
+                            PGC_S_SESSION, GUC_ACTION_SAVE, true, 0, false);
   }
 
   if (excalate_privs) {
