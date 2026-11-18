@@ -77,6 +77,8 @@ static List *sanitize_search_path(List *search_path) {
 
   List     *sanitized_search_path = NIL;
   ListCell *lc;
+  Oid   reqschema;
+  char *reqname;
 
   /* Ensure at leaat one item on search path */
   if (search_path == NIL)
@@ -86,15 +88,15 @@ static List *sanitize_search_path(List *search_path) {
    * If pg_catalog is the first item in search path allow that to be added to 
    * sanitized search path.
    */
-  Oid   reqschema = lfirst_oid(list_head(search_path));
-  char *reqname   = get_namespace_name(reqschema);
+  reqschema = lfirst_oid(list_head(search_path));
+  reqname   = get_namespace_name(reqschema);
   if (reqname && strcmp(reqname, "pg_catalog") == 0)
 	  sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
 
   /* loop through and add only non pg_catalog entries to search_path */
   foreach (lc, search_path) {
-    Oid   reqschema = lfirst_oid(lc);
-    char *reqname   = get_namespace_name(reqschema);
+    reqschema = lfirst_oid(lc);
+    reqname   = get_namespace_name(reqschema);
     if (reqname && strcmp(reqname, "pg_catalog") != 0) {
       sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
     }
