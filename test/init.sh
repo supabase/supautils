@@ -95,7 +95,6 @@ echo "do \$\$
         perform set_config('search_path', 'public', false);
       end \$\$;" > "$TMPDIR/extension-custom-scripts/intarray/before-create.sql"
 
-<<<<<<< HEAD
 # Self-recursion: bloom extension's before-create.sql creates itself
 mkdir -p "$TMPDIR/extension-custom-scripts/bloom"
 echo "do \$\$
