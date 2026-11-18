@@ -61,10 +61,10 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
 }
 
 /*
- * Sanitize search path. Essential when using RUN_ELEVATED to prevent 
- * untrusted code from executing. Please note that the final step of sanitization
- * should be to add pg_temp to the end of a search path. pg_temp does not have its own 
- * OID so it is not appeneded in this function.
+ * Sanitize search path. Essential when using RUN_ELEVATED to prevent
+ * untrusted code from executing. Please note that the final step of
+ * sanitization should be to add pg_temp to the end of a search path. pg_temp
+ * does not have its own OID so it is not appeneded in this function.
  *
  * example sanitizations:
  * pg_catalog -> pg_catalog
@@ -77,21 +77,20 @@ static List *sanitize_search_path(List *search_path) {
 
   List     *sanitized_search_path = NIL;
   ListCell *lc;
-  Oid   reqschema;
-  char *reqname;
+  Oid       reqschema;
+  char     *reqname;
 
   /* Ensure at leaat one item on search path */
-  if (search_path == NIL)
-	  return NIL;
+  if (search_path == NIL) return NIL;
 
   /*
-   * If pg_catalog is the first item in search path allow that to be added to 
+   * If pg_catalog is the first item in search path allow that to be added to
    * sanitized search path.
    */
   reqschema = lfirst_oid(list_head(search_path));
   reqname   = get_namespace_name(reqschema);
   if (reqname && strcmp(reqname, "pg_catalog") == 0)
-	  sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
+    sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
 
   /* loop through and add only non pg_catalog entries to search_path */
   foreach (lc, search_path) {
@@ -132,18 +131,17 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // nest level, same as core's execute_extension_script, so on error the
   // change is rolled back with the transaction.
 
-  save_nestlevel = NewGUCNestLevel();
-  List     *search_path   = fetch_search_path(false);
+  save_nestlevel    = NewGUCNestLevel();
+  List *search_path = fetch_search_path(false);
 
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
 
-    search_path = lcons_oid(
-        get_namespace_oid(policy->default_schema, true), search_path);
+    search_path =
+        lcons_oid(get_namespace_oid(policy->default_schema, true), search_path);
   }
-  
-  if (excalate_privs)
-    search_path = sanitize_search_path(search_path);
+
+  if (excalate_privs) search_path = sanitize_search_path(search_path);
 
   foreach (lc, search_path) {
     Oid   reqschema = lfirst_oid(lc);
