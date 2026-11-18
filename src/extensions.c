@@ -60,11 +60,39 @@ static List *restrict_version_specification(extension_stmt_kind     stmt_kind,
   return options;
 }
 
-static List *get_sanitized_search_path(void) {
-  List     *current_search_path   = fetch_search_path(false);
+/*
+ * Sanitize search path. Essential when using RUN_ELEVATED to prevent 
+ * untrusted code from executing. Please note that the final step of sanitization
+ * should be to add pg_temp to the end of a search path. pg_temp does not have its own 
+ * OID so it is not appeneded in this function.
+ *
+ * example sanitizations:
+ * pg_catalog -> pg_catalog
+ * pg_temp, pg_catalog -> pg_temp
+ * public, pg_catalog -> public
+ * public, pg_catalog, pg_temp -> public, pg_temp
+ *
+ */
+static List *sanitize_search_path(List *search_path) {
+
   List     *sanitized_search_path = NIL;
   ListCell *lc;
-  foreach (lc, current_search_path) {
+
+  /* Ensure at leaat one item on search path */
+  if (search_path == NIL)
+	  return NIL;
+
+  /*
+   * If pg_catalog is the first item in search path allow that to be added to 
+   * sanitized search path.
+   */
+  Oid   reqschema = lfirst_oid(list_head(search_path));
+  char *reqname   = get_namespace_name(reqschema);
+  if (reqname && strcmp(reqname, "pg_catalog") == 0)
+	  sanitized_search_path = lappend_oid(sanitized_search_path, reqschema);
+
+  /* loop through and add only non pg_catalog entries to search_path */
+  foreach (lc, search_path) {
     Oid   reqschema = lfirst_oid(lc);
     char *reqname   = get_namespace_name(reqschema);
     if (reqname && strcmp(reqname, "pg_catalog") != 0) {
@@ -90,8 +118,6 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   StringInfoData pathbuf;
   initStringInfo(&pathbuf);
 
-  List *sanitized_search_path;
-
   bool excalate_privs =
       is_current_role_privileged(policy->privileged_role) || superuser();
 
@@ -105,20 +131,19 @@ static bool create_extension(CreateExtensionStmt     *stmt,
   // change is rolled back with the transaction.
 
   save_nestlevel = NewGUCNestLevel();
-  if (excalate_privs) {
-    sanitized_search_path = get_sanitized_search_path();
-  } else {
-    sanitized_search_path = NIL;
-  }
+  List     *search_path   = fetch_search_path(false);
 
   if (policy->default_schema != NULL && policy->default_schema[0] != '\0' &&
       OidIsValid(get_namespace_oid(policy->default_schema, true))) {
 
-    sanitized_search_path = lcons_oid(
-        get_namespace_oid(policy->default_schema, true), sanitized_search_path);
+    search_path = lcons_oid(
+        get_namespace_oid(policy->default_schema, true), search_path);
   }
+  
+  if (excalate_privs)
+    search_path = sanitize_search_path(search_path);
 
-  foreach (lc, sanitized_search_path) {
+  foreach (lc, search_path) {
     Oid   reqschema = lfirst_oid(lc);
     char *reqname   = get_namespace_name(reqschema);
 
