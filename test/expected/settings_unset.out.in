@@ -1,0 +1,173 @@
+-- what this test is about:
+-- supautils only acts when its settings are configured. with nothing
+-- configured every hook should fall through and let core handle the
+-- statement, this test makes sure of that.
+--
+-- how it works:
+-- 1. save the current values of the settings with \gset so they can be
+--    restored at the end
+-- 2. alter system reset each one so they go back to their defaults, reload
+--    and reconnect so the new session sees the defaults
+-- 3. run the statements the hooks intercept (alter role, create role, grant,
+--    create extension, create policy, set, create publication) as nonsuper
+--    and then as privileged_role. the errors in the output should be the
+--    ones core gives, no supautils error or hint should show up
+-- 4. put the settings back and reconnect so the next test runs with the
+--    usual config
+create table settings_unset_t (id int);
+select current_setting('supautils.reserved_roles') as reserved_roles, current_setting('supautils.reserved_memberships') as reserved_memberships, current_setting('supautils.privileged_role') as privileged_role, current_setting('supautils.privileged_role_allowed_configs') as privileged_role_allowed_configs, current_setting('supautils.privileged_extensions') as privileged_extensions, current_setting('supautils.policy_grants') as policy_grants, current_setting('supautils.drop_trigger_grants') as drop_trigger_grants, current_setting('supautils.restrict_extension_versions') as restrict_extension_versions \gset
+alter system reset supautils.reserved_roles;
+alter system reset supautils.reserved_memberships;
+alter system reset supautils.privileged_role;
+alter system reset supautils.privileged_role_allowed_configs;
+alter system reset supautils.privileged_extensions;
+alter system reset supautils.policy_grants;
+alter system reset supautils.drop_trigger_grants;
+alter system reset supautils.restrict_extension_versions;
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+-- reconnect, pg_reload_conf only signals the backends and the change
+-- may not be picked up before the next statement runs
+\c
+-- every setting should now come from its default
+select name, source
+from pg_settings
+where name in (
+    'supautils.reserved_roles',
+    'supautils.reserved_memberships',
+    'supautils.privileged_role',
+    'supautils.privileged_role_allowed_configs',
+    'supautils.privileged_extensions',
+    'supautils.policy_grants',
+    'supautils.drop_trigger_grants',
+    'supautils.restrict_extension_versions')
+order by name;
+                   name                    | source  
+-------------------------------------------+---------
+ supautils.drop_trigger_grants             | default
+ supautils.policy_grants                   | default
+ supautils.privileged_extensions           | default
+ supautils.privileged_role                 | default
+ supautils.privileged_role_allowed_configs | default
+ supautils.reserved_memberships            | default
+ supautils.reserved_roles                  | default
+ supautils.restrict_extension_versions     | default
+(8 rows)
+
+set role nonsuper;
+alter role anon nologin;
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  permission denied
+</PG_GE_14>
+alter role anon set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  permission denied
+</PG_GE_14>
+create role settings_unset_member in role anon;
+ERROR:  permission denied to create role
+<PG_GE_16>
+DETAIL:  Only roles with the CREATEROLE attribute may create roles.
+</PG_GE_16>
+grant pg_read_server_files to nonsuper;
+<PG_GE_16>
+ERROR:  permission denied to grant role "pg_read_server_files"
+DETAIL:  Only roles with the ADMIN option on role "pg_read_server_files" may grant this role.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must have admin option on role "pg_read_server_files"
+</PG_GE_14>
+create extension postgres_fdw;
+ERROR:  permission denied to create extension "postgres_fdw"
+HINT:  Must be superuser to create this extension.
+create policy p on settings_unset_t using (true);
+ERROR:  must be owner of table settings_unset_t
+set session_replication_role = 'replica';
+ERROR:  permission denied to set parameter "session_replication_role"
+create publication settings_unset_pub for table settings_unset_t;
+ERROR:  must be owner of table settings_unset_t
+reset role;
+set role privileged_role;
+alter role anon nologin;
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+alter role anon set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter role
+DETAIL:  Only roles with the CREATEROLE attribute and the ADMIN option on role "anon" may alter this role.
+</PG_GE_16>
+create role settings_unset_member in role anon;
+<PG_GE_16>
+ERROR:  permission denied to grant role "anon"
+DETAIL:  Only roles with the ADMIN option on role "anon" may grant this role.
+</PG_GE_16>
+grant pg_read_server_files to privileged_role;
+<PG_GE_16>
+ERROR:  permission denied to grant role "pg_read_server_files"
+DETAIL:  Only roles with the ADMIN option on role "pg_read_server_files" may grant this role.
+</PG_GE_16>
+create extension postgres_fdw;
+ERROR:  permission denied to create extension "postgres_fdw"
+HINT:  Must be superuser to create this extension.
+create policy p on settings_unset_t using (true);
+ERROR:  must be owner of table settings_unset_t
+set session_replication_role = 'replica';
+ERROR:  permission denied to set parameter "session_replication_role"
+create publication settings_unset_pub for table settings_unset_t;
+ERROR:  permission denied for database contrib_regression
+reset role;
+alter system set supautils.reserved_roles = :'reserved_roles';
+alter system set supautils.reserved_memberships = :'reserved_memberships';
+alter system set supautils.privileged_role = :'privileged_role';
+alter system set supautils.privileged_role_allowed_configs = :'privileged_role_allowed_configs';
+alter system set supautils.privileged_extensions = :'privileged_extensions';
+alter system set supautils.policy_grants = :'policy_grants';
+alter system set supautils.drop_trigger_grants = :'drop_trigger_grants';
+alter system set supautils.restrict_extension_versions = :'restrict_extension_versions';
+select pg_reload_conf();
+ pg_reload_conf 
+----------------
+ t
+(1 row)
+
+-- reconnect so the restored values are picked up
+\c
+-- and back from the config file after the restore
+select name, source
+from pg_settings
+where name in (
+    'supautils.reserved_roles',
+    'supautils.reserved_memberships',
+    'supautils.privileged_role',
+    'supautils.privileged_role_allowed_configs',
+    'supautils.privileged_extensions',
+    'supautils.policy_grants',
+    'supautils.drop_trigger_grants',
+    'supautils.restrict_extension_versions')
+order by name;
+                   name                    |       source       
+-------------------------------------------+--------------------
+ supautils.drop_trigger_grants             | configuration file
+ supautils.policy_grants                   | configuration file
+ supautils.privileged_extensions           | configuration file
+ supautils.privileged_role                 | configuration file
+ supautils.privileged_role_allowed_configs | configuration file
+ supautils.reserved_memberships            | configuration file
+ supautils.reserved_roles                  | configuration file
+ supautils.restrict_extension_versions     | configuration file
+(8 rows)
+
+drop table settings_unset_t;

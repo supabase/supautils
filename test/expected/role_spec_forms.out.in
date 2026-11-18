@@ -1,0 +1,71 @@
+-- ALTER ROLE ALL names no single role, so there is nothing for the role policy
+-- to check; the statements must fall through to core's own permission checks.
+-- The IN DATABASE form is not exercised anywhere else.
+set role nonsuper;
+alter role all set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter user all set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter role all in database contrib_regression set statement_timeout = '1s';
+ERROR:  must be owner of database contrib_regression
+alter role all reset statement_timeout;
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter role all reset all;
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter role nonsuper in database contrib_regression reset statement_timeout;
+alter role anon in database contrib_regression set statement_timeout = '1s';
+ERROR:  "anon" is a reserved role, only superusers can modify it
+-- privileged_role is not a superuser either
+set role privileged_role;
+alter role all set statement_timeout = '1s';
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter role all in database contrib_regression reset all;
+ERROR:  must be owner of database contrib_regression
+alter role all reset all;
+<PG_GE_16>
+ERROR:  permission denied to alter setting
+DETAIL:  Only roles with the SUPERUSER attribute may alter settings globally.
+</PG_GE_16>
+<PG_GE_14>
+ERROR:  must be superuser to alter settings globally
+</PG_GE_14>
+alter role anon in database contrib_regression set statement_timeout = '1s';
+ERROR:  "anon" is a reserved role, only superusers can modify it
+reset role;
+-- the session is still usable
+select 1 as alive;
+ alive 
+-------
+     1
+(1 row)
+

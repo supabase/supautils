@@ -1,3 +1,23 @@
+-- settings are set via alter system and not init.conf. settings_unset.sql
+-- needs every supautils setting back at its default to check the hooks
+-- do nothing when nothing is configured. reset on a value coming from a
+-- config file only goes back to the file value, alter system reset goes
+-- all the way to the default. extension_custom_scripts_path stays in
+-- init.conf because xpg replaces @TMPDIR@ only there
+alter system set supautils.reserved_roles = 'supabase_storage_admin, anon, reserved_but_not_yet_created, authenticator*';
+alter system set supautils.reserved_memberships = 'pg_read_server_files,pg_write_server_files,pg_execute_server_program,role_with_reserved_membership';
+alter system set supautils.privileged_extensions = 'autoinc, citext, hstore, sslinfo, insert_username, dict_xsyn, postgres_fdw, pageinspect, plls, no_control_file_extension, dblink, ltree, unaccent, tablefunc, tcn';
+alter system set supautils.privileged_role = 'privileged_role';
+alter system set supautils.privileged_role_allowed_configs = 'session_replication_role, pgrst.*, other.nested.*';
+alter system set supautils.hint_roles = 'hint_role';
+alter system set supautils.placeholders = 'response.headers, another.placeholder';
+alter system set supautils.placeholders_disallowed_values = '"content-type","x-special-header",special-value';
+alter system set supautils.extensions_parameter_overrides = '{"sslinfo":{"schema":"pg_catalog"}}';
+alter system set supautils.drop_trigger_grants = '{"privileged_role":["allow_drop_triggers.my_table"]}';
+alter system set supautils.policy_grants = '{"privileged_role":["allow_policies_other.other_table","allow_policies.my_table","allow_policies.nonexistent_table"]}';
+alter system set supautils.restrict_extension_versions = 'error';
+select pg_reload_conf();
+
 -- reserved roles
 create role supabase_storage_admin noinherit;
 create role anon noinherit;
