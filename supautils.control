@@ -1,0 +1,4 @@
+comment = 'Supauser'
+default_version = '4.2.0'
+relocatable = false
+module_pathname = '$libdir/supautils'

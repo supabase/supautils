@@ -17,8 +17,15 @@ ifeq ($(COVERAGE), 1)
 PG_CFLAGS += --coverage
 endif
 
+DATA = $(wildcard sql/*--*.sql)
+
 MODULE_big = supautils
-MODVERSION = 4.0.1
+MODVERSION = 4.2.0
+
+$(MODULE_big).control: $(MODULE_big).control.in
+	sed "s/@EXTVERSION@/$(MODVERSION)/g" $(MODULE_big).control.in > $@
+
+EXTRA_CLEAN = $(MODULE_big).control
 
 SRC_DIR = src
 
@@ -91,7 +98,11 @@ else
 OBJS = $(patsubst $(SRC_DIR)/%.c, src/%.o, $(SRC)) # if no BUILD_DIR, just build on src so standard PGXS `make` works
 endif
 
-build: $(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX) test/init.conf
+build: $(BUILD_DIR)/$(MODULE_big).$(DL_SUFFIX) test/init.conf $(MODULE_big).control
+	mkdir -p $(BUILD_DIR)/extension
+	cp $(MODULE_big).control $(BUILD_DIR)/extension
+	cp sql/*.sql $(BUILD_DIR)/extension
+	echo "*" > $(BUILD_DIR)/.gitignore
 
 .PHONY: test/init.conf
 test/init.conf: test/init.conf.in
@@ -211,3 +222,5 @@ test-startup:
 test:
 	make installcheck
 	make test-startup
+
+all: $(EXTENSION).control

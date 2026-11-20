@@ -46,6 +46,12 @@
 #include <utils/snapmgr.h>
 #include <utils/syscache.h>
 #include <utils/varlena.h>
+#include "access/htup_details.h"
+#include "funcapi.h"
+#include "pgstat.h"
+#include "utils/builtins.h"
+#include "utils/pgstat_internal.h"
+#include "utils/timestamp.h"
 
 #pragma GCC diagnostic pop
 

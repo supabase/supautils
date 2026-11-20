@@ -12,6 +12,9 @@
 #include <utils/acl.h>
 #include <utils/queryenvironment.h>
 
+#include "pgstat.h"
+#include "supautils_pgstat.h"
+
 /**
  * Run the statements in `...` with the current user and security context set
  * to `uid` and `sec_context`, then restore the caller's, whether the body
@@ -45,6 +48,7 @@
  * context, then restore the caller's role.
  */
 #define RUN_ELEVATED(superuser, ...)                                           \
+  stats_run_elevated_update();                                                  \
   do {                                                                         \
     Oid _uid;                                                                  \
     int _sec_context;                                                          \

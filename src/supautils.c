@@ -1,5 +1,6 @@
 #include "pg_prelude.h"
 
+#include "supautils_pgstat.h"
 #include "drop_trigger_grants.h"
 #include "event_triggers.h"
 #include "extension_custom_scripts.h"
@@ -93,6 +94,7 @@ static void supautils_executor_start(QueryDesc *queryDesc, int eflags);
 #endif
 
 PlannedStmt *supautils_planner(PLANNER_ARGS_DEF);
+
 
 // the hook will only be attached to functions that `RETURN event_trigger`
 static bool supautils_needs_fmgr_hook(Oid functionId) {
@@ -817,6 +819,8 @@ void _PG_init(void) {
     }
     list_free(comma_separated_list);
   }
+
+  supautils_register_stats();
 
   EmitWarningsOnPlaceholders("supautils");
 }
