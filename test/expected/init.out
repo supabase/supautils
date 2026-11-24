@@ -1,7 +1,6 @@
 -- reserved roles
 create role supabase_storage_admin noinherit;
 create role anon noinherit;
-
 -- login role
 create user rolecreator createrole createdb noinherit nosuperuser;
 grant anon to rolecreator with admin option;
@@ -9,7 +8,6 @@ grant pg_monitor to rolecreator with admin option;
 grant pg_read_all_settings to rolecreator with admin option;
 grant pg_read_all_stats to rolecreator with admin option;
 grant supabase_storage_admin to rolecreator;
-
 -- other roles
 create role fake noinherit;
 create role privileged_role login createrole bypassrls replication;
@@ -19,13 +17,11 @@ grant testme to privileged_role with admin option;
 create role authenticator login noinherit;
 grant authenticator to privileged_role with admin option;
 grant all on database postgres to privileged_role;
-
 -- non-superuser extensions role
 create role extensions_role login nosuperuser;
 grant privileged_role to extensions_role with admin option;
 grant all on database contrib_regression, postgres to extensions_role;
 alter default privileges for role postgres in schema public grant all on tables to extensions_role;
-
 -- non-superuser that should be unaffected by extension logic when creating db objects
 create user nonsuper nosuperuser;
 grant all privileges on database contrib_regression to nonsuper;
@@ -34,15 +30,12 @@ grant all on schema public to nonsuper;
 \c postgres
 grant all on schema public to nonsuper;
 grant all privileges on database postgres to nonsuper;
-
 -- non-superuser role configured as supautils.superuser for testing version restriction bypass
 -- Must be nosuperuser so the test exercises the supautils.superuser name comparison,
 -- not the superuser() early return.
 create role superuser_for_test nosuperuser login;
 grant all on database contrib_regression, postgres to superuser_for_test;
-
 \c contrib_regression
-
 -- starting from pg16 not every role can create objects on the public schema by default
 -- this makes the behavior backwards compat
 grant all on schema public to privileged_role;

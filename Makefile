@@ -61,10 +61,13 @@ ifeq ($(PG_NEQ18), 0)
 TESTS := $(filter-out test/sql/eq18_%.sql, $(TESTS))
 endif
 
+TESTS := $(filter-out test/sql/init.sql, $(TESTS))
+TESTS := test/sql/init.sql $(TESTS)
+
 REGRESS = $(patsubst test/sql/%.sql,%,$(TESTS))
 REGRESS_OPTS = --use-existing --inputdir=test
 
-GENERATED_OUT = test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out test/expected/ge18_supautils_version.out test/expected/lt18_supautils_version.out
+GENERATED_OUT = test/init.conf test/expected/event_triggers.out test/expected/permission_hints.out test/expected/privileged_role.out test/expected/ge18_supautils_version.out test/expected/lt18_supautils_version.out
 EXTRA_CLEAN = $(GENERATED_OUT)
 
 PGXS := $(shell $(PG_CONFIG) --pgxs)
@@ -210,4 +213,5 @@ test-startup:
 .PHONY: test
 test:
 	make installcheck
+
 	make test-startup
