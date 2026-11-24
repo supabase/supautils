@@ -6,7 +6,6 @@
 create role not_superuser nosuperuser nologin;
 set role not_superuser;
 \echo 
-
 -- Confirm that the user is not currently superuser
 select current_user, rolsuper
 from pg_roles

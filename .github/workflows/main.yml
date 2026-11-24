@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  rockylinux-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        container-image: ['rockylinux:9', 'rockylinux:8']
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run tests
+        run: ./build_docker.sh ${{ matrix.container-image }}
+
   test:
 
     runs-on: ubuntu-latest
