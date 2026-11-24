@@ -448,59 +448,94 @@ static void extensions_parameter_overrides_assign_hook(
   }
 }
 
+static void clear_policy_grants_array(policy_grants *target, size_t count) {
+  for (size_t i = 0; i < count; i++) {
+    if (target[i].role_name != NULL) pfree(target[i].role_name);
+    for (size_t j = 0; j < target[i].total_tables; j++) {
+      pfree(target[i].table_names[j]);
+    }
+  }
+  memset(target, 0, sizeof(policy_grants) * count);
+}
+
 static bool policy_grants_check_hook(char                            **newval,
                                      __attribute__((unused)) void    **extra,
                                      __attribute__((unused)) GucSource source) {
-  char *val = *newval;
+  if (*newval) {
+    policy_grants *tmp_pgs = palloc0(sizeof(policy_grants) * MAX_POLICY_GRANTS);
+    json_policy_grants_parse_state state =
+        parse_policy_grants(*newval, tmp_pgs);
 
-  for (size_t i = 0; i < total_pgs; i++) {
-    pfree(pgs[i].role_name);
-    for (size_t j = 0; j < pgs[i].total_tables; j++) {
-      pfree(pgs[i].table_names[j]);
-    }
-    pgs[i].total_tables = 0;
-  }
-  total_pgs = 0;
+    clear_policy_grants_array(tmp_pgs, MAX_POLICY_GRANTS);
+    pfree(tmp_pgs);
 
-  if (val) {
-    json_policy_grants_parse_state state = parse_policy_grants(val, pgs);
     if (state.error_msg) {
       ereport(ERROR, (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
                       errmsg("supautils.policy_grants: %s", state.error_msg)));
     }
-    total_pgs = state.total_pgs;
   }
 
   return true;
+}
+
+// the check hook already validated newval
+static void policy_grants_assign_hook(const char                   *newval,
+                                      __attribute__((unused)) void *extra) {
+  clear_policy_grants_array(pgs, MAX_POLICY_GRANTS);
+  total_pgs = 0;
+
+  if (newval) {
+    json_policy_grants_parse_state state = parse_policy_grants(newval, pgs);
+    total_pgs                            = state.total_pgs;
+  }
+}
+
+static void clear_drop_trigger_grants_array(drop_trigger_grants *target,
+                                            size_t               count) {
+  for (size_t i = 0; i < count; i++) {
+    if (target[i].role_name != NULL) pfree(target[i].role_name);
+    for (size_t j = 0; j < target[i].total_tables; j++) {
+      pfree(target[i].table_names[j]);
+    }
+  }
+  memset(target, 0, sizeof(drop_trigger_grants) * count);
 }
 
 static bool
 drop_trigger_grants_check_hook(char                            **newval,
                                __attribute__((unused)) void    **extra,
                                __attribute__((unused)) GucSource source) {
-  char *val = *newval;
-
-  for (size_t i = 0; i < total_dtgs; i++) {
-    pfree(dtgs[i].role_name);
-    for (size_t j = 0; j < dtgs[i].total_tables; j++) {
-      pfree(dtgs[i].table_names[j]);
-    }
-    dtgs[i].total_tables = 0;
-  }
-  total_dtgs = 0;
-
-  if (val) {
+  if (*newval) {
+    drop_trigger_grants *tmp_dtgs =
+        palloc0(sizeof(drop_trigger_grants) * MAX_DROP_TRIGGER_GRANTS);
     json_drop_trigger_grants_parse_state state =
-        parse_drop_trigger_grants(val, dtgs);
+        parse_drop_trigger_grants(*newval, tmp_dtgs);
+
+    clear_drop_trigger_grants_array(tmp_dtgs, MAX_DROP_TRIGGER_GRANTS);
+    pfree(tmp_dtgs);
+
     if (state.error_msg) {
       ereport(ERROR,
               (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
                errmsg("supautils.drop_trigger_grants: %s", state.error_msg)));
     }
-    total_dtgs = state.total_dtgs;
   }
 
   return true;
+}
+
+// the check hook already validated newval
+static void
+drop_trigger_grants_assign_hook(const char                   *newval,
+                                __attribute__((unused)) void *extra) {
+  clear_drop_trigger_grants_array(dtgs, MAX_DROP_TRIGGER_GRANTS);
+  total_dtgs = 0;
+
+  if (newval) {
+    json_drop_trigger_grants_parse_state state =
+        parse_drop_trigger_grants(newval, dtgs);
+    total_dtgs = state.total_dtgs;
+  }
 }
 
 static bool
@@ -777,12 +812,14 @@ void _PG_init(void) {
   DefineCustomStringVariable("supautils.drop_trigger_grants",
                              "Allow non-owners to drop triggers on tables",
                              NULL, &drop_trigger_grants_str, NULL, PGC_SIGHUP,
-                             0, &drop_trigger_grants_check_hook, NULL, NULL);
+                             0, &drop_trigger_grants_check_hook,
+                             &drop_trigger_grants_assign_hook, NULL);
 
   DefineCustomStringVariable("supautils.policy_grants",
                              "Allow non-owners to manage policies on tables",
                              NULL, &policy_grants_str, NULL, PGC_SIGHUP, 0,
-                             &policy_grants_check_hook, NULL, NULL);
+                             &policy_grants_check_hook,
+                             &policy_grants_assign_hook, NULL);
 
   DefineCustomEnumVariable(
       "supautils.restrict_extension_versions",
