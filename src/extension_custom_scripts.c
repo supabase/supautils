@@ -282,60 +282,65 @@ static void parse_statement_options(List *stmt_options, char **extschema,
 
 void run_global_before_create_script(
     char *extname, List *stmt_options,
-    const char *privileged_extensions_custom_scripts_path) {
+    const char *extension_custom_scripts_path) {
   char *extschema  = NULL;
   char *extversion = NULL;
   bool  extcascade = false;
   char  filename[MAXPGPATH];
+
+  if (extension_custom_scripts_path == NULL) return;
 
   parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/before-create.sql",
-           privileged_extensions_custom_scripts_path);
+           extension_custom_scripts_path);
   run_custom_script(filename, extname, extschema, extversion, extcascade);
 }
 
-void run_ext_before_create_script(
-    char *extname, List *stmt_options,
-    const char *privileged_extensions_custom_scripts_path) {
+void run_ext_before_create_script(char *extname, List *stmt_options,
+                                  const char *extension_custom_scripts_path) {
   char *extschema  = NULL;
   char *extversion = NULL;
   bool  extcascade = false;
   char  filename[MAXPGPATH];
+
+  if (extension_custom_scripts_path == NULL) return;
 
   parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/%s/before-create.sql",
-           privileged_extensions_custom_scripts_path, extname);
+           extension_custom_scripts_path, extname);
   run_custom_script(filename, extname, extschema, extversion, extcascade);
 }
 
-void run_ext_after_create_script(
-    char *extname, List *stmt_options,
-    const char *privileged_extensions_custom_scripts_path) {
+void run_ext_after_create_script(char *extname, List *stmt_options,
+                                 const char *extension_custom_scripts_path) {
   char *extschema  = NULL;
   char *extversion = NULL;
   bool  extcascade = false;
   char  filename[MAXPGPATH];
+
+  if (extension_custom_scripts_path == NULL) return;
 
   parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/%s/after-create.sql",
-           privileged_extensions_custom_scripts_path, extname);
+           extension_custom_scripts_path, extname);
   run_custom_script(filename, extname, extschema, extversion, extcascade);
 }
 
-void run_global_after_create_script(
-    char *extname, List *stmt_options,
-    const char *privileged_extensions_custom_scripts_path) {
+void run_global_after_create_script(char *extname, List *stmt_options,
+                                    const char *extension_custom_scripts_path) {
   char *extschema  = NULL;
   char *extversion = NULL;
   bool  extcascade = false;
   char  filename[MAXPGPATH];
 
+  if (extension_custom_scripts_path == NULL) return;
+
   parse_statement_options(stmt_options, &extschema, &extversion, &extcascade);
 
   snprintf(filename, MAXPGPATH, "%s/after-create.sql",
-           privileged_extensions_custom_scripts_path);
+           extension_custom_scripts_path);
   run_custom_script(filename, extname, extschema, extversion, extcascade);
 }
